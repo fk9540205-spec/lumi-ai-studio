@@ -767,6 +767,39 @@
     `;
   }
 
+  // --- Image Compression & Resizing (Keeps payload small & crystal-clear) ---
+  function compressAndReadImage(file) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let { width, height } = img;
+          const maxDim = 1024;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+          resolve(dataUrl);
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   // --- UI Components: Attachments, Personas, Export & HTML Modal ---
   function renderAttachmentChips() {
     if (attachedFiles.length === 0) return "";
@@ -776,7 +809,13 @@
           .map(
             (f, idx) => `
           <div class="attachment-chip">
-            <span>${f.isPdf ? "📑" : "📄"}</span>
+            ${
+              f.isImage && f.dataUrl
+                ? `<img src="${f.dataUrl}" class="size-4 object-cover rounded-xs inline-block" />`
+                : f.isPdf
+                ? "📑"
+                : "📄"
+            }
             <span class="attachment-chip-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
             <span class="text-[10px] text-muted-foreground">(${formatBytes(f.size)}${f.pages ? `, ${f.pages}p` : ""})</span>
             <button type="button" class="attachment-chip-remove" data-remove-attachment="${idx}" title="Remove file">✕</button>
@@ -1131,7 +1170,7 @@
                       ${
                         msg.attachedFiles && msg.attachedFiles.length > 0
                           ? `<div class="flex flex-wrap justify-end gap-1.5 mb-1">
-                              ${msg.attachedFiles.map(f => `<span class="attachment-chip text-[11px] py-0.5 px-2">📄 ${escapeHtml(f.name)} (${formatBytes(f.size)})</span>`).join('')}
+                              ${msg.attachedFiles.map(f => `<span class="attachment-chip text-[11px] py-0.5 px-2">${f.isImage && f.dataUrl ? `<img src="${f.dataUrl}" class="size-3.5 object-cover rounded-xs inline-block mr-1" />` : f.isPdf ? "📑 " : "📄 "}${escapeHtml(f.name)} (${formatBytes(f.size)})</span>`).join('')}
                             </div>`
                           : ""
                       }
@@ -1807,11 +1846,43 @@
       navigate(`/chat/${threadId}`);
     }
 
+    // Process Attached Files & Images Upfront
+    let imagePayload = null;
+    let fileContext = "";
+    let attachedList = [];
+    if (attachedFiles.length > 0) {
+      const imgFile = attachedFiles.find((f) => f.isImage);
+      if (imgFile) {
+        imagePayload = imgFile.dataUrl;
+      }
+      attachedList = attachedFiles.map((f) => ({
+        name: f.name,
+        size: f.size,
+        pages: f.pages || null,
+        isImage: f.isImage || false,
+        dataUrl: f.isImage ? f.dataUrl : null,
+      }));
+      const textFiles = attachedFiles.filter((f) => !f.isImage);
+      if (textFiles.length > 0) {
+        fileContext =
+          "\n\n[Attached User Files]:\n" +
+          textFiles
+            .map(
+              (f) =>
+                `--- File: ${f.name} (${formatBytes(f.size)}${f.pages ? `, ${f.pages} pages` : ""}) ---\n${f.content}\n--- End of File ---`
+            )
+            .join("\n\n");
+      }
+      attachedFiles = [];
+      updateAttachmentChipsUI();
+    }
+
     // Add User Message
     const userMsg = {
       id: "msg_" + Date.now().toString(36) + "_user",
       role: "user",
       content: prompt,
+      attachedFiles: attachedList.length > 0 ? attachedList : null,
       timestamp: Date.now(),
     };
     thread.messages.push(userMsg);
@@ -1838,7 +1909,7 @@
           ${
             userMsg.attachedFiles && userMsg.attachedFiles.length > 0
               ? `<div class="flex flex-wrap justify-end gap-1.5 mb-1">
-                  ${userMsg.attachedFiles.map(f => `<span class="attachment-chip text-[11px] py-0.5 px-2">📄 ${escapeHtml(f.name)} (${formatBytes(f.size)})</span>`).join('')}
+                  ${userMsg.attachedFiles.map(f => `<span class="attachment-chip text-[11px] py-0.5 px-2">${f.isImage && f.dataUrl ? `<img src="${f.dataUrl}" class="size-3.5 object-cover rounded-xs inline-block mr-1" />` : f.isPdf ? "📑 " : "📄 "}${escapeHtml(f.name)} (${formatBytes(f.size)})</span>`).join('')}
                 </div>`
               : ""
           }
@@ -1967,26 +2038,6 @@
       }
     }
 
-    // Process Attached Files
-    let fileContext = "";
-    if (attachedFiles.length > 0) {
-      userMsg.attachedFiles = attachedFiles.map((f) => ({
-        name: f.name,
-        size: f.size,
-        pages: f.pages || null,
-      }));
-      fileContext =
-        "\n\n[Attached User Files]:\n" +
-        attachedFiles
-          .map(
-            (f) =>
-              `--- File: ${f.name} (${formatBytes(f.size)}${f.pages ? `, ${f.pages} pages` : ""}) ---\n${f.content}\n--- End of File ---`
-          )
-          .join("\n\n");
-      attachedFiles = [];
-      render();
-    }
-
     // Start Streaming
     isStreaming = true;
     streamAbortController = new AbortController();
@@ -2040,6 +2091,7 @@
             body: JSON.stringify({
               model: selectedModel.model || "qwen-2.5-coder-32b",
               messages: chatHistory,
+              image: imagePayload,
               stream: true,
             }),
           });
@@ -2763,7 +2815,19 @@
         showToast(`Reading ${files.length} file(s)...`);
         for (const file of files) {
           try {
-            if (file.name.toLowerCase().endsWith(".pdf")) {
+            const isImg = /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name) || (file.type && file.type.startsWith("image/"));
+            if (isImg) {
+              const compressedB64 = await compressAndReadImage(file);
+              attachedFiles.push({
+                name: file.name,
+                size: file.size,
+                isImage: true,
+                dataUrl: compressedB64,
+                content: `[Attached Image: ${file.name}]`,
+              });
+              updateAttachmentChipsUI();
+              showToast(`✔ Attached image ${file.name}`);
+            } else if (file.name.toLowerCase().endsWith(".pdf")) {
               const reader = new FileReader();
               reader.onload = async (ev) => {
                 const b64 = ev.target.result;

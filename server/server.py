@@ -55,7 +55,7 @@ G4F_URL = os.environ.get("G4F_URL", "http://localhost:1337/v1").rstrip("/")
 GEMINI_WEB_URL = os.environ.get("GEMINI_WEB_URL", "http://localhost:4981/v1").rstrip("/")
 CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "*")
 RATE_LIMIT = int(os.environ.get("RATE_LIMIT", 60))
-MAX_BODY = 1048576  # 1MB
+MAX_BODY = 25 * 1024 * 1024  # 25MB for PDFs, images & multi-doc attachments
 
 # Root directory of web assets (parent of server/)
 WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -376,6 +376,49 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
         messages = data.get("messages", [])
         stream = data.get("stream", True)
+        image = data.get("image")
+
+        # 0. Multimodal Vision: If user uploaded an image, route to Gemini Vision
+        if image and G4F_AVAILABLE and _g4f_client:
+            try:
+                if stream:
+                    gen = _g4f_client.chat.completions.create(
+                        model="gemini",
+                        messages=messages,
+                        image=image,
+                        stream=True,
+                    )
+                    self._start_sse()
+                    for chunk in gen:
+                        c = ""
+                        if hasattr(chunk, "choices") and chunk.choices:
+                            c = getattr(chunk.choices[0].delta, "content", "") or ""
+                        if c:
+                            chunk_payload = {
+                                "choices": [{"index": 0, "delta": {"content": c}, "finish_reason": None}],
+                                "provider": "gemini-vision",
+                                "model": "gemini-vision",
+                            }
+                            self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                    self._send_chunk(b"data: [DONE]\n\n")
+                    self._end_chunks()
+                    return
+                else:
+                    response = _g4f_client.chat.completions.create(
+                        model="gemini",
+                        messages=messages,
+                        image=image,
+                        stream=False,
+                    )
+                    content = response.choices[0].message.content or ""
+                    self._json_response({
+                        "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+                        "provider": "gemini-vision",
+                        "model": "gemini-vision",
+                    })
+                    return
+            except Exception as vision_err:
+                sys.stderr.write(f"Vision streaming attempt failed: {vision_err}\n")
 
         # 1. Primary: In-process Cloudflare G4F Engine (Zero rate-limit, super fast)
         if G4F_AVAILABLE and _g4f_client:
