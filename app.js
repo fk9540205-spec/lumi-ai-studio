@@ -2169,9 +2169,10 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
     }
 
     // Default: OpenAI-compatible (works with Free AI Hub, GPT4Free, Duck.ai, Gemini Web, Ollama, Groq, etc.)
-    const backendOrigin = window.location.origin.includes(":3456")
-      ? window.location.origin
-      : "http://localhost:3456";
+    const backendOrigin =
+      window.location.origin && window.location.origin.startsWith("http")
+        ? window.location.origin
+        : "https://lumi-backend-v2-production.up.railway.app";
 
     let rawBase = (provider.base_url || "").trim().replace(/\/+$/, "");
     if (rawBase.startsWith("/")) {
@@ -2344,9 +2345,10 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
         );
       } else {
         // Built-in Real Free AI Streaming via backend /api/free/chat
-        const backendOrigin = window.location.origin.includes(":3456")
-          ? window.location.origin
-          : "http://localhost:3456";
+        const backendOrigin =
+          window.location.origin && window.location.origin.startsWith("http")
+            ? window.location.origin
+            : "https://lumi-backend-v2-production.up.railway.app";
 
         let streamedSuccessfully = false;
         try {
