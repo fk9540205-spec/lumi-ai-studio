@@ -294,6 +294,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_proxy_health(query)
         elif path == "/api/search":
             self._handle_search(query.get("q", ""))
+        elif path == "/api/fetch/url":
+            self._handle_fetch_url(query.get("url", ""))
         elif path.startswith("/api/"):
             self._error(404, f"API endpoint {path} not found")
         else:
@@ -319,6 +321,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_proxy_chat()
         elif path == "/api/run/python":
             self._handle_run_python()
+        elif path == "/api/extract/pdf":
+            self._handle_extract_pdf()
         elif path == "/api/export/zip":
             self._handle_export_zip()
         else:
@@ -992,6 +996,82 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 results.append({"title": f"Search: {q}", "snippet": f"Web search could not reach external engines: {str(e)}", "url": ""})
 
         self._json_response({"query": q, "results": results[:6]})
+
+    # -----------------------------------------------------------------------
+    # Web URL Reader & Scraper
+    # -----------------------------------------------------------------------
+    def _handle_fetch_url(self, target_url: str):
+        if not target_url.strip():
+            self._error(400, "Missing 'url' query parameter")
+            return
+        if not target_url.startswith(("http://", "https://")):
+            target_url = "https://" + target_url
+
+        try:
+            req = urllib.request.Request(
+                target_url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+            )
+            with urllib.request.urlopen(req, timeout=8, context=_get_ssl_context()) as resp:
+                raw_bytes = resp.read(1024 * 1024)
+                text = raw_bytes.decode("utf-8", errors="ignore")
+                import re, html
+                clean = re.sub(r"<(script|style|noscript|svg)[^>]*>[\s\S]*?</\1>", " ", text, flags=re.IGNORECASE)
+                title_match = re.search(r"<title[^>]*>(.*?)</title>", clean, flags=re.IGNORECASE | re.DOTALL)
+                page_title = html.unescape(title_match.group(1).strip()) if title_match else target_url
+                plain_text = re.sub(r"<[^>]+>", " ", clean)
+                plain_text = re.sub(r"\s+", " ", plain_text).strip()
+                excerpt = plain_text[:5000]
+
+                self._json_response({
+                    "url": target_url,
+                    "title": page_title,
+                    "content": excerpt,
+                    "length": len(excerpt)
+                })
+        except Exception as e:
+            self._error(500, f"Failed to fetch webpage: {str(e)}")
+
+    # -----------------------------------------------------------------------
+    # PDF Text Extraction (Real pypdf engine)
+    # -----------------------------------------------------------------------
+    def _handle_extract_pdf(self):
+        body = self._read_body()
+        if body is None:
+            return
+        try:
+            data = json.loads(body)
+        except Exception:
+            self._error(400, "Invalid JSON")
+            return
+
+        b64_data = data.get("base64", "")
+        if not b64_data:
+            self._error(400, "Missing base64 PDF data")
+            return
+
+        if "," in b64_data:
+            b64_data = b64_data.split(",", 1)[1]
+
+        try:
+            import base64, io
+            pdf_bytes = base64.b64decode(b64_data)
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            pages_text = []
+            for i, page in enumerate(reader.pages[:30]):
+                t = page.extract_text() or ""
+                if t.strip():
+                    pages_text.append(f"--- Page {i+1} ---\n" + t.strip())
+
+            full_text = "\n\n".join(pages_text)
+            self._json_response({
+                "pages": len(reader.pages),
+                "text": full_text[:12000],
+                "length": len(full_text)
+            })
+        except Exception as e:
+            self._error(500, f"Failed to extract PDF text: {str(e)}")
 
     # -----------------------------------------------------------------------
     # Python Code Runner (Secure Sandbox Subprocess)

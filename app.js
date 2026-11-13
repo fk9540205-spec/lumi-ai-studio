@@ -125,6 +125,11 @@
 
   // --- SVG Icons ---
   const ICONS = {
+    paperclip: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 17.96 8.8l-8.58 8.57a2 2 0 0 1-2.83-2.83l7.87-7.86"></path></svg>`,
+    persona: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+    export: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>`,
+    eye: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+
     arrowRight: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`,
     arrowLeft: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>`,
     messageSquarePlus: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path><path d="M12 8v6"></path><path d="M9 11h6"></path></svg>`,
@@ -182,10 +187,6 @@
   let searchQuery = "";
   let sidebarOpen = false;
   let modelMenuOpen = false;
-  let workspaceOpen = false;
-  let activeWorkspaceTab = "active_code"; // 'active_code' | 'diff' | 'appjs' | 'terminal' | 'preview'
-  let currentActiveCodeTask = null;
-  let expandedWorkSteps = {}; // messageId -> boolean
   let activeModal = null; // 'add-provider' | 'edit-provider' | null
   let editingProvider = null;
   let editingChatId = null;
@@ -194,16 +195,45 @@
   let streamAbortController = null;
   let pendingQueryText = ""; // query passed via URL search or suggestions
 
-  // Super-Feature States: Audio, Voice, Runner & Active Project
+  // Super-Feature States: Audio, Voice & Search
   let soundEnabled = loadJson("lumi_sound_enabled", true);
   let webSearchEnabled = loadJson("lumi_web_search_enabled", false);
   let isListening = false;
   let recognitionInstance = null;
   let currentlySpeakingId = null;
-  let terminalHistory = [
-    { type: "info", text: "🚀 Lumi Interactive Sandbox Terminal v2.0" },
-    { type: "info", text: "Connected to Python 3.13 Subprocess Sandbox on :3456" },
-  ];
+
+  // Real System Personas
+  const PERSONA_PROMPTS = {
+    general: "You are Lumi, an exceptionally intelligent, clear, and helpful AI assistant. Always provide accurate, well-structured, and thoughtful responses.",
+    engineer: "You are an elite Senior Staff Software Engineer. Focus on clean, modular, production-ready code, idiomatic architecture, robust error handling, edge cases, and peak performance. Provide complete, runnable code examples.",
+    dsa: "You are an expert Data Structures & Algorithms (DSA) and Coding Interview Coach. Explain problem-solving patterns intuitively, break down step-by-step algorithms, rigorously analyze Time & Space Complexity (Big-O), and write clean, optimal implementations.",
+    hindi: "Aap ek friendly aur bohot helpful AI sathi ho. Baat-cheet bilkul aasan aur natural Hindi / Hinglish mein karo. Har technical ya normal cheez ko saral shabdon mein samjhao jaise ek sacha dost samjhata hai.",
+    bughunter: "You are a Senior Code Auditor and Bug Hunter. Thoroughly inspect code for security vulnerabilities (XSS, SQLi, injection, logic bugs), race conditions, memory leaks, and edge cases. Offer concrete, minimal fixes.",
+    writer: "You are a master creative writer, storyteller, and copywriter. Craft vivid, compelling, engaging, and beautifully phrased prose with powerful narrative flow."
+  };
+
+  const PERSONA_LABELS = {
+    general: "🌟 General AI",
+    engineer: "💻 Senior Engineer",
+    dsa: "🧠 DSA Coach",
+    hindi: "🇮🇳 Hindi Companion",
+    bughunter: "🐛 Bug Hunter",
+    writer: "✍️ Creative Writer"
+  };
+
+  let activePersona = "general";
+  let personaMenuOpen = false;
+  let exportMenuOpen = false;
+  let attachedFiles = []; // [{ name, size, type, content, isPdf, pages }]
+  let activeHtmlModal = null; // code string for HTML preview modal
+
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  }
 
   // --- High-Tech Web Audio Synthesis (Zero external audio files) ---
   const AudioEffects = {
@@ -362,6 +392,20 @@
     return `<div class="markdown-table-wrapper"><table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`;
   }
 
+  // --- Real Code Syntax Highlighting & Tokenizer ---
+  function highlightCodeSyntax(code, lang) {
+    if (!code) return "";
+    let safe = escapeHtml(code);
+    safe = safe.replace(/(\/\*[\s\S]*?\*\/|\/\/.*$|#.*$)/gm, '<span class="tok-comment">$1</span>');
+    safe = safe.replace(/(&quot;.*?&quot;|&#39;.*?&#39;|`.*?`)/g, '<span class="tok-str">$1</span>');
+    safe = safe.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
+    const kwRegex = /\b(def|class|return|import|from|as|if|elif|else|for|while|try|except|finally|with|raise|lambda|async|await|const|let|var|function|new|switch|case|break|continue|default|typeof|instanceof|interface|type|public|private|protected|extends|implements|static|yield)\b/g;
+    safe = safe.replace(kwRegex, '<span class="tok-kw">$1</span>');
+    const typeRegex = /\b(int|float|str|bool|list|dict|set|tuple|void|Promise|Array|Object|String|Number|Boolean|null|undefined|None|True|False)\b/g;
+    safe = safe.replace(typeRegex, '<span class="tok-type">$1</span>');
+    return safe;
+  }
+
   // --- Markdown Parser with Code Block Copying & Math Support ---
   function renderMarkdown(content) {
     if (!content) return "";
@@ -378,21 +422,41 @@
       return `<span class="math-inline">${escapeHtml(math.trim())}</span>`;
     });
 
-    // 3. Fenced Code Blocks with Language Header & Copy Button
+    // 3. Fenced Code Blocks with IDE Syntax Highlighting, Sandbox Run & Copy
     const codeBlocks = [];
     text = text.replace(/```([a-zA-Z0-9_\-\.]*)\n([\s\S]*?)```/g, (match, lang, code) => {
       const id = "code-" + Math.random().toString(36).slice(2, 9);
-      const displayLang = lang.trim() || "code";
-      const escapedCode = escapeHtml(code.trim());
+      const cleanLang = (lang || "").trim().toLowerCase();
+      const displayLang = cleanLang || "code";
+      const rawCode = code.trim();
+      const highlighted = highlightCodeSyntax(rawCode, cleanLang);
+      const isPython = cleanLang === "python" || cleanLang === "py";
+      const isHtml = cleanLang === "html" || cleanLang.includes("html");
+
       const blockHtml = `
-        <div class="code-block-container" data-code-id="${id}">
+        <div class="code-block-container" id="container-${id}">
           <div class="code-block-header">
-            <span class="code-block-lang">${displayLang}</span>
-            <button type="button" class="code-copy-btn" data-copy-code="${escapeHtml(code.trim())}">
-              ${ICONS.copy} <span>Copy</span>
-            </button>
+            <span class="code-block-lang">${escapeHtml(displayLang)}</span>
+            <div class="code-block-actions">
+              ${
+                isPython
+                  ? `<button type="button" class="code-block-btn btn-run" data-run-py="${id}" title="Run Python code in live sandbox">
+                      ${ICONS.play} <span>Run</span>
+                    </button>`
+                  : isHtml
+                  ? `<button type="button" class="code-block-btn btn-preview" data-preview-html="${id}" title="Live HTML Preview">
+                      ${ICONS.eye} <span>Preview</span>
+                    </button>`
+                  : ""
+              }
+              <button type="button" class="code-block-btn" data-copy-code="${id}" title="Copy code">
+                ${ICONS.copy} <span>Copy</span>
+              </button>
+            </div>
           </div>
-          <pre><code>${escapedCode}</code></pre>
+          <pre><code>${highlighted}</code></pre>
+          <textarea id="raw-${id}" style="display:none;">${escapeHtml(rawCode)}</textarea>
+          <div id="output-${id}" class="code-exec-output" style="display:none;"></div>
         </div>`;
       codeBlocks.push(blockHtml);
       return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
@@ -685,53 +749,123 @@
     `;
   }
 
-  // Helper to detect if user requested code or if assistant generated code
-  function detectCodeTask(userPrompt, assistantContent) {
-    const p = (userPrompt || "").toLowerCase();
-    const c = assistantContent || "";
+  // --- UI Components: Attachments, Personas, Export & HTML Modal ---
+  function renderAttachmentChips() {
+    if (attachedFiles.length === 0) return "";
+    return `
+      <div class="attachment-chips-container" id="attachment-chips-container">
+        ${attachedFiles
+          .map(
+            (f, idx) => `
+          <div class="attachment-chip">
+            <span>${f.isPdf ? "📑" : "📄"}</span>
+            <span class="attachment-chip-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+            <span class="text-[10px] text-muted-foreground">(${formatBytes(f.size)}${f.pages ? `, ${f.pages}p` : ""})</span>
+            <button type="button" class="attachment-chip-remove" data-remove-attachment="${idx}" title="Remove file">✕</button>
+          </div>`
+          )
+          .join("")}
+      </div>`;
+  }
 
-    const codeKeywords = [
-      "code", "program", "function", "script", "build", "create app", "banao", "likho code",
-      "python", "javascript", "html", "css", "react", "sql", "api", "backend", "frontend",
-      "bug", "error", "fix", "refactor", "component", "class", "def ", "import ", "regex",
-      "server", "algorithm", "database", "crud"
-    ];
-    const isCodePrompt = codeKeywords.some((k) => p.includes(k));
-    const codeBlockMatch = c.match(/```([a-zA-Z0-9_\-\.\+]*)\n([\s\S]*?)```/);
-    const hasCodeBlock = !!codeBlockMatch;
+  function renderPersonaPicker() {
+    const label = PERSONA_LABELS[activePersona] || "🌟 General AI";
+    return `
+      <div class="topbar-menu-wrapper relative">
+        <button
+          type="button"
+          id="toggle-persona-btn"
+          class="inline-flex items-center gap-1.5 h-8 rounded-full border border-border bg-card/80 px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
+          title="Select AI Persona & System Behavior"
+        >
+          <span>${escapeHtml(label)}</span>
+          ${ICONS.chevronDown}
+        </button>
 
-    if (!isCodePrompt && !hasCodeBlock) {
-      return null;
-    }
+        ${
+          personaMenuOpen
+            ? `
+          <div class="topbar-dropdown-menu" id="persona-dropdown-menu">
+            <div class="px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              AI Persona & Mode
+            </div>
+            ${Object.keys(PERSONA_LABELS)
+              .map(
+                (key) => `
+              <button
+                type="button"
+                class="dropdown-item ${activePersona === key ? "is-active" : ""}"
+                data-select-persona="${key}"
+              >
+                <span>${PERSONA_LABELS[key]}</span>
+                ${activePersona === key ? ICONS.check : ""}
+              </button>`
+              )
+              .join("")}
+          </div>`
+            : ""
+        }
+      </div>`;
+  }
 
-    let lang = codeBlockMatch ? (codeBlockMatch[1] || "text").toLowerCase() : "code";
-    let codeSnippet = codeBlockMatch ? codeBlockMatch[2] : "";
-    let lineCount = codeSnippet ? codeSnippet.split("\n").length : 0;
+  function renderExportPicker(threadId) {
+    return `
+      <div class="topbar-menu-wrapper relative">
+        <button
+          type="button"
+          id="toggle-export-btn"
+          class="inline-flex items-center gap-1.5 h-8 rounded-full border border-border bg-card/80 px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
+          title="Export Conversation"
+        >
+          ${ICONS.export}
+          <span class="hidden sm:inline">Export</span>
+          ${ICONS.chevronDown}
+        </button>
 
-    let filename = "main";
-    if (lang === "python" || lang === "py") filename = "script.py";
-    else if (lang === "javascript" || lang === "js") filename = "app.js";
-    else if (lang === "typescript" || lang === "ts") filename = "index.ts";
-    else if (lang === "html") filename = "index.html";
-    else if (lang === "css") filename = "styles.css";
-    else if (lang === "json") filename = "data.json";
-    else if (lang === "sql") filename = "schema.sql";
-    else if (lang === "sh" || lang === "bash") filename = "run.sh";
-    else filename = "solution.code";
+        ${
+          exportMenuOpen
+            ? `
+          <div class="topbar-dropdown-menu" id="export-dropdown-menu">
+            <div class="px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Export Chat
+            </div>
+            <button type="button" class="dropdown-item" data-export-chat="md">
+              <span>Markdown (.md)</span>
+              ${ICONS.download}
+            </button>
+            <button type="button" class="dropdown-item" data-export-chat="txt">
+              <span>Plain Text (.txt)</span>
+              ${ICONS.download}
+            </button>
+            <button type="button" class="dropdown-item" data-export-chat="pdf">
+              <span>Print / PDF Document</span>
+              ${ICONS.download}
+            </button>
+          </div>`
+            : ""
+        }
+      </div>`;
+  }
 
-    const fileMention = (p + " " + c).match(/([a-zA-Z0-9_\-]+\.(?:py|js|ts|html|css|json|sql|sh))/i);
-    if (fileMention) {
-      filename = fileMention[1];
-    }
-
-    return {
-      isCodeTask: true,
-      lang,
-      filename,
-      code: codeSnippet,
-      lines: lineCount,
-      taskTitle: `Drafted ${filename}`
-    };
+  function renderHtmlModal() {
+    if (!activeHtmlModal) return "";
+    return `
+      <div class="html-preview-modal" id="html-preview-modal">
+        <div class="html-preview-card animate-rise-in">
+          <div class="html-preview-header">
+            <span class="flex items-center gap-2">
+              <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>Live HTML Interactive Preview</span>
+            </span>
+            <button type="button" class="close-html-modal-btn p-1 text-muted-foreground hover:text-foreground cursor-pointer" id="close-html-modal-btn">
+              ${ICONS.close}
+            </button>
+          </div>
+          <div class="html-preview-body">
+            <iframe id="html-modal-iframe" sandbox="allow-scripts allow-modals"></iframe>
+          </div>
+        </div>
+      </div>`;
   }
 
   // 3. PROMPT COMPOSER & MODEL SELECTOR
@@ -823,6 +957,14 @@
     return `
       <div class="relative w-full rounded-3xl bg-card border border-border shadow-composer transition-shadow focus-within:ring-1 focus-within:ring-primary/20">
         <form id="chat-composer-form" class="w-full">
+          ${renderAttachmentChips()}
+          <input
+            type="file"
+            id="file-upload-input"
+            class="hidden"
+            multiple
+            accept=".pdf,.txt,.py,.js,.jsx,.ts,.tsx,.json,.csv,.md,.html,.css,.sql,.sh,.log"
+          />
           <textarea
             id="composer-textarea"
             name="message"
@@ -835,6 +977,15 @@
           <div class="flex items-center justify-between gap-2 px-3 pb-3">
             <div class="flex min-w-0 items-center gap-2">
               ${renderModelPicker("composer")}
+
+              <button
+                type="button"
+                id="attach-file-btn"
+                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
+                title="Attach files or documents (.pdf, .txt, .py, .js, .csv, .md, .json)"
+              >
+                ${ICONS.paperclip}
+              </button>
 
               <button
                 type="button"
@@ -925,418 +1076,7 @@
       </div>`;
   }
 
-  // --- Antigravity IDE Components: Thinking Box & Workspace Diff Panel ---
 
-  function renderAgentThinkingBox(codeTask, msgId, isCurrentlyStreaming) {
-    if (!codeTask) return ""; // Pure conversational chat — NO fake build box!
-
-    const isExpanded = expandedWorkSteps[msgId] !== false; // default open
-    const lines = codeTask.lines || 1;
-    const filename = codeTask.filename || "code.py";
-    const lang = codeTask.lang || "code";
-
-    return `
-      <div class="agent-work-box animate-rise-in mb-3">
-        <div class="agent-work-header cursor-pointer select-none" data-toggle-steps="${msgId}">
-          <div class="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-            ${isCurrentlyStreaming ? `<span class="size-2 rounded-full bg-emerald-500 animate-ping"></span>` : ICONS.clock}
-            <span>${isCurrentlyStreaming ? "Building solution..." : "Completed in 4s"}</span>
-          </div>
-          <div class="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground">
-            <span>Analyzed files, generated ${escapeHtml(filename)}</span>
-            <span class="transform transition-transform ${isExpanded ? 'rotate-180' : ''}">${ICONS.chevronDown}</span>
-          </div>
-        </div>
-
-        ${isExpanded ? `
-        <div class="agent-step-list">
-          <div class="agent-step-item" data-open-workspace="active_code" title="View generated ${escapeHtml(filename)}">
-            <span class="flex items-center gap-1.5 truncate">
-              <span class="text-xs">🔍</span>
-              <span>Analyzed prompt requirements & architecture</span>
-            </span>
-            <span class="text-[10px] text-muted-foreground font-mono">read</span>
-          </div>
-
-          <div class="agent-step-item" data-open-workspace="active_code" title="Inspect ${escapeHtml(filename)} in Workspace IDE">
-            <span class="flex items-center gap-1.5 truncate">
-              <span class="text-xs">⚡</span>
-              <span>Created <code>${escapeHtml(filename)}</code></span>
-            </span>
-            <span class="badge-add">+${lines}</span>
-          </div>
-
-          <div class="agent-step-item" data-open-workspace="active_code" title="Open Workspace IDE">
-            <span class="flex items-center gap-1.5 truncate">
-              <span class="text-xs">✔</span>
-              <span>Syntax validated (${escapeHtml(lang)})</span>
-            </span>
-            <span class="text-[10px] text-emerald-600 font-mono font-bold">READY</span>
-          </div>
-        </div>` : ''}
-      </div>`;
-  }
-
-  function renderServerPyDiff() {
-    const diffLines = [
-      { type: "header", oldNum: "...", newNum: "...", text: "@@ -16,11 +3,24 @@ Lumi AI Studio Server" },
-      { type: "del", oldNum: 16, newNum: "", text: '  POST /api/g4f/chat      — GPT4Free proxy (streaming SSE)' },
-      { type: "del", oldNum: 17, newNum: "", text: '  GET  /api/g4f/models    — GPT4Free model list' },
-      { type: "del", oldNum: 18, newNum: "", text: '  GET  /api/g4f/health    — GPT4Free health check' },
-      { type: "del", oldNum: 19, newNum: "", text: '' },
-      { type: "del", oldNum: 20, newNum: "", text: '  POST /api/proxy/chat    — Generic OpenAI-compatible proxy' },
-      { type: "del", oldNum: 21, newNum: "", text: '  GET  /api/proxy/health  — Generic endpoint health check' },
-      { type: "del", oldNum: 22, newNum: "", text: '' },
-      { type: "del", oldNum: 23, newNum: "", text: '  GET  /api/status        — Overall server & provider status' },
-      { type: "add", oldNum: "", newNum: 3, text: 'Lumi AI Studio — Unified Free & Reverse-Engineered AI Backend Server' },
-      { type: "add", oldNum: "", newNum: 4, text: '' },
-      { type: "add", oldNum: "", newNum: 5, text: 'Combines top open-source AI projects into one backend:' },
-      { type: "add", oldNum: "", newNum: 6, text: '  1. Zero-Setup Free AI Hub (Pollinations & Reverse-Engineered OpenAI)' },
-      { type: "add", oldNum: "", newNum: 7, text: '  2. GPT4Free (xtekky/gpt4free) — 70+ models without API keys' },
-      { type: "add", oldNum: "", newNum: 8, text: '  3. Duck.ai API (enter-a-new-username3/duck-ai-api) — DuckDuckGo free AI' },
-      { type: "add", oldNum: "", newNum: 9, text: '  4. Gemini Web to API (ntthanh2603/gemini-web-to-api & XD06/gemini-free-api)' },
-      { type: "add", oldNum: "", newNum: 10, text: '  5. Awesome Reverse-Engineered Proxy Hub (alexgaoth/awesome-reverse-engineered)' },
-      { type: "add", oldNum: "", newNum: 11, text: '' },
-      { type: "add", oldNum: "", newNum: 12, text: 'Also serves the frontend web application directly on http://localhost:3456/!' },
-      { type: "add", oldNum: "", newNum: 13, text: '"""' },
-      { type: "add", oldNum: "", newNum: 14, text: '' },
-      { type: "add", oldNum: "", newNum: 15, text: 'import glob' },
-      { type: "add", oldNum: "", newNum: 16, text: 'import http.server' },
-      { type: "add", oldNum: "", newNum: 17, text: 'import json' },
-      { type: "add", oldNum: "", newNum: 18, text: 'import mimetypes' },
-      { type: "add", oldNum: "", newNum: 19, text: 'import os' },
-      { type: "add", oldNum: "", newNum: 20, text: 'import ssl' },
-      { type: "add", oldNum: "", newNum: 21, text: 'import sys' },
-      { type: "add", oldNum: "", newNum: 22, text: 'import threading' },
-      { type: "add", oldNum: "", newNum: 23, text: 'import time' },
-      { type: "add", oldNum: "", newNum: 24, text: 'import urllib.error' },
-      { type: "add", oldNum: "", newNum: 25, text: 'import urllib.parse' },
-      { type: "add", oldNum: "", newNum: 26, text: 'import urllib.request' },
-      { type: "ctx", oldNum: 27, newNum: 27, text: 'FREE_HUB_URL = "https://text.pollinations.ai/openai/chat/completions"' },
-      { type: "ctx", oldNum: 28, newNum: 28, text: 'PORT = int(os.environ.get("PORT", 3456))' },
-    ];
-
-    return `
-      <div class="diff-container">
-        ${diffLines
-          .map((line) => {
-            if (line.type === "header") {
-              return `
-                <div class="diff-line bg-zinc-900/90 text-zinc-500 font-semibold text-[11px] py-1 px-4 border-y border-zinc-800">
-                  ${escapeHtml(line.text)}
-                </div>`;
-            }
-            const isDel = line.type === "del";
-            const isAdd = line.type === "add";
-            const lineClass = isDel ? "diff-line-del" : isAdd ? "diff-line-add" : "";
-            const prefix = isDel ? "- " : isAdd ? "+ " : "  ";
-
-            return `
-              <div class="diff-line ${lineClass}">
-                <div class="diff-gutter">
-                  <span>${line.oldNum || ""}</span>
-                  <span>${line.newNum || ""}</span>
-                </div>
-                <div class="diff-content"><span>${prefix}</span>${escapeHtml(line.text)}</div>
-              </div>`;
-          })
-          .join("")}
-      </div>`;
-  }
-
-  function renderAppJsDiff() {
-    const diffLines = [
-      { type: "header", oldNum: "...", newNum: "...", text: "@@ -1571,15 +1571,45 @@ Built-in Real Free AI Streaming" },
-      { type: "del", oldNum: 1571, newNum: "", text: '  // Built-in intelligent simulated streaming with smooth typewriter delay' },
-      { type: "del", oldNum: 1572, newNum: "", text: '  const fullReply = generateBuiltInResponse(prompt, selectedModel.model);' },
-      { type: "del", oldNum: 1573, newNum: "", text: '  const chunkSize = 4;' },
-      { type: "add", oldNum: "", newNum: 1571, text: '  // Built-in Real Free AI Streaming via backend /api/free/chat' },
-      { type: "add", oldNum: "", newNum: 1572, text: '  const backendOrigin = window.location.origin.includes(":3456") ? window.location.origin : "http://localhost:3456";' },
-      { type: "add", oldNum: "", newNum: 1573, text: '  let streamedSuccessfully = false;' },
-      { type: "add", oldNum: "", newNum: 1574, text: '  const resp = await fetch(`${backendOrigin}/api/free/chat`, {' },
-      { type: "add", oldNum: "", newNum: 1575, text: '    method: "POST",' },
-      { type: "add", oldNum: "", newNum: 1576, text: '    signal: streamAbortController.signal,' },
-      { type: "add", oldNum: "", newNum: 1577, text: '    headers: { "Content-Type": "application/json" },' },
-      { type: "add", oldNum: "", newNum: 1578, text: '    body: JSON.stringify({' },
-      { type: "add", oldNum: "", newNum: 1579, text: '      model: selectedModel.model || "openai",' },
-      { type: "add", oldNum: "", newNum: 1580, text: '      messages: chatHistory,' },
-      { type: "add", oldNum: "", newNum: 1581, text: '      stream: true,' },
-      { type: "add", oldNum: "", newNum: 1582, text: '    }),' },
-      { type: "add", oldNum: "", newNum: 1583, text: '  });' },
-      { type: "ctx", oldNum: 1584, newNum: 1584, text: '  // Unified Provider Presets: GPT4Free, Duck.ai, Gemini Web' },
-    ];
-
-    return `
-      <div class="diff-container">
-        ${diffLines
-          .map((line) => {
-            if (line.type === "header") {
-              return `
-                <div class="diff-line bg-zinc-900/90 text-zinc-500 font-semibold text-[11px] py-1 px-4 border-y border-zinc-800">
-                  ${escapeHtml(line.text)}
-                </div>`;
-            }
-            const isDel = line.type === "del";
-            const isAdd = line.type === "add";
-            const lineClass = isDel ? "diff-line-del" : isAdd ? "diff-line-add" : "";
-            const prefix = isDel ? "- " : isAdd ? "+ " : "  ";
-
-            return `
-              <div class="diff-line ${lineClass}">
-                <div class="diff-gutter">
-                  <span>${line.oldNum || ""}</span>
-                  <span>${line.newNum || ""}</span>
-                </div>
-                <div class="diff-content"><span>${prefix}</span>${escapeHtml(line.text)}</div>
-              </div>`;
-          })
-          .join("")}
-      </div>`;
-  }
-
-  function getRunnableHtml(codeTask) {
-    if (!codeTask || !codeTask.code) {
-      return `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:90vh;color:#888;background:#0d1117;text-align:center;"><div><h3 style="color:#eee;margin-bottom:8px;">🚀 Live Preview Ready</h3><p style="color:#6e7681;font-size:13px;">Ask Lumi to build a game, calculator, or landing page to run it interactively here!</p></div></body></html>`;
-    }
-    const c = codeTask.code;
-    if (codeTask.lang === "html" || codeTask.filename.endsWith(".html") || c.includes("<!DOCTYPE") || c.includes("<html") || c.includes("<div") || c.includes("<canvas")) {
-      return c;
-    }
-    if (codeTask.lang === "javascript" || codeTask.lang === "js") {
-      return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{background:#0d1117;color:#c9d1d9;font-family:monospace;padding:24px;margin:0;}h3{color:#58a6ff;margin-top:0;font-size:14px;}pre{background:#161b22;padding:16px;border-radius:8px;border:1px solid #30363d;white-space:pre-wrap;font-size:13px;line-height:1.5;}</style></head><body><h3>⚡ JavaScript Output Console:</h3><pre id="log"></pre><script>
-        const logEl = document.getElementById('log');
-        const _log = console.log;
-        console.log = (...args) => {
-          _log(...args);
-          logEl.textContent += args.map(a => typeof a === 'object' ? JSON.stringify(a,null,2) : a).join(' ') + '\\n';
-        };
-        try {
-          ${c}
-        } catch(e) {
-          logEl.textContent += '❌ Error: ' + e.message;
-        }
-      <\/script></body></html>`;
-    }
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{background:#0d1117;color:#58a6ff;font-family:monospace;padding:24px;line-height:1.6;}</style></head><body><div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;"><span style="color:#8b949e;">// File: ${escapeHtml(codeTask.filename)}</span><br><br><pre style="color:#e6edf3;white-space:pre-wrap;margin:0;">${escapeHtml(c)}</pre></div></body></html>`;
-  }
-
-  function renderTerminalView() {
-    return `
-      <div class="terminal-container">
-        <div class="terminal-line"><span class="terminal-prompt">jayu@ai:~/Videos/ai$</span> ./run_backend.sh</div>
-        <div class="terminal-line terminal-info">========================================================</div>
-        <div class="terminal-line terminal-info">  🚀 Lumi AI Studio — Sandbox Terminal & Code Runner</div>
-        <div class="terminal-line terminal-info">========================================================</div>
-        <div class="terminal-line terminal-success">✔ Python sandbox active with subprocess runner (:3456)</div>
-        <div class="terminal-line terminal-success">✔ Web preview sandbox active (HTML5, Canvas, JS)</div>
-        <div class="terminal-line terminal-info">--------------------------------------------------------</div>
-        ${terminalHistory.map((item) => `
-          <div class="terminal-line ${item.type === 'error' ? 'text-rose-400' : item.type === 'stdout' ? 'text-zinc-100 font-mono' : 'terminal-success'}">
-            ${item.cmd ? `<div class="text-sky-400 font-bold mb-0.5"><span class="text-zinc-500">$</span> ${escapeHtml(item.cmd)}</div>` : ''}
-            ${item.stdout ? `<div class="whitespace-pre-wrap text-emerald-300 font-mono pl-3 border-l-2 border-emerald-500/40 my-1">${escapeHtml(item.stdout)}</div>` : ''}
-            ${item.stderr ? `<div class="whitespace-pre-wrap text-rose-400 font-mono pl-3 border-l-2 border-rose-500/40 my-1">${escapeHtml(item.stderr)}</div>` : ''}
-            ${item.text ? `<div>${escapeHtml(item.text)}</div>` : ''}
-          </div>
-        `).join("")}
-        <div class="terminal-line mt-4"><span class="terminal-prompt">jayu@ai:~/Videos/ai$</span> <span class="inline-block w-2 h-4 bg-emerald-400 animate-pulse align-middle"></span></div>
-      </div>`;
-  }
-
-  function renderPreviewView() {
-    const hasActiveApp = !!(currentActiveCodeTask && currentActiveCodeTask.code);
-    const runnableHtml = getRunnableHtml(currentActiveCodeTask);
-
-    return `
-      <div class="preview-container">
-        <div class="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
-          <div class="flex items-center gap-2">
-            <span class="inline-block size-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="font-mono text-[11px] font-semibold text-foreground">
-              ${hasActiveApp ? escapeHtml(currentActiveCodeTask.filename) + " (Live App)" : "http://localhost:3456/#/chat"}
-            </span>
-            ${hasActiveApp ? `<span class="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/20">RUNNING</span>` : ""}
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium cursor-pointer"
-              id="reload-preview-btn"
-            >
-              ${ICONS.refreshCw} <span>Reload</span>
-            </button>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-medium cursor-pointer"
-              id="fullscreen-preview-btn"
-              title="Open in new window"
-            >
-              ${ICONS.split} <span>New Window</span>
-            </button>
-          </div>
-        </div>
-        <iframe
-          srcdoc="${hasActiveApp ? escapeHtml(runnableHtml) : ""}"
-          src="${!hasActiveApp ? "http://localhost:3456/" : ""}"
-          id="live-preview-iframe"
-          sandbox="allow-scripts allow-modals allow-same-origin allow-forms allow-popups"
-          class="preview-iframe"
-        ></iframe>
-      </div>`;
-  }
-
-  function renderActiveCodeView() {
-    if (!currentActiveCodeTask || !currentActiveCodeTask.code) {
-      return `
-        <div class="diff-container p-6 text-zinc-400 font-mono text-xs flex flex-col items-center justify-center h-full text-center">
-          <span class="text-sky-400 text-lg mb-2">⚡</span>
-          <span class="font-semibold text-zinc-300">No active code generated yet</span>
-          <span class="text-zinc-500 mt-1 max-w-sm">Ask Lumi to write or build code (Python, JS, HTML, API) to view the live editable file right here in Workspace IDE.</span>
-        </div>`;
-    }
-    const lines = currentActiveCodeTask.code.split("\n");
-    return `
-      <div class="diff-container">
-        <div class="diff-line bg-zinc-900/90 text-zinc-400 font-semibold text-[11px] py-2 px-4 border-b border-zinc-800 flex items-center justify-between sticky top-0 z-10 backdrop-blur">
-          <div class="flex items-center gap-2">
-            <span class="text-sky-400 font-bold">⚡</span>
-            <span class="text-zinc-100 font-mono font-semibold">${escapeHtml(currentActiveCodeTask.filename)}</span>
-            <span class="text-zinc-500 font-mono text-[10px]">(${lines.length} lines)</span>
-          </div>
-          <span class="text-[10px] uppercase font-mono tracking-wider text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-800 font-bold">
-            ${escapeHtml(currentActiveCodeTask.lang)}
-          </span>
-        </div>
-        ${lines.map((l, idx) => `
-          <div class="diff-line hover:bg-zinc-900/60 transition-colors">
-            <div class="diff-gutter">
-              <span></span>
-              <span>${idx + 1}</span>
-            </div>
-            <div class="diff-content text-zinc-200 font-mono text-[12px]">${escapeHtml(l) || "&nbsp;"}</div>
-          </div>
-        `).join("")}
-      </div>`;
-  }
-
-  function renderIdeWorkspacePanel() {
-    const hasActiveCode = !!(currentActiveCodeTask && currentActiveCodeTask.code);
-
-    return `
-      <aside class="ide-workspace-panel" id="ide-workspace-panel">
-        <!-- Top Tab Bar -->
-        <div class="ide-top-tabbar">
-          <div class="ide-tabs">
-            ${
-              hasActiveCode
-                ? `
-            <button
-              type="button"
-              class="ide-tab ${activeWorkspaceTab === "active_code" ? "is-active" : ""}"
-              data-workspace-tab="active_code"
-            >
-              <span class="text-sky-400">⚡</span>
-              <span>${escapeHtml(currentActiveCodeTask.filename)}</span>
-              <span class="badge-add">+${currentActiveCodeTask.lines || 1}</span>
-            </button>`
-                : ""
-            }
-
-            <button
-              type="button"
-              class="ide-tab ${activeWorkspaceTab === "diff" ? "is-active" : ""}"
-              data-workspace-tab="diff"
-            >
-              <span class="text-amber-400">📄</span>
-              <span>Diff: server.py</span>
-              <span class="badge-add">+145</span>
-              <span class="badge-del">-12</span>
-            </button>
-
-            <button
-              type="button"
-              class="ide-tab ${activeWorkspaceTab === "appjs" ? "is-active" : ""}"
-              data-workspace-tab="appjs"
-            >
-              <span class="text-yellow-400">📄</span>
-              <span>Diff: app.js</span>
-              <span class="badge-add">+96</span>
-              <span class="badge-del">-30</span>
-            </button>
-
-            <button
-              type="button"
-              class="ide-tab ${activeWorkspaceTab === "terminal" ? "is-active" : ""}"
-              data-workspace-tab="terminal"
-            >
-              ${ICONS.terminal}
-              <span>Terminal (:3456)</span>
-            </button>
-
-            <button
-              type="button"
-              class="ide-tab ${activeWorkspaceTab === "preview" ? "is-active" : ""}"
-              data-workspace-tab="preview"
-            >
-              ${ICONS.server}
-              <span>Live Preview</span>
-            </button>
-          </div>
-
-          <div class="ide-actions">
-            ${
-              hasActiveCode
-                ? `
-            <button
-              type="button"
-              class="ide-btn text-emerald-500 hover:text-emerald-400 font-semibold cursor-pointer"
-              id="workspace-run-code-btn"
-              title="Run code in sandbox terminal / preview"
-            >
-              ${ICONS.play} <span class="text-[11px] ml-1">Run</span>
-            </button>
-            <button
-              type="button"
-              class="ide-btn text-sky-500 hover:text-sky-400 font-semibold cursor-pointer"
-              id="download-project-zip-btn"
-              title="Download Full Project as .ZIP"
-            >
-              ${ICONS.download} <span class="text-[11px] ml-1">ZIP</span>
-            </button>`
-                : ""
-            }
-            <button
-              type="button"
-              class="ide-btn cursor-pointer"
-              data-action="copy-workspace-code"
-              title="Copy code"
-            >
-              ${ICONS.copy}
-            </button>
-            <button
-              type="button"
-              class="ide-btn cursor-pointer"
-              id="close-workspace-btn"
-              title="Close panel"
-            >
-              ${ICONS.close}
-            </button>
-          </div>
-        </div>
-
-        <!-- Main Body per Active Tab -->
-        ${
-          activeWorkspaceTab === "active_code"
-            ? renderActiveCodeView()
-            : activeWorkspaceTab === "diff"
-            ? renderServerPyDiff()
-            : activeWorkspaceTab === "appjs"
-            ? renderAppJsDiff()
-            : activeWorkspaceTab === "terminal"
-            ? renderTerminalView()
-            : renderPreviewView()
-        }
-      </aside>`;
-  }
 
   // 5. ACTIVE CHAT THREAD VIEW
   function renderThreadChat(thread) {
@@ -1355,7 +1095,14 @@
 
                 if (isUser) {
                   return `
-                    <div class="animate-rise-in flex justify-end">
+                    <div class="animate-rise-in flex flex-col items-end gap-1">
+                      ${
+                        msg.attachedFiles && msg.attachedFiles.length > 0
+                          ? `<div class="flex flex-wrap justify-end gap-1.5 mb-0.5">
+                              ${msg.attachedFiles.map(f => `<span class="attachment-chip text-[11px] py-0.5 px-2">📄 ${escapeHtml(f.name)} (${formatBytes(f.size)})</span>`).join('')}
+                            </div>`
+                          : ""
+                      }
                       <div class="max-w-[85%] rounded-3xl bg-primary px-4 py-2.5 text-primary-foreground text-[15px] whitespace-pre-wrap leading-relaxed shadow-xs">
                         ${escapeHtml(msg.content)}
                       </div>
@@ -1367,17 +1114,20 @@
                 const isCurrentlyStreaming =
                   isStreaming && index === messages.length - 1;
 
-                // Detect if this message was a code task based on prompt and response
-                const prevUserMsg = index > 0 && messages[index - 1].role === "user" ? messages[index - 1].content : "";
-                const codeTask = detectCodeTask(prevUserMsg, rawText);
-
                 return `
                   <div class="animate-rise-in flex gap-3.5 items-start">
                     <img src="${LUMI_LOGO}" alt="Lumi" class="mt-0.5 size-6 shrink-0 object-contain select-none" />
                     
                     <div class="min-w-0 flex-1">
-                      <!-- Antigravity Thinking & Tool Execution Accordion (Only for real code tasks) -->
-                      ${renderAgentThinkingBox(codeTask, msg.id, isCurrentlyStreaming)}
+                      ${
+                        msg.scrapedUrl
+                          ? `<div class="mb-2">
+                              <a href="${escapeHtml(msg.scrapedUrl.url)}" target="_blank" rel="noopener" class="url-scrape-badge">
+                                ${ICONS.globe} <span>Scraped: ${escapeHtml(msg.scrapedUrl.title)}</span>
+                              </a>
+                            </div>`
+                          : ""
+                      }
 
                       <!-- Real-Time Web Search Source Badges (if search query) -->
                       ${
@@ -1458,28 +1208,7 @@
                             <span>${currentlySpeakingId === msg.id ? "Speaking..." : "Listen"}</span>
                           </button>
 
-                          ${
-                            codeTask
-                              ? `
-                          <button
-                            type="button"
-                            class="run-code-action-btn"
-                            data-action="run-code"
-                            title="Execute in Sandbox Terminal / Preview"
-                          >
-                            ${ICONS.play} <span>Run Code</span>
-                          </button>
 
-                          <button
-                            type="button"
-                            class="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 transition-colors font-medium border border-sky-200 dark:border-sky-800/50 cursor-pointer"
-                            data-open-workspace="active_code"
-                            title="Inspect generated code in Workspace IDE"
-                          >
-                            ${ICONS.split} <span>View in Workspace IDE</span>
-                          </button>`
-                              : ""
-                          }
                           
                           ${
                             isLastAssistant
@@ -1560,33 +1289,16 @@
 
             <div class="flex items-center gap-2">
               ${renderModelPicker("topbar")}
-
-              <button
-                type="button"
-                id="toggle-workspace-btn"
-                class="inline-flex items-center gap-1.5 h-8 rounded-full border px-3 text-xs font-medium transition-all ${
-                  workspaceOpen
-                    ? "border-sky-500/50 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-semibold shadow-xs"
-                    : "border-border bg-card/80 text-muted-foreground hover:text-foreground"
-                }"
-                title="Toggle Antigravity IDE Workspace / Diff View"
-              >
-                ${ICONS.code}
-                <span class="hidden sm:inline">Workspace IDE</span>
-                <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              </button>
+              ${renderPersonaPicker()}
+              ${renderExportPicker(threadId)}
             </div>
           </div>
 
-          <!-- Dynamic Stage (Split Workspace Layout) -->
+          <!-- Main Chat Area -->
           <div class="flex min-h-0 flex-1 overflow-hidden">
-            <!-- Left / Center: Chat Area -->
             <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
               ${thread ? renderThreadChat(thread) : renderEmptyChat()}
             </div>
-
-            <!-- Right: Antigravity IDE Split Panel -->
-            ${workspaceOpen ? renderIdeWorkspacePanel() : ""}
           </div>
         </main>
       </div>`;
@@ -1912,218 +1624,6 @@
       </div>`;
   }
 
-  // --- Intelligent Offline Assistant Responses ---
-  function generateBuiltInResponse(promptText, modelId) {
-    const text = promptText.trim().toLowerCase();
-
-    // 1. Maldives Trip
-    if (text.includes("maldives") || (text.includes("trip") && text.includes("3-day"))) {
-      return `### 🌴 3-Day Luxury Island Escape to the Maldives
-
-Here is a curated itinerary balancing azure lagoons, reef exploration, and sunset relaxation.
-
----
-
-#### **Day 1: Arrival & Overwater Bliss**
-- **Morning:** Arrive at Velana International Airport (Malé). Board your scenic **25-minute seaplane flight** over the North Malé Atoll with breathtaking aerial views of coral rings.
-- **Afternoon:** Check into your private **Overwater Bungalow**. Unpack and step directly down your villa ladder into warm, crystal-clear 28°C turquoise water.
-- **Evening:** Sunset cocktails on the ocean deck followed by an authentic seafood grill at a beachfront restaurant under the stars.
-
----
-
-#### **Day 2: Manta Ray Safari & Sandbank Picnic**
-- **Morning (08:30):** Private dhoni boat excursion to a protected reef channel. Snorkel alongside majestic **Manta Rays** and gentle sea turtles.
-- **Lunch:** Castaway picnic on an uninhabited sandbank — fresh chilled fruit, grilled reef fish, and sparkling coconut water.
-- **Afternoon:** Indulge in an overwater glass-bottom spa massage listening to ocean swells.
-- **Night:** Bioluminescent night walk along the shoreline where glowing phytoplankton lights up the sand.
-
----
-
-#### **Day 3: Marine Conservation & Sunset Cruise**
-- **Morning:** Coral adoption dive with the resident marine biologist to plant your own coral fragment on the resort reef.
-- **Afternoon:** Stand-Up Paddleboarding (SUP) across the tranquil lagoon or kayaking with clear glass kayaks.
-- **Late Afternoon (17:30):** Traditional sunset dolphin cruise with champagne while pods of spinner dolphins leap alongside the boat bow.
-- **Night:** Departure transfer to Malé for your flight home.
-
-> **Pro Tip:** Pack reef-safe mineral sunscreen and an underwater action camera with red filter lens!`;
-    }
-
-    // 2. React Server Components
-    if (text.includes("react server components") || text.includes("rsc")) {
-      return `### ⚛️ React Server Components (RSC) Simply Explained
-
-**React Server Components (RSC)** let React components execute exclusively on the **server**, sending zero JavaScript bundle weight to the browser.
-
----
-
-#### 1. The Core Problem RSC Solves
-Traditionally, in client-side React (SPA):
-1. Browser downloads a huge \`bundle.js\` (libraries, components, markdown parsers).
-2. Browser renders the HTML.
-3. Component makes API calls \`fetch('/api/data')\`, causing waterfall delays.
-
-With **RSC**, the component runs on your server, queries your database directly, and streams lightweight **pre-rendered UI** to the browser.
-
----
-
-#### 2. Server vs Client Components Comparison
-
-| Feature | Server Component (Default) | Client Component (\`'use client'\`) |
-| :--- | :--- | :--- |
-| **Executes on** | Server Only | Server (SSR) + Browser Hydration |
-| **Bundle Impact** | **0 KB** JS sent to client | Included in client JS bundle |
-| **Database Access** | Direct \`await db.query()\` | Requires \`fetch()\` API endpoint |
-| **Interactivity** | No (\`onClick\`, \`useState\`) | Yes (hooks, DOM event listeners) |
-
----
-
-#### 3. Code Example
-
-\`\`\`tsx
-// app/users/page.tsx (Server Component - runs on server)
-import { db } from '@/lib/db';
-import LikeButton from './like-button'; // Client component
-
-export default async function UsersPage() {
-  // Direct DB query with NO client API route needed!
-  const users = await db.user.findMany();
-
-  return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold">Community Members</h1>
-      <ul>
-        {users.map(u => (
-          <li key={u.id} className="flex justify-between py-2 border-b">
-            <span>{u.name} ({u.role})</span>
-            {/* Interactive widget with use client */}
-            <LikeButton userId={u.id} />
-          </li>
-        ))}
-      </ul>
-    </main>
-  );
-}
-\`\`\`
-
-\`\`\`tsx
-// app/users/like-button.tsx (Client Component)
-'use client';
-
-import { useState } from 'react';
-
-export default function LikeButton({ userId }: { userId: string }) {
-  const [likes, setLikes] = useState(0);
-
-  return (
-    <button 
-      onClick={() => setLikes(l => l + 1)} 
-      className="px-3 py-1 bg-pink-50 text-pink-600 rounded-full text-xs font-semibold"
-    >
-      ❤️ {likes}
-    </button>
-  );
-}
-\`\`\`
-
-> **Mental Model:** Think of Server Components as **fast skeletons & data engines**, and Client Components as **interactive buttons, inputs & modals**.`;
-    }
-
-    // 3. Birthday Note
-    if (text.includes("birthday note") || text.includes("birthday")) {
-      return `### 🎂 Heartfelt Birthday Notes
-
-Here are four unique versions you can personalize:
-
----
-
-#### Option 1: Warm, Meaningful & Deep
-> *"Happy Birthday, [Name]! Another year older, wiser, and even more wonderful. Looking back on all the memories we've shared, I am so grateful to have you in my corner. Thank you for your kindness, your steady laugh, and the way you always light up any room you walk into. May this year bring you all the quiet peace, grand adventures, and dreams you've been working so hard toward. Cheers to you!"*
-
----
-
-#### Option 2: Short, Sweet & Poetic
-> *"Wishing the happiest of birthdays to someone who makes life so much brighter simply by being in it. May your year ahead be filled with serendipity, deep laughter, and endless good coffee. Happy Birthday, [Name]!"*
-
----
-
-#### Option 3: Fun & Energetic
-> *"Happy Birthday, superstar! 🥳 Another year of being unapologetically you and crushing everything you set your mind to. Let’s celebrate big, eat all the cake, and make this your best trip around the sun yet!"*
-
----
-
-#### Option 4: Hinglish Warmth
-> *"Janamdin bohot bohot mubarak ho, [Name]! 🎉 Tum jaise dost kismat se milte hain. Hamesha aise hi khush raho, hasti raho aur life mein aage badhte raho. Aaj ka din tumhara hai — celebrate hard!"*`;
-    }
-
-    // 4. Productivity Tips in Hinglish
-    if (text.includes("productivity") || text.includes("tips") || text.includes("kaam")) {
-      return `### ⚡ Supercharge Your Day: 5 Powerful Productivity Tips
-
-Yeh 5 practical rules tumhari daily efficiency aur focus ko 3x kar denge:
-
----
-
-#### 1. 🐸 Eat That Frog First (Sabse Mushkil Kaam Pehle)
-- **Problem:** Log subah chote-mote emails aur social media mein time waste karte hain aur hard tasks ko postpone karte rehte hain.
-- **Fix:** Apne din ka **#1 most critical & challenging task** pehle 90 minutes mein finish karo jab tumhara will-power aur energy 100% hoti hai. Baaki din automatically aasaan lagne lagega.
-
----
-
-#### 2. ⏳ The 50/10 Time-Boxing Rule (Deep Focus Sprints)
-- Continuous 4-5 ghante kaam karne se burnout hota hai.
-- **Rule:** 50 minutes **strict deep work** (no notifications, phone in another room), aur uske baad **10 minutes screen-free break** (pani piyo, stretch karo, walk karo).
-
----
-
-#### 3. ⏱️ 2-Minute Rule
-- Agar koi task **2 minute se kam samay** leta hai (e.g., email reply, file organize, quick reminder set karna), toh usse baad ke liye mat taalo — **do it right away!** Yeh mental clutter khatam karta hai.
-
----
-
-#### 4. 🔕 Notification Blackout & Batching
-- Multitasking is a myth. Har WhatsApp ya Instagram ding tumhara focus tod deti hai.
-- Work hours ke dauran **Do Not Disturb (DND)** on rakho. Messages aur emails din mein sirf 2 baar check karo: ek baar dopahar 1 PM aur ek baar shaam 5 PM.
-
----
-
-#### 5. 📝 Night-Before Prep (Top 3 Priorities)
-- Sone se 5 minutes pehle ek index card ya notebook par agle din ke **sirf 3 non-negotiable tasks** likho.
-- Subah uthte hi decision fatigue nahi hoga aur tum instantly action mode mein hoge!
-
-> **Quote:** *"Focus is not about saying yes to things, it's about saying NO to the 100 other good ideas."*`;
-    }
-
-    // Default intelligent conversational reply
-    return `### ✨ Lumi AI Assistant
-
-Thank you for your message: **"${escapeHtml(promptText)}"**
-
-Here are some thoughtful thoughts and next steps:
-
-1. **Clarity & Core Principles:** Breaking down complex challenges into bite-sized, actionable milestones is always the most effective path forward.
-2. **Key Consideration:** Keep ergonomics, user delight, and reliability at the foundation of what you are building.
-3. **Execution Plan:**
-   - Define the primary objective.
-   - Iterate rapidly in small feedback loops.
-   - Polish micro-animations and typography for maximum sensory impact.
-
-\`\`\`javascript
-// Example: Creating smooth micro-interactions
-const animateIn = (element) => {
-  element.animate([
-    { opacity: 0, transform: 'translateY(12px) scale(0.98)' },
-    { opacity: 1, transform: 'translateY(0) scale(1)' }
-  ], {
-    duration: 350,
-    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-    fill: 'forwards'
-  });
-};
-\`\`\`
-
-Let me know if you would like me to expand on any specific aspect or dive deeper into code, writing, or analysis!`;
-  }
-
   // --- Real API Streaming Integration ---
   async function streamFromCustomProvider(provider, modelName, promptText, onChunk, abortSignal) {
     const isAnthropic = provider.protocol === "anthropic";
@@ -2345,6 +1845,51 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       }
     }
 
+    // Live URL Scraper Detection
+    const urlMatch = prompt.match(/https?:\/\/[^\s]+/i);
+    let scrapedContext = "";
+    if (urlMatch) {
+      const targetUrl = urlMatch[0];
+      try {
+        const apiBase =
+          window.location.origin && window.location.origin.startsWith("http")
+            ? ""
+            : "https://lumi-backend-v4-production.up.railway.app";
+        const fetchResp = await fetch(`${apiBase}/api/fetch/url?url=${encodeURIComponent(targetUrl)}`);
+        if (fetchResp.ok) {
+          const pageData = await fetchResp.json();
+          if (pageData.content) {
+            assistantMsg.scrapedUrl = { title: pageData.title || targetUrl, url: targetUrl };
+            scrapedContext = `\n\n[Live Scraped Webpage Content from ${pageData.title} (${pageData.url})]:\n${pageData.content}\n`;
+            render();
+            scrollToBottom();
+          }
+        }
+      } catch (scrapeErr) {
+        console.warn("Live URL fetch failed:", scrapeErr);
+      }
+    }
+
+    // Process Attached Files
+    let fileContext = "";
+    if (attachedFiles.length > 0) {
+      userMsg.attachedFiles = attachedFiles.map((f) => ({
+        name: f.name,
+        size: f.size,
+        pages: f.pages || null,
+      }));
+      fileContext =
+        "\n\n[Attached User Files]:\n" +
+        attachedFiles
+          .map(
+            (f) =>
+              `--- File: ${f.name} (${formatBytes(f.size)}${f.pages ? `, ${f.pages} pages` : ""}) ---\n${f.content}\n--- End of File ---`
+          )
+          .join("\n\n");
+      attachedFiles = [];
+      render();
+    }
+
     // Start Streaming
     isStreaming = true;
     streamAbortController = new AbortController();
@@ -2352,12 +1897,6 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
     const onChunk = (chunk) => {
       assistantMsg.content += chunk;
       updateStreamingMessageUI(threadId, assistantMsg.content);
-
-      // Dynamically detect code blocks as they stream in
-      const detectedTask = detectCodeTask(prompt, assistantMsg.content);
-      if (detectedTask) {
-        currentActiveCodeTask = detectedTask;
-      }
       scrollToBottom();
     };
 
@@ -2384,12 +1923,17 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
 
         let streamedSuccessfully = false;
         try {
-          const chatHistory = thread.messages
-            .filter((m) => m.id !== assistantMsgId && m.content)
-            .map((m) => ({ role: m.role, content: m.content }));
+          const systemPrompt = PERSONA_PROMPTS[activePersona] || PERSONA_PROMPTS.general;
+          const chatHistory = [
+            { role: "system", content: systemPrompt },
+            ...thread.messages
+              .filter((m) => m.id !== assistantMsgId && m.content)
+              .map((m) => ({ role: m.role, content: m.content }))
+          ];
 
-          if (webContext && chatHistory.length > 0) {
-            chatHistory[chatHistory.length - 1].content += webContext;
+          const extraContext = (webContext || "") + (scrapedContext || "") + (fileContext || "");
+          if (extraContext && chatHistory.length > 0) {
+            chatHistory[chatHistory.length - 1].content += extraContext;
           }
 
           const resp = await fetch(`${apiBase}/api/free/chat`, {
@@ -2465,13 +2009,7 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       isStreaming = false;
       streamAbortController = null;
 
-      // When streaming completes, if code was generated, auto-open workspace to active file
-      const finalCodeTask = detectCodeTask(prompt, assistantMsg.content);
-      if (finalCodeTask) {
-        currentActiveCodeTask = finalCodeTask;
-        activeWorkspaceTab = "active_code";
-        workspaceOpen = true;
-      }
+
 
       saveJson(STORAGE.CHATS, conversations);
       AudioEffects.play("success");
@@ -2672,6 +2210,7 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       root.innerHTML = renderLanding();
     }
 
+    root.innerHTML += renderHtmlModal();
     attachEventListeners();
   }
 
@@ -3023,79 +2562,87 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       });
     });
 
-    // 13. Workspace IDE & Thinking Controls
-    const toggleWorkspaceBtn = document.querySelector("#toggle-workspace-btn");
-    if (toggleWorkspaceBtn) {
-      toggleWorkspaceBtn.addEventListener("click", () => {
-        workspaceOpen = !workspaceOpen;
-        render();
+    // 13. File Attachments (.pdf, .txt, .py, .js, .csv, etc.)
+    const attachBtn = document.querySelector("#attach-file-btn");
+    const fileInput = document.querySelector("#file-upload-input");
+    if (attachBtn && fileInput) {
+      attachBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        fileInput.click();
       });
-    }
 
-    const closeWorkspaceBtn = document.querySelector("#close-workspace-btn");
-    if (closeWorkspaceBtn) {
-      closeWorkspaceBtn.addEventListener("click", () => {
-        workspaceOpen = false;
-        render();
-      });
-    }
+      fileInput.addEventListener("change", async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
 
-    // Workspace Tab Switch
-    document.querySelectorAll("[data-workspace-tab]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const tab = btn.getAttribute("data-workspace-tab");
-        if (tab) {
-          activeWorkspaceTab = tab;
-          render();
+        showToast(`Reading ${files.length} file(s)...`);
+        for (const file of files) {
+          try {
+            if (file.name.toLowerCase().endsWith(".pdf")) {
+              const reader = new FileReader();
+              reader.onload = async (ev) => {
+                const b64 = ev.target.result;
+                const apiBase =
+                  window.location.origin && window.location.origin.startsWith("http")
+                    ? ""
+                    : "https://lumi-backend-v4-production.up.railway.app";
+                try {
+                  const resp = await fetch(`${apiBase}/api/extract/pdf`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ base64: b64 }),
+                  });
+                  if (resp.ok) {
+                    const data = await resp.json();
+                    attachedFiles.push({
+                      name: file.name,
+                      size: file.size,
+                      content: data.text || "",
+                      isPdf: true,
+                      pages: data.pages || 1,
+                    });
+                    render();
+                    showToast(`✔ Extracted ${data.pages || 1} pages from ${file.name}`);
+                  }
+                } catch (pdfErr) {
+                  showToast("PDF extract failed: " + pdfErr.message);
+                }
+              };
+              reader.readAsDataURL(file);
+            } else {
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                attachedFiles.push({
+                  name: file.name,
+                  size: file.size,
+                  content: ev.target.result || "",
+                  isPdf: false,
+                });
+                render();
+                showToast(`✔ Attached ${file.name}`);
+              };
+              reader.readAsText(file);
+            }
+          } catch (err) {
+            console.error("File read error:", err);
+          }
         }
+        fileInput.value = "";
       });
-    });
+    }
 
-    // Open Workspace from Action Badge or Step Item
-    document.querySelectorAll("[data-open-workspace]").forEach((btn) => {
+    document.querySelectorAll("[data-remove-attachment]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
-        const target = btn.getAttribute("data-open-workspace") || "active_code";
-        if (target === "active_code") {
-          activeWorkspaceTab = "active_code";
-        } else if (target === "appjs") {
-          activeWorkspaceTab = "appjs";
-        } else if (target === "terminal") {
-          activeWorkspaceTab = "terminal";
-        } else {
-          activeWorkspaceTab = "diff";
-        }
-        workspaceOpen = true;
-        render();
-      });
-    });
-
-    // Toggle Agent Thinking Steps Accordion
-    document.querySelectorAll("[data-toggle-steps]").forEach((el) => {
-      el.addEventListener("click", () => {
-        const msgId = el.getAttribute("data-toggle-steps");
-        if (msgId) {
-          expandedWorkSteps[msgId] = expandedWorkSteps[msgId] === false ? true : false;
+        const idx = parseInt(btn.getAttribute("data-remove-attachment"), 10);
+        if (!isNaN(idx) && idx >= 0 && idx < attachedFiles.length) {
+          attachedFiles.splice(idx, 1);
           render();
         }
       });
     });
 
-    // Copy Workspace Code
-    const copyWorkspaceBtn = document.querySelector("[data-action='copy-workspace-code']");
-    if (copyWorkspaceBtn) {
-      copyWorkspaceBtn.addEventListener("click", () => {
-        AudioEffects.play("click");
-        if (currentActiveCodeTask && currentActiveCodeTask.code) {
-          navigator.clipboard.writeText(currentActiveCodeTask.code);
-          showToast(`Copied ${currentActiveCodeTask.filename} to clipboard!`);
-        } else {
-          showToast("Workspace code copied to clipboard!");
-        }
-      });
-    }
-
-    // 13B. Super-Features: Voice, Audio, Code Runner & ZIP Export Wiring
+    // 13B. Super-Features: Voice, Audio, Persona & Export Wiring
     const toggleSoundBtn = document.querySelector("#toggle-sound-btn");
     if (toggleSoundBtn) {
       toggleSoundBtn.addEventListener("click", (e) => {
@@ -3136,67 +2683,164 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       });
     });
 
-    const handleRunActiveCode = () => {
-      if (!currentActiveCodeTask || !currentActiveCodeTask.code) {
-        showToast("No active code to run. Ask Lumi to generate a script or app!");
-        return;
-      }
-      AudioEffects.play("click");
-      const lang = (currentActiveCodeTask.lang || "").toLowerCase();
-      if (lang === "python" || lang === "py" || currentActiveCodeTask.filename.endsWith(".py")) {
-        runPythonCode(currentActiveCodeTask.code);
-      } else {
-        activeWorkspaceTab = "preview";
-        workspaceOpen = true;
-        AudioEffects.play("success");
-        showToast(`🚀 ${currentActiveCodeTask.filename} is running in Live Preview!`);
+    // 13C. Persona Selector Handlers
+    const togglePersonaBtn = document.querySelector("#toggle-persona-btn");
+    if (togglePersonaBtn) {
+      togglePersonaBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        personaMenuOpen = !personaMenuOpen;
+        exportMenuOpen = false;
         render();
-      }
-    };
-
-    document.querySelectorAll("[data-action='run-code']").forEach((btn) => {
-      btn.addEventListener("click", handleRunActiveCode);
-    });
-
-    const workspaceRunBtn = document.querySelector("#workspace-run-code-btn");
-    if (workspaceRunBtn) {
-      workspaceRunBtn.addEventListener("click", handleRunActiveCode);
-    }
-
-    const downloadZipBtn = document.querySelector("#download-project-zip-btn");
-    if (downloadZipBtn) {
-      downloadZipBtn.addEventListener("click", () => {
-        downloadProjectZip();
       });
     }
 
-    const reloadPreviewBtn = document.querySelector("#reload-preview-btn");
-    if (reloadPreviewBtn) {
-      reloadPreviewBtn.addEventListener("click", () => {
-        AudioEffects.play("click");
-        const iframe = document.querySelector("#live-preview-iframe");
-        if (iframe) {
-          const code = currentActiveCodeTask ? getRunnableHtml(currentActiveCodeTask) : "";
-          if (code) {
-            iframe.srcdoc = code;
-          } else {
-            iframe.src = iframe.src;
-          }
-          showToast("Live Preview reloaded.");
+    document.querySelectorAll("[data-select-persona]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const p = btn.getAttribute("data-select-persona");
+        if (p && PERSONA_PROMPTS[p]) {
+          activePersona = p;
+          personaMenuOpen = false;
+          AudioEffects.play("click");
+          showToast(`Persona: ${PERSONA_LABELS[p]}`);
+          render();
         }
       });
-    }
+    });
 
-    const fullscreenPreviewBtn = document.querySelector("#fullscreen-preview-btn");
-    if (fullscreenPreviewBtn) {
-      fullscreenPreviewBtn.addEventListener("click", () => {
-        AudioEffects.play("click");
-        const code = currentActiveCodeTask ? getRunnableHtml(currentActiveCodeTask) : "<h1>No App</h1>";
-        const blob = new Blob([code], { type: "text/html" });
-        const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
+    // 13D. Chat Export Handlers (Markdown, Text, Print/PDF)
+    const toggleExportBtn = document.querySelector("#toggle-export-btn");
+    if (toggleExportBtn) {
+      toggleExportBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        exportMenuOpen = !exportMenuOpen;
+        personaMenuOpen = false;
+        render();
       });
     }
+
+    document.querySelectorAll("[data-export-chat]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const format = btn.getAttribute("data-export-chat");
+        exportMenuOpen = false;
+        const { path } = parseLocation();
+        const threadId = path.startsWith("/chat/") ? path.slice(6) : null;
+        const thread = conversations.find((c) => c.id === threadId);
+        if (!thread || !thread.messages || thread.messages.length === 0) {
+          showToast("No messages to export.");
+          render();
+          return;
+        }
+
+        const title = thread.title || "lumi-conversation";
+        if (format === "pdf") {
+          window.print();
+        } else if (format === "md") {
+          let md = `# ${title}\nExported from Lumi AI Studio on ${new Date().toLocaleString()}\n\n---\n\n`;
+          thread.messages.forEach((m) => {
+            const role = m.role === "user" ? "User" : "Lumi AI";
+            md += `### ${role}\n\n${m.content}\n\n---\n\n`;
+          });
+          const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.md`;
+          a.click();
+          AudioEffects.play("success");
+          showToast("✔ Downloaded Markdown export!");
+        } else if (format === "txt") {
+          let txt = `${title.toUpperCase()}\nExported on ${new Date().toLocaleString()}\n=====================================\n\n`;
+          thread.messages.forEach((m) => {
+            const role = m.role === "user" ? "USER" : "LUMI AI";
+            txt += `[${role}]:\n${m.content}\n\n-------------------------------------\n\n`;
+          });
+          const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.txt`;
+          a.click();
+          AudioEffects.play("success");
+          showToast("✔ Downloaded Text export!");
+        }
+        render();
+      });
+    });
+
+    // 13E. Real Python Sandbox Execution & HTML Live Preview
+    document.querySelectorAll("[data-run-py]").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute("data-run-py");
+        const rawEl = document.querySelector(`#raw-${id}`);
+        const outEl = document.querySelector(`#output-${id}`);
+        if (!rawEl || !outEl) return;
+
+        const code = rawEl.value;
+        outEl.style.display = "block";
+        outEl.innerHTML = `<div class="code-exec-header"><span class="status-dot animate-ping"></span> Executing in Python 3.13 Sandbox...</div><pre>Running...</pre>`;
+
+        try {
+          const apiBase =
+            window.location.origin && window.location.origin.startsWith("http")
+              ? ""
+              : "https://lumi-backend-v4-production.up.railway.app";
+          const resp = await fetch(`${apiBase}/api/run/python`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code }),
+          });
+          const data = await resp.json();
+          const isSuccess = data.exit_code === 0;
+          const output = (data.stdout || "") + (data.stderr || "");
+          outEl.innerHTML = `
+            <div class="code-exec-header">
+              <span class="status-dot ${isSuccess ? "" : "error"}"></span>
+              Console Output (Exit Code: ${data.exit_code})
+            </div>
+            <pre>${escapeHtml(output || "[Process exited with no output]")}</pre>`;
+          AudioEffects.play(isSuccess ? "success" : "click");
+        } catch (err) {
+          outEl.innerHTML = `
+            <div class="code-exec-header"><span class="status-dot error"></span> Execution Failed</div>
+            <pre>${escapeHtml(err.message)}</pre>`;
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-preview-html]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute("data-preview-html");
+        const rawEl = document.querySelector(`#raw-${id}`);
+        if (!rawEl) return;
+        activeHtmlModal = rawEl.value;
+        render();
+        const iframe = document.querySelector("#html-modal-iframe");
+        if (iframe) iframe.srcdoc = activeHtmlModal;
+      });
+    });
+
+    const closeHtmlModalBtn = document.querySelector("#close-html-modal-btn");
+    if (closeHtmlModalBtn) {
+      closeHtmlModalBtn.addEventListener("click", () => {
+        activeHtmlModal = null;
+        render();
+      });
+    }
+
+    document.querySelectorAll("[data-copy-code]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute("data-copy-code");
+        const rawEl = document.querySelector(`#raw-${id}`);
+        if (rawEl) {
+          navigator.clipboard.writeText(rawEl.value);
+          AudioEffects.play("click");
+          showToast("✔ Code copied to clipboard!");
+        }
+      });
+    });
 
     // 14. Auth Screen Handlers
     const googleAuthBtn = document.querySelector("#google-auth-btn");
@@ -3264,7 +2908,13 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
             {
               id: "m2",
               role: "assistant",
-              content: generateBuiltInResponse("Mujhe productivity ke 5 tips do", "openai"),
+              content: `### ⚡ 5 Powerful Productivity Tips
+
+1. **Eat That Frog First:** Apne din ka sabse mushkil aur zaroori kaam pehle 90 minutes mein khatam karo jab energy 100% hoti hai.
+2. **The 50/10 Rule:** 50 minutes deep focus work karo, fir 10 minutes ka screen-free break lo.
+3. **2-Minute Rule:** Agar koi kaam 2 minute se kam ka ho, toh baad ke liye mat taalo — turant kar dalo!
+4. **Notification Blackout:** Kaam ke waqt WhatsApp aur Instagram notifications band rakho.
+5. **Top 3 Priorities:** Sone se pehle agle din ke sirf 3 priority tasks decide karo.`,
               timestamp: Date.now() - 3550000,
             },
           ],
