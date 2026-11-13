@@ -2377,7 +2377,14 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
             let buffer = "";
 
             while (true) {
-              const { done, value } = await reader.read();
+              let chunkObj;
+              try {
+                chunkObj = await reader.read();
+              } catch (readErr) {
+                if (streamedSuccessfully) break;
+                throw readErr;
+              }
+              const { done, value } = chunkObj;
               if (done) break;
               buffer += decoder.decode(value, { stream: true });
               const lines = buffer.split("\n");

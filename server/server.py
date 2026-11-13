@@ -197,8 +197,9 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         self._cors_headers()
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-transform")
-        self.send_header("Connection", "keep-alive")
+        self.send_header("Connection", "close")
         self.send_header("X-Accel-Buffering", "no")
+        self.close_connection = True
         self.end_headers()
 
     def _send_chunk(self, data: bytes):
@@ -213,6 +214,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.flush()
         except Exception:
             pass
+        self.close_connection = True
 
     # --- Static File Serving ---
     def _serve_static(self, rel_path: str):
