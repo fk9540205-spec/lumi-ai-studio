@@ -385,9 +385,9 @@ body {
 
 .model-dropdown-menu.placement-topbar {
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
+  left: auto;
   bottom: auto;
-  right: auto;
 }
 
 .model-picker-toggle-btn {
@@ -931,4 +931,118 @@ body {
 .run-code-action-btn:hover {
   background: rgba(16, 185, 129, 0.25);
   border-color: #10b981;
+}
+
+/* --------------------------------------------------------------------------
+   User Message Bubble & Thinking Animation Enhancements
+   -------------------------------------------------------------------------- */
+.user-msg-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 100%;
+  margin-top: 0.65rem;
+  margin-bottom: 0.65rem;
+}
+
+.user-msg-bubble {
+  display: inline-block;
+  width: fit-content;
+  max-width: 82%;
+  padding: 0.6rem 1rem;
+  border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
+  background-color: var(--primary, #18181b);
+  color: var(--primary-foreground, #ffffff);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Thinking Indicator Component */
+.thinking-badge-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 9999px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  animation: fadeIn 0.2s ease;
+  user-select: none;
+}
+
+.thinking-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.thinking-dot {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background-color: var(--primary);
+  animation: thinking-bounce 1.4s infinite ease-in-out both;
+}
+
+.thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+.thinking-dot:nth-child(2) { animation-delay: -0.16s; }
+.thinking-dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Mobile Topbar & Persona Overflows Prevention */
+.topbar-action-pill {
+  white-space: nowrap !important;
+  flex-shrink: 0;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .topbar-action-pill {
+    padding-left: 0.45rem !important;
+    padding-right: 0.45rem !important;
+  }
+  .model-picker-toggle-btn {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  .model-dropdown-menu {
+    max-width: calc(100vw - 24px) !important;
+    width: 280px !important;
+  }
+  .topbar-dropdown-menu {
+    max-width: calc(100vw - 24px) !important;
+  }
 }

@@ -221,6 +221,24 @@
     writer: "✍️ Creative Writer"
   };
 
+  const PERSONA_ICONS = {
+    general: "🌟",
+    engineer: "💻",
+    dsa: "🧠",
+    hindi: "🇮🇳",
+    bughunter: "🐛",
+    writer: "✍️",
+  };
+
+  const PERSONA_SHORT_LABELS = {
+    general: "AI",
+    engineer: "Dev",
+    dsa: "DSA",
+    hindi: "Hindi",
+    bughunter: "Bug",
+    writer: "Writer",
+  };
+
   let activePersona = "general";
   let personaMenuOpen = false;
   let exportMenuOpen = false;
@@ -769,42 +787,43 @@
   }
 
   function renderPersonaPicker() {
-    const label = PERSONA_LABELS[activePersona] || "🌟 General AI";
+    const icon = PERSONA_ICONS[activePersona] || "🌟";
+    const rawLabel = PERSONA_LABELS[activePersona] || "General AI";
+    const cleanLabel = rawLabel.replace(/^[^\w\s]+\s*/, "");
+    const shortLabel = PERSONA_SHORT_LABELS[activePersona] || "AI";
+
     return `
       <div class="topbar-menu-wrapper relative">
         <button
           type="button"
           id="toggle-persona-btn"
-          class="inline-flex items-center gap-1.5 h-8 rounded-full border border-border bg-card/80 px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
-          title="Select AI Persona & System Behavior"
+          class="topbar-action-pill inline-flex items-center gap-1 h-8 rounded-full border border-border bg-card/80 px-2 sm:px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer whitespace-nowrap"
+          title="Select AI Persona: ${escapeHtml(cleanLabel)}"
         >
-          <span>${escapeHtml(label)}</span>
+          <span>${icon}</span>
+          <span class="persona-label hidden sm:inline">${escapeHtml(cleanLabel)}</span>
+          <span class="persona-short-label sm:hidden font-medium text-[11px]">${escapeHtml(shortLabel)}</span>
           ${ICONS.chevronDown}
         </button>
 
-        ${
-          personaMenuOpen
-            ? `
-          <div class="topbar-dropdown-menu" id="persona-dropdown-menu">
-            <div class="px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              AI Persona & Mode
-            </div>
-            ${Object.keys(PERSONA_LABELS)
-              .map(
-                (key) => `
-              <button
-                type="button"
-                class="dropdown-item ${activePersona === key ? "is-active" : ""}"
-                data-select-persona="${key}"
-              >
-                <span>${PERSONA_LABELS[key]}</span>
-                ${activePersona === key ? ICONS.check : ""}
-              </button>`
-              )
-              .join("")}
-          </div>`
-            : ""
-        }
+        <div class="topbar-dropdown-menu hidden" id="persona-dropdown-menu">
+          <div class="px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            AI Persona & Mode
+          </div>
+          ${Object.keys(PERSONA_LABELS)
+            .map(
+              (key) => `
+            <button
+              type="button"
+              class="dropdown-item ${activePersona === key ? "is-active" : ""}"
+              data-select-persona="${key}"
+            >
+              <span>${PERSONA_LABELS[key]}</span>
+              ${activePersona === key ? ICONS.check : ""}
+            </button>`
+            )
+            .join("")}
+        </div>
       </div>`;
   }
 
@@ -814,7 +833,7 @@
         <button
           type="button"
           id="toggle-export-btn"
-          class="inline-flex items-center gap-1.5 h-8 rounded-full border border-border bg-card/80 px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
+          class="topbar-action-pill inline-flex items-center gap-1 h-8 rounded-full border border-border bg-card/80 px-2 sm:px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer whitespace-nowrap"
           title="Export Conversation"
         >
           ${ICONS.export}
@@ -822,28 +841,23 @@
           ${ICONS.chevronDown}
         </button>
 
-        ${
-          exportMenuOpen
-            ? `
-          <div class="topbar-dropdown-menu" id="export-dropdown-menu">
-            <div class="px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Export Chat
-            </div>
-            <button type="button" class="dropdown-item" data-export-chat="md">
-              <span>Markdown (.md)</span>
-              ${ICONS.download}
-            </button>
-            <button type="button" class="dropdown-item" data-export-chat="txt">
-              <span>Plain Text (.txt)</span>
-              ${ICONS.download}
-            </button>
-            <button type="button" class="dropdown-item" data-export-chat="pdf">
-              <span>Print / PDF Document</span>
-              ${ICONS.download}
-            </button>
-          </div>`
-            : ""
-        }
+        <div class="topbar-dropdown-menu ${exportMenuOpen ? "" : "hidden"}" id="export-dropdown-menu">
+          <div class="px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            Export Chat
+          </div>
+          <button type="button" class="dropdown-item" data-export-chat="md">
+            <span>Markdown (.md)</span>
+            ${ICONS.download}
+          </button>
+          <button type="button" class="dropdown-item" data-export-chat="txt">
+            <span>Plain Text (.txt)</span>
+            ${ICONS.download}
+          </button>
+          <button type="button" class="dropdown-item" data-export-chat="pdf">
+            <span>Print / PDF Document</span>
+            ${ICONS.download}
+          </button>
+        </div>
       </div>`;
   }
 
@@ -873,83 +887,77 @@
     const label = getActiveModelLabel();
     const isTopbar = placement === "topbar";
     const dropdownPosClass = isTopbar ? "placement-topbar" : "placement-composer";
-    const isOpen = modelMenuOpen === placement;
 
     return `
       <div class="relative model-picker-wrapper" data-placement="${placement}">
         <button
           type="button"
-          class="model-picker-toggle-btn inline-flex items-center gap-1.5 h-8 rounded-full border border-border bg-card/80 px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
+          class="model-picker-toggle-btn inline-flex items-center gap-1 h-8 rounded-full border border-border bg-card/80 px-2 sm:px-3 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer whitespace-nowrap"
           data-toggle-model-picker="${placement}"
-          aria-expanded="${isOpen}"
+          aria-expanded="false"
           aria-label="Select AI Model"
         >
-          <span class="truncate max-w-[12rem]">${escapeHtml(label)}</span>
+          <span class="truncate max-w-[85px] sm:max-w-[12rem] model-picker-label">${escapeHtml(label)}</span>
           ${ICONS.chevronDown}
         </button>
 
-        ${
-          isOpen
-            ? `
-          <div class="model-dropdown-menu ${dropdownPosClass}" id="model-dropdown-menu">
-            <div class="model-group-title">Free AI Engine (Zero Setup)</div>
-            ${BUILT_IN_MODELS.map(
-              (m) => `
-              <button
-                type="button"
-                class="model-item-btn ${
-                  !selectedModel.provider_id && selectedModel.model === m.id ? "is-active" : ""
-                }"
-                data-select-model="builtin::${m.id}"
-              >
-                <span>${escapeHtml(m.label)}</span>
-                ${
-                  !selectedModel.provider_id && selectedModel.model === m.id
-                    ? ICONS.check
-                    : ""
-                }
-              </button>`
-            ).join("")}
+        <div class="model-dropdown-menu ${dropdownPosClass} hidden" id="model-dropdown-menu-${placement}">
+          <div class="model-group-title">Free AI Engine (Zero Setup)</div>
+          ${BUILT_IN_MODELS.map(
+            (m) => `
+            <button
+              type="button"
+              class="model-item-btn ${
+                !selectedModel.provider_id && selectedModel.model === m.id ? "is-active" : ""
+              }"
+              data-select-model="builtin::${m.id}"
+            >
+              <span>${escapeHtml(m.label)}</span>
+              ${
+                !selectedModel.provider_id && selectedModel.model === m.id
+                  ? ICONS.check
+                  : ""
+              }
+            </button>`
+          ).join("")}
 
-            ${
-              providers.length > 0
-                ? `
-                <div class="model-group-title mt-2">Custom AI Providers</div>
-                ${providers
-                  .map((p) => {
-                    const models = p.models && p.models.length ? p.models : [p.default_model || "default"];
-                    return models
-                      .map((mod) => {
-                        const isCur =
-                          selectedModel.provider_id === p.id && selectedModel.model === mod;
-                        return `
-                        <button
-                          type="button"
-                          class="model-item-btn ${isCur ? "is-active" : ""}"
-                          data-select-model="${p.id}::${mod}"
-                        >
-                          <div class="flex flex-col">
-                            <span class="truncate max-w-[180px]">${escapeHtml(mod)}</span>
-                            <span class="text-[10px] text-muted-foreground">${escapeHtml(p.name)}</span>
-                          </div>
-                          ${isCur ? ICONS.check : ""}
-                        </button>`;
-                      })
-                      .join("");
-                  })
-                  .join("")}
-              `
-                : ""
-            }
+          ${
+            providers.length > 0
+              ? `
+              <div class="model-group-title mt-2">Custom AI Providers</div>
+              ${providers
+                .map((p) => {
+                  const models = p.models && p.models.length ? p.models : [p.default_model || "default"];
+                  return models
+                    .map((mod) => {
+                      const isCur =
+                        selectedModel.provider_id === p.id && selectedModel.model === mod;
+                      return `
+                      <button
+                        type="button"
+                        class="model-item-btn ${isCur ? "is-active" : ""}"
+                        data-select-model="${p.id}::${mod}"
+                      >
+                        <div class="flex flex-col">
+                          <span class="truncate max-w-[180px]">${escapeHtml(mod)}</span>
+                          <span class="text-[10px] text-muted-foreground">${escapeHtml(p.name)}</span>
+                        </div>
+                        ${isCur ? ICONS.check : ""}
+                      </button>`;
+                    })
+                    .join("");
+                })
+                .join("")}
+            `
+              : ""
+          }
 
-            <div class="mt-2 pt-2 border-t border-border">
-              <a href="#/providers" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-primary font-medium hover:underline">
-                ${ICONS.server} <span>Manage AI Providers...</span>
-              </a>
-            </div>
-          </div>`
-            : ""
-        }
+          <div class="mt-2 pt-2 border-t border-border">
+            <a href="#/providers" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-primary font-medium hover:underline">
+              ${ICONS.server} <span>Manage AI Providers...</span>
+            </a>
+          </div>
+        </div>
       </div>`;
   }
 
@@ -1095,17 +1103,15 @@
 
                 if (isUser) {
                   return `
-                    <div class="animate-rise-in flex flex-col items-end gap-1">
+                    <div class="animate-rise-in user-msg-row" id="msg-row-${msg.id}">
                       ${
                         msg.attachedFiles && msg.attachedFiles.length > 0
-                          ? `<div class="flex flex-wrap justify-end gap-1.5 mb-0.5">
+                          ? `<div class="flex flex-wrap justify-end gap-1.5 mb-1">
                               ${msg.attachedFiles.map(f => `<span class="attachment-chip text-[11px] py-0.5 px-2">📄 ${escapeHtml(f.name)} (${formatBytes(f.size)})</span>`).join('')}
                             </div>`
                           : ""
                       }
-                      <div class="max-w-[85%] rounded-3xl bg-primary px-4 py-2.5 text-primary-foreground text-[15px] whitespace-pre-wrap leading-relaxed shadow-xs">
-                        ${escapeHtml(msg.content)}
-                      </div>
+                      <div class="user-msg-bubble">${escapeHtml(msg.content.trim())}</div>
                     </div>`;
                 }
 
@@ -1115,7 +1121,7 @@
                   isStreaming && index === messages.length - 1;
 
                 return `
-                  <div class="animate-rise-in flex gap-3.5 items-start">
+                  <div class="animate-rise-in flex gap-3.5 items-start" id="msg-row-${msg.id}">
                     <img src="${LUMI_LOGO}" alt="Lumi" class="mt-0.5 size-6 shrink-0 object-contain select-none" />
                     
                     <div class="min-w-0 flex-1">
@@ -1152,9 +1158,21 @@
                           : ""
                       }
 
-                      <div class="markdown-body text-[15px] leading-relaxed text-foreground">
-                        ${renderMarkdown(rawText)}
-                        ${isCurrentlyStreaming ? `<span class="streaming-cursor"></span>` : ""}
+                      <div class="markdown-body text-[15px] leading-relaxed text-foreground" id="msg-body-${msg.id}">
+                        ${
+                          isCurrentlyStreaming && !rawText
+                            ? `<div class="thinking-badge-container">
+                                <span class="thinking-spinner"></span>
+                                <span>Thinking…</span>
+                                <span class="thinking-dots">
+                                  <span class="thinking-dot"></span>
+                                  <span class="thinking-dot"></span>
+                                  <span class="thinking-dot"></span>
+                                </span>
+                              </div>`
+                            : renderMarkdown(rawText)
+                        }
+                        ${isCurrentlyStreaming && rawText ? `<span class="streaming-cursor"></span>` : ""}
                       </div>
 
                       <!-- AI Image Generation Result Card -->
@@ -1263,31 +1281,27 @@
         ${renderSidebar(threadId)}
 
         <!-- Mobile Backdrop -->
-        ${
-          sidebarOpen
-            ? `<div class="fixed inset-0 z-20 bg-foreground/20 backdrop-blur-xs md:hidden" id="sidebar-backdrop"></div>`
-            : ""
-        }
+        <div class="fixed inset-0 z-20 bg-foreground/20 backdrop-blur-xs md:hidden ${sidebarOpen ? "" : "hidden"}" id="sidebar-backdrop"></div>
 
         <!-- Workspace Main View -->
         <main class="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           <!-- Top Bar -->
-          <div class="flex items-center justify-between border-b border-border/50 px-4 py-2 bg-card/50 backdrop-blur z-10">
-            <div class="flex items-center gap-2">
+          <div class="flex items-center justify-between border-b border-border/50 px-3 py-2 bg-card/60 backdrop-blur z-10 gap-1.5">
+            <div class="flex items-center gap-1.5 min-w-0">
               <button
                 type="button"
                 id="sidebar-toggle-btn"
-                class="inline-flex size-8 items-center justify-center rounded-lg hover:bg-accent transition-colors md:hidden"
+                class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg hover:bg-accent transition-colors md:hidden"
                 aria-label="Open chats"
               >
                 ${ICONS.panelLeft}
               </button>
-              <div class="text-sm font-medium truncate max-w-[160px] sm:max-w-xs">
-                ${thread ? escapeHtml(thread.title) : "Lumi AI Studio"}
+              <div class="text-xs sm:text-sm font-semibold truncate max-w-[70px] sm:max-w-xs text-foreground">
+                ${thread ? escapeHtml(thread.title) : "Lumi AI"}
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
               ${renderModelPicker("topbar")}
               ${renderPersonaPicker()}
               ${renderExportPicker(threadId)}
@@ -1770,12 +1784,13 @@
     }
 
     // Add User Message
-    thread.messages.push({
+    const userMsg = {
       id: "msg_" + Date.now().toString(36) + "_user",
       role: "user",
       content: prompt,
       timestamp: Date.now(),
-    });
+    };
+    thread.messages.push(userMsg);
 
     // Add Empty Assistant Message placeholder for streaming
     const assistantMsgId = "msg_" + Date.now().toString(36) + "_assistant";
@@ -1789,9 +1804,76 @@
     const assistantMsg = thread.messages.find((m) => m.id === assistantMsgId);
 
     saveJson(STORAGE.CHATS, conversations);
-    render();
-    scrollToBottom();
     AudioEffects.play("send");
+
+    // In-place append if chat container exists, preventing full-screen repaint/flash!
+    const msgsContainer = document.querySelector("#chat-messages-container .space-y-7");
+    if (msgsContainer) {
+      const userHtml = `
+        <div class="animate-rise-in user-msg-row" id="msg-row-${userMsg.id}">
+          ${
+            userMsg.attachedFiles && userMsg.attachedFiles.length > 0
+              ? `<div class="flex flex-wrap justify-end gap-1.5 mb-1">
+                  ${userMsg.attachedFiles.map(f => `<span class="attachment-chip text-[11px] py-0.5 px-2">📄 ${escapeHtml(f.name)} (${formatBytes(f.size)})</span>`).join('')}
+                </div>`
+              : ""
+          }
+          <div class="user-msg-bubble">${escapeHtml(userMsg.content.trim())}</div>
+        </div>`;
+
+      const assistantHtml = `
+        <div class="animate-rise-in flex gap-3.5 items-start" id="msg-row-${assistantMsg.id}">
+          <img src="${LUMI_LOGO}" alt="Lumi" class="mt-0.5 size-6 shrink-0 object-contain select-none" />
+          <div class="min-w-0 flex-1">
+            <div class="markdown-body text-[15px] leading-relaxed text-foreground" id="msg-body-${assistantMsg.id}">
+              <div class="thinking-badge-container">
+                <span class="thinking-spinner"></span>
+                <span>Thinking…</span>
+                <span class="thinking-dots">
+                  <span class="thinking-dot"></span>
+                  <span class="thinking-dot"></span>
+                  <span class="thinking-dot"></span>
+                </span>
+              </div>
+            </div>
+            <div class="mt-2.5 flex items-center flex-wrap gap-2" id="msg-actions-${assistantMsg.id}" style="display:none;"></div>
+          </div>
+        </div>`;
+
+      msgsContainer.insertAdjacentHTML("beforeend", userHtml);
+      msgsContainer.insertAdjacentHTML("beforeend", assistantHtml);
+
+      const ta = document.querySelector("#composer-textarea");
+      if (ta) {
+        ta.value = "";
+        ta.style.height = "auto";
+      }
+
+      // In-place switch send button to stop button
+      const submitBtn = document.querySelector("#submit-prompt-btn");
+      if (submitBtn) {
+        submitBtn.outerHTML = `
+          <button
+            type="button"
+            id="stop-generation-btn"
+            class="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer"
+            title="Stop generation"
+          >
+            ${ICONS.square}
+          </button>`;
+        const newStop = document.querySelector("#stop-generation-btn");
+        if (newStop) {
+          newStop.addEventListener("click", () => {
+            if (streamAbortController) streamAbortController.abort();
+            isStreaming = false;
+          });
+        }
+      }
+      scrollToBottom();
+    } else {
+      render();
+      scrollToBottom();
+    }
 
     // 1. FREE IMAGE GENERATION (/image or image prompt)
     const isImageCommand = /^\/(?:image|img)\s+/i.test(prompt) || prompt.toLowerCase().startsWith("generate image") || prompt.toLowerCase().startsWith("image of ");
@@ -2008,12 +2090,54 @@
     } finally {
       isStreaming = false;
       streamAbortController = null;
-
-
-
       saveJson(STORAGE.CHATS, conversations);
       AudioEffects.play("success");
-      render();
+
+      // In-place UI update to prevent whole page refresh flash!
+      const bodyEl = document.querySelector(`#msg-body-${assistantMsgId}`);
+      if (bodyEl) {
+        bodyEl.innerHTML = renderMarkdown(assistantMsg.content);
+      }
+      const actionsEl = document.querySelector(`#msg-actions-${assistantMsgId}`);
+      if (actionsEl) {
+        actionsEl.style.display = "flex";
+        actionsEl.innerHTML = `
+          <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer" data-action="copy-message" data-text="${escapeHtml(assistantMsg.content)}" title="Copy reply">
+            ${ICONS.copy} <span>Copy</span>
+          </button>
+          <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer" data-action="speak-message" data-id="${assistantMsg.id}" data-text="${escapeHtml(assistantMsg.content)}" title="Read aloud">
+            ${ICONS.volume} <span>Listen</span>
+          </button>
+          <button type="button" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer" data-action="regenerate-message" title="Regenerate reply">
+            ${ICONS.refreshCw} <span>Regenerate</span>
+          </button>`;
+      }
+
+      const stopBtn = document.querySelector("#stop-generation-btn");
+      if (stopBtn) {
+        stopBtn.outerHTML = `
+          <button
+            type="submit"
+            id="submit-prompt-btn"
+            class="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Send message"
+          >
+            ${ICONS.cornerDownLeft}
+          </button>`;
+      }
+
+          document.addEventListener("click", () => {
+      const pMenu = document.querySelector("#persona-dropdown-menu");
+      if (pMenu && !pMenu.classList.contains("hidden")) pMenu.classList.add("hidden");
+      const eMenu = document.querySelector("#export-dropdown-menu");
+      if (eMenu && !eMenu.classList.contains("hidden")) eMenu.classList.add("hidden");
+      const mMenu = document.querySelector("#model-dropdown-menu");
+      if (mMenu) {
+        modelMenuOpen = null;
+        mMenu.remove();
+      }
+    });
+    attachEventListeners();
       scrollToBottom();
     }
   }
@@ -2262,25 +2386,43 @@
       });
     });
 
-    // 5. Model Picker Dropdown Toggle (supports both topbar and composer buttons)
+    // 5. Model Picker Dropdown Toggle (In-place, no full refresh!)
     document.querySelectorAll(".model-picker-toggle-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const placement = btn.getAttribute("data-toggle-model-picker") || "composer";
-        modelMenuOpen = (modelMenuOpen === placement) ? false : placement;
-        render();
+        const menu = document.querySelector(`#model-dropdown-menu-${placement}`);
+        const otherPlacement = placement === "topbar" ? "composer" : "topbar";
+        const otherMenu = document.querySelector(`#model-dropdown-menu-${otherPlacement}`);
+        if (otherMenu) otherMenu.classList.add("hidden");
+        const personaMenu = document.querySelector("#persona-dropdown-menu");
+        if (personaMenu) personaMenu.classList.add("hidden");
+        const exportMenu = document.querySelector("#export-dropdown-menu");
+        if (exportMenu) exportMenu.classList.add("hidden");
+
+        if (menu) {
+          menu.classList.toggle("hidden");
+          const isHidden = menu.classList.contains("hidden");
+          btn.setAttribute("aria-expanded", String(!isHidden));
+        }
       });
     });
 
-    // Close model dropdown on document click
+    // Close menus on outside click
     document.addEventListener("click", (e) => {
-      if (modelMenuOpen && !e.target.closest("#model-dropdown-menu") && !e.target.closest(".model-picker-toggle-btn")) {
-        modelMenuOpen = false;
-        render();
+      if (!e.target.closest(".model-dropdown-menu") && !e.target.closest(".model-picker-toggle-btn")) {
+        document.querySelectorAll(".model-dropdown-menu").forEach((m) => m.classList.add("hidden"));
+        document.querySelectorAll(".model-picker-toggle-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      }
+      if (!e.target.closest(".topbar-dropdown-menu") && !e.target.closest("#toggle-persona-btn") && !e.target.closest("#toggle-export-btn")) {
+        const pMenu = document.querySelector("#persona-dropdown-menu");
+        if (pMenu) pMenu.classList.add("hidden");
+        const eMenu = document.querySelector("#export-dropdown-menu");
+        if (eMenu) eMenu.classList.add("hidden");
       }
     });
 
-    // Model selection click
+    // Model selection click (In-place, no full refresh!)
     document.querySelectorAll("[data-select-model]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2292,34 +2434,76 @@
           model: modName || null,
         };
         saveJson(STORAGE.MODEL, selectedModel);
-        modelMenuOpen = false;
-        showToast(`Model set to: ${getActiveModelLabel()}`);
-        render();
+
+        // Hide model dropdowns
+        document.querySelectorAll(".model-dropdown-menu").forEach((m) => m.classList.add("hidden"));
+        document.querySelectorAll(".model-picker-toggle-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+
+        // Update labels in-place
+        const newLabel = getActiveModelLabel();
+        document.querySelectorAll(".model-picker-label").forEach((el) => {
+          el.textContent = newLabel;
+        });
+
+        // Update active checkmarks inside model items
+        document.querySelectorAll("[data-select-model]").forEach((itemBtn) => {
+          const itemVal = itemBtn.getAttribute("data-select-model");
+          const isActive = itemVal === raw;
+          itemBtn.classList.toggle("is-active", isActive);
+          const existingCheck = itemBtn.querySelector("svg");
+          if (isActive && !existingCheck) {
+            itemBtn.insertAdjacentHTML("beforeend", ICONS.check);
+          } else if (!isActive && existingCheck) {
+            existingCheck.remove();
+          }
+        });
+
+        AudioEffects.play("click");
+        showToast(`Model set to: ${newLabel}`);
       });
     });
 
-    // 6. Sidebar Controls
+    // 6. Sidebar Controls (In-place smooth slide-in, no full reload!)
     const sidebarToggle = document.querySelector("#sidebar-toggle-btn");
+    const aside = document.querySelector("aside");
+    const sidebarBackdrop = document.querySelector("#sidebar-backdrop");
+
+    function setSidebarState(open) {
+      sidebarOpen = open;
+      if (aside) {
+        if (open) {
+          aside.classList.add("translate-x-0", "shadow-2xl");
+          aside.classList.remove("-translate-x-full");
+        } else {
+          aside.classList.remove("translate-x-0", "shadow-2xl");
+          aside.classList.add("-translate-x-full");
+        }
+      }
+      if (sidebarBackdrop) {
+        if (open) {
+          sidebarBackdrop.classList.remove("hidden");
+        } else {
+          sidebarBackdrop.classList.add("hidden");
+        }
+      }
+    }
+
     if (sidebarToggle) {
       sidebarToggle.addEventListener("click", () => {
-        sidebarOpen = !sidebarOpen;
-        render();
+        setSidebarState(!sidebarOpen);
       });
     }
 
     const closeSidebarBtn = document.querySelector("#close-sidebar-btn");
     if (closeSidebarBtn) {
       closeSidebarBtn.addEventListener("click", () => {
-        sidebarOpen = false;
-        render();
+        setSidebarState(false);
       });
     }
 
-    const backdrop = document.querySelector("#sidebar-backdrop");
-    if (backdrop) {
-      backdrop.addEventListener("click", () => {
-        sidebarOpen = false;
-        render();
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener("click", () => {
+        setSidebarState(false);
       });
     }
 
@@ -2683,14 +2867,15 @@
       });
     });
 
-    // 13C. Persona Selector Handlers
+    // 13B. Persona Selector (In-place, no full refresh!)
     const togglePersonaBtn = document.querySelector("#toggle-persona-btn");
-    if (togglePersonaBtn) {
+    const personaMenu = document.querySelector("#persona-dropdown-menu");
+    if (togglePersonaBtn && personaMenu) {
       togglePersonaBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        personaMenuOpen = !personaMenuOpen;
-        exportMenuOpen = false;
-        render();
+        personaMenu.classList.toggle("hidden");
+        const exportMenu = document.querySelector("#export-dropdown-menu");
+        if (exportMenu) exportMenu.classList.add("hidden");
       });
     }
 
@@ -2700,22 +2885,27 @@
         const p = btn.getAttribute("data-select-persona");
         if (p && PERSONA_PROMPTS[p]) {
           activePersona = p;
-          personaMenuOpen = false;
+          if (personaMenu) personaMenu.classList.add("hidden");
+          const pIcon = document.querySelector("#toggle-persona-btn span:first-child");
+          const pLabel = document.querySelector("#toggle-persona-btn .persona-label");
+          const pShort = document.querySelector("#toggle-persona-btn .persona-short-label");
+          if (pIcon) pIcon.textContent = PERSONA_ICONS[p] || "🌟";
+          if (pLabel) pLabel.textContent = PERSONA_LABELS[p].replace(/^[^\w\s]+\s*/, "");
+          if (pShort) pShort.textContent = PERSONA_SHORT_LABELS[p];
           AudioEffects.play("click");
           showToast(`Persona: ${PERSONA_LABELS[p]}`);
-          render();
         }
       });
     });
 
-    // 13D. Chat Export Handlers (Markdown, Text, Print/PDF)
+    // 13C. Chat Export Handlers (In-place, no full refresh!)
     const toggleExportBtn = document.querySelector("#toggle-export-btn");
-    if (toggleExportBtn) {
+    const exportMenu = document.querySelector("#export-dropdown-menu");
+    if (toggleExportBtn && exportMenu) {
       toggleExportBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        exportMenuOpen = !exportMenuOpen;
-        personaMenuOpen = false;
-        render();
+        exportMenu.classList.toggle("hidden");
+        if (personaMenu) personaMenu.classList.add("hidden");
       });
     }
 
