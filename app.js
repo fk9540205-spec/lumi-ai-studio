@@ -2172,7 +2172,7 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
     const apiBase =
       window.location.origin && window.location.origin.startsWith("http")
         ? ""
-        : "https://lumi-backend-v2-production.up.railway.app";
+        : "https://lumi-backend-v4-production.up.railway.app";
 
     let rawBase = (provider.base_url || "").trim().replace(/\/+$/, "");
     if (rawBase.startsWith("/")) {
@@ -2348,7 +2348,7 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
         const apiBase =
           window.location.origin && window.location.origin.startsWith("http")
             ? ""
-            : "https://lumi-backend-v2-production.up.railway.app";
+            : "https://lumi-backend-v4-production.up.railway.app";
 
         let streamedSuccessfully = false;
         try {
