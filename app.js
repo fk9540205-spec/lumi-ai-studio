@@ -1265,14 +1265,38 @@ Always write a short friendly conversational sentence before or after the card.
       }
     });
 
-    // 0.1 Progressive live streaming GenUI card rendering (Zero-wait instant rendering)
+    // 0.1 Stable, zero-jitter GenUI skeleton during live streaming (Prevents screen jumping/flickering)
     text = text.replace(/```(?:ui|genui|json:ui)\s*([\s\S]*?)$/i, (match, innerStream) => {
       if (innerStream.includes("```")) return match;
-      const partialParsed = tryParsePartialJson(innerStream);
-      if (partialParsed && (partialParsed.type || partialParsed.blocks)) {
-        return `\n<div class="genui-streaming-live-wrap relative">${GenUIRenderer.render(partialParsed)}<div class="genui-live-badge"><span class="size-1.5 rounded-full bg-indigo-500 animate-ping"></span> Live building…</div></div>\n`;
+      if (!isStreaming) {
+        const finalParsed = tryParseJson(innerStream);
+        if (finalParsed) {
+          const id = "genui-" + Math.random().toString(36).slice(2, 9);
+          codeBlocks.push(`<div id="${id}" class="genui-wrapper animate-fade-in">${GenUIRenderer.render(finalParsed)}</div>`);
+          return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+        }
       }
-      return `\n<div class="genui-card p-3.5 my-2 flex items-center gap-3 border border-indigo-500/30 bg-indigo-500/5 rounded-xl"><div class="size-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div><span class="text-xs text-muted-foreground font-medium">Generating interactive card…</span></div>\n`;
+      return `\n<div class="genui-card genui-skeleton-stable my-3 p-4 rounded-2xl border border-indigo-500/25 bg-card/80 backdrop-blur-sm relative overflow-hidden" style="min-height: 200px;">
+        <div class="flex items-center justify-between pb-3 border-b border-border/40">
+          <div class="flex items-center gap-2.5">
+            <span class="relative flex h-2.5 w-2.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+            </span>
+            <span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider">Generating interactive card…</span>
+          </div>
+          <span class="text-[11px] text-muted-foreground font-mono">Lumi GenUI</span>
+        </div>
+        <div class="pt-4 space-y-3">
+          <div class="h-4 w-2/5 bg-muted/60 rounded-md animate-pulse"></div>
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div class="h-16 bg-muted/40 rounded-xl border border-border/20 p-2.5 animate-pulse"></div>
+            <div class="h-16 bg-muted/40 rounded-xl border border-border/20 p-2.5 animate-pulse"></div>
+          </div>
+          <div class="h-6 w-full bg-muted/30 rounded-lg animate-pulse"></div>
+        </div>
+        <div class="genui-shimmer-sweep"></div>
+      </div>\n`;
     });
 
     // 3. Fenced Code Blocks with IDE Syntax Highlighting, GenUI Interception, Sandbox Run & Copy
@@ -1296,7 +1320,7 @@ Always write a short friendly conversational sentence before or after the card.
             const renderedGenUi = GenUIRenderer.render(parsed);
             if (renderedGenUi) {
               const id = "genui-" + Math.random().toString(36).slice(2, 9);
-              codeBlocks.push(`<div id="${id}">${renderedGenUi}</div>`);
+              codeBlocks.push(`<div id="${id}" class="genui-wrapper animate-fade-in">${renderedGenUi}</div>`);
               return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
             }
           }
@@ -3086,10 +3110,21 @@ Always write a short friendly conversational sentence before or after the card.
     isStreaming = true;
     streamAbortController = new AbortController();
 
+    let pendingStreamText = null;
+    let streamRaf = null;
+
     const onChunk = (chunk) => {
       assistantMsg.content += chunk;
-      updateStreamingMessageUI(threadId, assistantMsg.content, assistantMsg.id);
-      scrollToBottom();
+      pendingStreamText = assistantMsg.content;
+      if (!streamRaf) {
+        streamRaf = requestAnimationFrame(() => {
+          streamRaf = null;
+          if (pendingStreamText !== null) {
+            updateStreamingMessageUI(threadId, pendingStreamText, assistantMsg.id);
+            scrollToBottom();
+          }
+        });
+      }
     };
 
     try {
@@ -3199,8 +3234,18 @@ Always write a short friendly conversational sentence before or after the card.
         }
       }
     } finally {
+      if (streamRaf) {
+        cancelAnimationFrame(streamRaf);
+        streamRaf = null;
+      }
       isStreaming = false;
       streamAbortController = null;
+
+      // Auto-close open code block if LLM stream ended mid-block
+      if (assistantMsg.content.includes("```") && (assistantMsg.content.match(/```/g) || []).length % 2 !== 0) {
+        assistantMsg.content += "\n```";
+      }
+
       saveJson(STORAGE.CHATS, conversations);
       AudioEffects.play("success");
 
@@ -3235,7 +3280,7 @@ Always write a short friendly conversational sentence before or after the card.
         submitBtn.classList.add("inline-flex");
       }
 
-      scrollToBottom();
+      scrollToBottom(true);
     }
   }
 
@@ -3394,12 +3439,22 @@ Always write a short friendly conversational sentence before or after the card.
     }
   }
 
-  function scrollToBottom() {
+  let scrollScheduled = false;
+  function scrollToBottom(force = false) {
+    if (scrollScheduled && !force) return;
+    scrollScheduled = true;
     requestAnimationFrame(() => {
+      scrollScheduled = false;
       const container = document.querySelector("#chat-messages-container");
-      if (container) {
-        container.scrollTop = container.scrollHeight;
+      if (!container) return;
+
+      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      // If user has intentionally scrolled up to read (more than 120px away from bottom), don't hijack their scroll!
+      if (!force && distanceFromBottom > 120) {
+        return;
       }
+
+      container.scrollTop = container.scrollHeight;
     });
   }
 

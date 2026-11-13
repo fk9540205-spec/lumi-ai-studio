@@ -1671,7 +1671,7 @@ html.dark .genui-recom-rank.gold {
 }
 
 
-/* Live Progressive Streaming Badge */
+/* Live Progressive Streaming Badge & Stable Skeleton */
 .genui-streaming-live-wrap {
   position: relative;
   width: 100%;
@@ -1695,3 +1695,53 @@ html.dark .genui-recom-rank.gold {
   z-index: 10;
   backdrop-filter: blur(4px);
 }
+
+/* Stable GenUI Skeleton during Streaming (Zero Layout Shift / Zero Scroll Bouncing) */
+.genui-skeleton-stable {
+  min-height: 200px;
+  contain: layout paint;
+  position: relative;
+  overflow: hidden;
+}
+
+.genui-shimmer-sweep {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.12), transparent);
+  animation: genuiShimmer 1.8s infinite;
+  pointer-events: none;
+}
+
+@keyframes genuiShimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+.genui-wrapper {
+  width: 100%;
+}
+
+.animate-fade-in {
+  animation: genuiFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes genuiFadeIn {
+  from {
+    opacity: 0.7;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Chat Scroll Stability */
+#chat-messages-container {
+  overflow-anchor: auto;
+  scroll-behavior: auto;
+}
+
