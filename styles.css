@@ -9,6 +9,104 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 }
 
+/* --------------------------------------------------------------------------
+   Dark Mode & White Mode Theme System
+   -------------------------------------------------------------------------- */
+html.dark {
+  color-scheme: dark;
+  --background: #111114;
+  --foreground: #f4f4f7;
+  --card: #18181c;
+  --card-foreground: #f4f4f7;
+  --popover: #1c1c22;
+  --popover-foreground: #f4f4f7;
+  --primary: #f4f4f7;
+  --primary-foreground: #111114;
+  --secondary: #222228;
+  --secondary-foreground: #f4f4f7;
+  --muted: #222228;
+  --muted-foreground: #9ca3af;
+  --accent: #26262e;
+  --accent-foreground: #f4f4f7;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #282830;
+  --input: #282830;
+  --ring: #6366f1;
+  --sidebar: #131316;
+  --sidebar-foreground: #f4f4f7;
+  --sidebar-primary: #f4f4f7;
+  --sidebar-primary-foreground: #111114;
+  --sidebar-accent: #1e1e24;
+  --sidebar-accent-foreground: #f4f4f7;
+  --sidebar-border: #24242c;
+  --sidebar-ring: #6366f1;
+  --glow-1: #2a1b36;
+  --glow-2: #1b1b36;
+  --glow-3: #142236;
+  --shadow-composer: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.8), 0 4px 14px -6px rgba(0, 0, 0, 0.5);
+}
+
+html.dark body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+html.dark .user-msg-bubble {
+  background: #25252d !important;
+  color: #f4f4f7 !important;
+  border: 1px solid #363644;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .attachment-chip {
+  background: #222228;
+  border-color: #2e2e36;
+  color: #e4e4e7;
+}
+
+html.dark .composer-card {
+  background: rgba(24, 24, 28, 0.95);
+  border-color: #2e2e36;
+}
+
+html.dark .aurora::before,
+html.dark .aurora::after {
+  opacity: 0.15;
+}
+
+html.dark pre {
+  background: #0d0d10 !important;
+  border-color: #25252c !important;
+}
+
+html.dark .code-block-header {
+  background: #16161b !important;
+  border-bottom-color: #25252c !important;
+}
+
+html.dark .dropdown-menu,
+html.dark .model-dropdown-menu,
+html.dark .topbar-dropdown-menu {
+  background: #1c1c22 !important;
+  border-color: #2e2e38 !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
+}
+
+html.dark input,
+html.dark textarea {
+  background-color: transparent;
+  color: var(--foreground);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 body {
   font-family: var(--font-sans);
   min-height: 100vh;
@@ -1046,3 +1144,526 @@ body {
     max-width: calc(100vw - 24px) !important;
   }
 }
+
+/* ==========================================================================
+   Generative UI (GenUI) & ChatGPT-Style Rich Cards System
+   ========================================================================== */
+
+.genui-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0.75rem 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+.genui-card {
+  position: relative;
+  border-radius: 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.08), 0 2px 6px -2px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+html.dark .genui-card {
+  box-shadow: 0 8px 30px -6px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.3);
+  border-color: #2e2e38;
+}
+
+.genui-card:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* Header & Badges */
+.genui-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 0.5rem;
+}
+
+.genui-card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.35;
+}
+
+.genui-card-subtitle {
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+  margin-top: 0.2rem;
+}
+
+.genui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--accent);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.genui-badge.success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.genui-badge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.genui-badge.primary {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.genui-card-body {
+  padding: 0.75rem 1.25rem 1.25rem;
+}
+
+/* 1. PRODUCT CARD */
+.genui-product-image-wrap {
+  width: 100%;
+  height: 180px;
+  background: var(--accent);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.genui-product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.genui-card:hover .genui-product-image {
+  transform: scale(1.03);
+}
+
+.genui-product-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0.6rem 0;
+}
+
+.genui-product-price {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.genui-product-original-price {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+
+.genui-product-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #f59e0b;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
+.genui-product-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.75rem 0;
+}
+
+.genui-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted-foreground);
+}
+
+.genui-feature-item svg {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+/* 2. WEATHER CARD */
+.genui-weather-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+}
+
+.genui-weather-temp {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--foreground);
+  line-height: 1;
+}
+
+.genui-weather-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.genui-weather-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+}
+
+.genui-weather-stat-box {
+  background: var(--accent);
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.genui-weather-stat-label {
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+
+.genui-weather-stat-val {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.genui-weather-forecast-row {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  scrollbar-width: none;
+}
+
+.genui-forecast-day-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.6rem;
+  background: var(--accent);
+  min-width: 62px;
+  flex-shrink: 0;
+}
+
+/* 3. STATS CARD */
+.genui-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.genui-stat-item {
+  background: var(--accent);
+  padding: 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.genui-stat-val {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--foreground);
+  line-height: 1.1;
+}
+
+.genui-stat-label {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.genui-stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+
+.genui-stat-delta.up { color: #10b981; }
+.genui-stat-delta.down { color: #ef4444; }
+
+.genui-progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 0.4rem;
+}
+
+.genui-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 4. COMPARISON CARD */
+.genui-comparison-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.genui-compare-headers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.genui-compare-col-header {
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  text-align: center;
+  position: relative;
+}
+
+.genui-compare-col-header.winner {
+  border-color: #6366f1;
+  box-shadow: 0 0 15px -3px rgba(99, 102, 241, 0.25);
+}
+
+.genui-compare-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  background: var(--accent);
+  font-size: 0.82rem;
+}
+
+.genui-compare-row:nth-child(even) {
+  background: transparent;
+}
+
+.genui-verdict-box {
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  font-size: 0.85rem;
+  color: var(--foreground);
+  margin-top: 0.5rem;
+}
+
+/* 5. RECOMMENDATIONS CARD */
+.genui-recom-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.genui-recom-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  transition: border-color 0.2s ease;
+}
+
+.genui-recom-item:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.genui-recom-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  flex-shrink: 0;
+}
+
+.genui-recom-rank.gold {
+  background: #fef3c7;
+  color: #d97706;
+  border-color: #fde68a;
+}
+html.dark .genui-recom-rank.gold {
+  background: #78350f;
+  color: #fde68a;
+  border-color: #b45309;
+}
+
+/* 6. INTERACTIVE ACTION BUTTONS */
+.genui-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.genui-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.genui-action-btn:hover {
+  background: var(--border);
+  border-color: #6366f1;
+  transform: translateY(-1px);
+}
+
+.genui-action-btn:active {
+  transform: translateY(0);
+}
+
+.genui-action-btn.primary {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #4f46e5;
+}
+
+.genui-action-btn.primary:hover {
+  background: #4f46e5;
+}
+
+/* 7. ACCORDION */
+.genui-accordion-item {
+  border-bottom: 1px solid var(--border);
+}
+.genui-accordion-item:last-child {
+  border-bottom: none;
+}
+
+.genui-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.genui-accordion-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.genui-accordion-icon {
+  transition: transform 0.2s ease;
+}
+
+.genui-accordion-item.open .genui-accordion-icon {
+  transform: rotate(180deg);
+}
+
+.genui-accordion-content {
+  display: none;
+  padding: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+}
+
+.genui-accordion-item.open .genui-accordion-content {
+  display: block;
+}
+
+/* 8. CHART STYLING */
+.genui-chart-box {
+  width: 100%;
+  padding: 0.5rem 0;
+  overflow-x: auto;
+}
+
+.genui-chart-box svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* 9. INFO CARD METADATA */
+.genui-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.genui-meta-item {
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.genui-meta-label {
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.genui-meta-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+

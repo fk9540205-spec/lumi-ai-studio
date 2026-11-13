@@ -117,10 +117,10 @@
   ];
 
   const SUGGESTIONS = [
-    "Plan a 3-day trip to the Maldives",
-    "Explain React server components simply",
-    "Help me write a heartfelt birthday note",
-    "Mujhe productivity ke 5 tips do",
+    "📱 Compare iPhone 16 Pro vs Galaxy S24 Ultra",
+    "☀️ Weather in Mumbai with 3-day forecast",
+    "📈 Top tech companies valuation in a chart",
+    "🎧 Best noise-cancelling headphones under $350",
   ];
 
   // --- SVG Icons ---
@@ -161,6 +161,9 @@
     play: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
     download: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>`,
     image: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></svg>`,
+    settings: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
+    moon: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>`,
+    sun: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>`,
     globe: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" x2="22" y1="12" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`,
   };
 
@@ -209,8 +212,118 @@
     dsa: "You are an expert Data Structures & Algorithms (DSA) and Coding Interview Coach. Explain problem-solving patterns intuitively, break down step-by-step algorithms, rigorously analyze Time & Space Complexity (Big-O), and write clean, optimal implementations.",
     hindi: "Aap ek friendly aur bohot helpful AI sathi ho. Baat-cheet bilkul aasan aur natural Hindi / Hinglish mein karo. Har technical ya normal cheez ko saral shabdon mein samjhao jaise ek sacha dost samjhata hai.",
     bughunter: "You are a Senior Code Auditor and Bug Hunter. Thoroughly inspect code for security vulnerabilities (XSS, SQLi, injection, logic bugs), race conditions, memory leaks, and edge cases. Offer concrete, minimal fixes.",
-    writer: "You are a master creative writer, storyteller, and copywriter. Craft vivid, compelling, engaging, and beautifully phrased prose with powerful narrative flow."
+    writer: "You are a master creative writer, storyteller, and copywriter. Craft vivid, compelling, engaging, and beautifully phrased prose with powerful narrative flow.",
+    artist: "You are an AI Artist & Image Generator. When the user describes any image, scene, or concept, describe it evocatively and create stunning visual art."
   };
+
+  const GENUI_SYSTEM_INSTRUCTION = `
+[GENUI CAPABILITY: CHATGPT-STYLE INTERACTIVE RICH CARDS]
+You can generate rich, interactive UI cards using fenced code blocks tagged with \`\`\`json:ui ... \`\`\`.
+Use this format whenever the user asks for comparisons, product details/pricing, weather forecasts, statistical metrics, top recommendations, data charts, or interactive action options.
+Supported card schemas:
+1. Product Card:
+\`\`\`json:ui
+{
+  "type": "product",
+  "title": "Sony WH-1000XM5",
+  "subtitle": "Wireless Noise Cancelling Headphones",
+  "price": "$399",
+  "originalPrice": "$449",
+  "discount": "11% OFF",
+  "rating": 4.8,
+  "ratingCount": "3,420",
+  "badge": "Best Seller",
+  "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
+  "features": ["Industry-leading Noise Cancellation", "30-hour battery life", "Multipoint connection"],
+  "actions": [
+    { "label": "Full Specifications", "prompt": "Give me detailed specifications of Sony WH-1000XM5" },
+    { "label": "Compare with Bose", "prompt": "Compare Sony WH-1000XM5 with Bose QuietComfort Ultra" }
+  ]
+}
+\`\`\`
+2. Weather Card:
+\`\`\`json:ui
+{
+  "type": "weather",
+  "city": "Mumbai",
+  "temp": "31°C",
+  "condition": "Partly Cloudy",
+  "humidity": "68%",
+  "wind": "14 km/h",
+  "feelsLike": "34°C",
+  "forecast": [
+    { "day": "Tomorrow", "temp": "32°C", "icon": "☀️" },
+    { "day": "Friday", "temp": "30°C", "icon": "⛅" },
+    { "day": "Saturday", "temp": "29°C", "icon": "🌧️" }
+  ]
+}
+\`\`\`
+3. Statistics Card:
+\`\`\`json:ui
+{
+  "type": "stats",
+  "title": "Q3 Performance Growth",
+  "metrics": [
+    { "label": "Revenue", "value": "$1.42M", "delta": "+18.2%", "progress": 85 },
+    { "label": "Active Users", "value": "248.5K", "delta": "+24.0%", "progress": 72 },
+    { "label": "Server Uptime", "value": "99.98%", "delta": "+0.02%", "progress": 99 }
+  ]
+}
+\`\`\`
+4. Comparison Card:
+\`\`\`json:ui
+{
+  "type": "comparison",
+  "title": "iPhone 16 Pro vs Galaxy S24 Ultra",
+  "itemA": { "title": "iPhone 16 Pro", "subtitle": "Apple A18 Pro", "winner": false },
+  "itemB": { "title": "Galaxy S24 Ultra", "subtitle": "Snapdragon 8 Gen 3", "winner": true },
+  "features": [
+    { "feature": "Camera Zoom", "valA": "5x Optical", "valB": "5x + 10x Quad", "winner": "B" },
+    { "feature": "Battery Life", "valA": "3,582 mAh", "valB": "5,000 mAh", "winner": "B" },
+    { "feature": "Video Recording", "valA": "4K 120fps ProRes", "valB": "8K 30fps", "winner": "A" }
+  ],
+  "verdict": "Choose **Galaxy S24 Ultra** for superior zoom, stylus, and battery life. Choose **iPhone 16 Pro** for compact form factor and cinematic ProRes video."
+}
+\`\`\`
+5. Chart Card (chartType: "bar", "donut", "line"):
+\`\`\`json:ui
+{
+  "type": "chart",
+  "chartType": "bar",
+  "title": "Tech Giants Market Cap (Trillion USD)",
+  "data": [
+    { "label": "Apple", "value": 3.4 },
+    { "label": "Nvidia", "value": 3.3 },
+    { "label": "Microsoft", "value": 3.1 },
+    { "label": "Google", "value": 2.1 }
+  ]
+}
+\`\`\`
+6. Top Recommendations Card:
+\`\`\`json:ui
+{
+  "type": "recommendation",
+  "title": "Top Recommended Laptops",
+  "items": [
+    { "rank": 1, "title": "MacBook Air M3", "score": "9.6/10", "tag": "Best Overall", "reason": "Unmatched battery life, silent fanless design, and premium build.", "prompt": "Tell me more about MacBook Air M3" },
+    { "rank": 2, "title": "Dell XPS 13", "score": "9.1/10", "tag": "Best Windows", "reason": "Sleek infinity edge display and lightweight portability.", "prompt": "Tell me more about Dell XPS 13" }
+  ]
+}
+\`\`\`
+7. Multiple Blocks in One Response:
+\`\`\`json:ui
+{
+  "type": "rich_message",
+  "title": "Comprehensive Overview",
+  "blocks": [
+    { "type": "stats", ... },
+    { "type": "chart", ... },
+    { "type": "actions", "actions": [{ "label": "Deep Dive", "prompt": "..." }] }
+  ]
+}
+\`\`\`
+RULE: Always include clear, friendly conversational text before and/or after the card block. When normal conversation is requested, reply normally in markdown without forcing cards.
+`;
 
   const PERSONA_LABELS = {
     general: "🌟 General AI",
@@ -218,7 +331,8 @@
     dsa: "🧠 DSA Coach",
     hindi: "🇮🇳 Hindi Companion",
     bughunter: "🐛 Bug Hunter",
-    writer: "✍️ Creative Writer"
+    writer: "✍️ Creative Writer",
+    artist: "🎨 Image Artist"
   };
 
   const PERSONA_ICONS = {
@@ -228,6 +342,7 @@
     hindi: "🇮🇳",
     bughunter: "🐛",
     writer: "✍️",
+    artist: "🎨",
   };
 
   const PERSONA_SHORT_LABELS = {
@@ -237,11 +352,49 @@
     hindi: "Hindi",
     bughunter: "Bug",
     writer: "Writer",
+    artist: "Artist",
   };
+
+  // --- Theme Management (Light, Dark, System) ---
+  let currentTheme = localStorage.getItem("lumi_theme") || "system";
+
+  function applyTheme(theme) {
+    currentTheme = theme;
+    localStorage.setItem("lumi_theme", theme);
+    const isDark =
+      theme === "dark" ||
+      (theme === "system" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", "#111114");
+    } else {
+      document.documentElement.classList.remove("dark");
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", "#faf9f6");
+    }
+  }
+
+  // Apply immediately on script execution
+  applyTheme(currentTheme);
+
+  if (window.matchMedia) {
+    window
+      .matchMedia("(prefers-color-scheme: dark)")
+      .addEventListener("change", () => {
+        if (currentTheme === "system") {
+          applyTheme("system");
+        }
+      });
+  }
 
   let activePersona = "general";
   let personaMenuOpen = false;
   let exportMenuOpen = false;
+  let settingsModalOpen = false;
   let attachedFiles = []; // [{ name, size, type, content, isPdf, pages }]
   let activeHtmlModal = null; // code string for HTML preview modal
 
@@ -424,6 +577,662 @@
     return safe;
   }
 
+  // --- ChatGPT-Style Generative UI (GenUI) Engine & Component System ---
+  const GenUIRenderer = {
+    isRecognizedType(type) {
+      if (!type || typeof type !== "string") return false;
+      const clean = type.toLowerCase().replace(/_card$/, "");
+      return [
+        "product",
+        "info",
+        "information",
+        "fact",
+        "weather",
+        "stats",
+        "statistic",
+        "metric",
+        "metrics",
+        "comparison",
+        "compare",
+        "profile",
+        "persona",
+        "recommendation",
+        "recommendations",
+        "picks",
+        "chart",
+        "actions",
+        "buttons",
+        "chips",
+        "accordion",
+        "expandable",
+        "image",
+        "media",
+        "rich_message"
+      ].includes(clean);
+    },
+
+    render(payload) {
+      if (!payload) return "";
+      try {
+        let blocksHtml = "";
+        if (Array.isArray(payload)) {
+          blocksHtml = payload.map((b) => this.renderBlock(b)).join("\n");
+        } else if (payload.type === "rich_message" && Array.isArray(payload.blocks)) {
+          if (payload.title) {
+            blocksHtml += `<div class="genui-message-header"><span class="genui-badge primary">${escapeHtml(payload.title)}</span></div>`;
+          }
+          blocksHtml += payload.blocks.map((b) => this.renderBlock(b)).join("\n");
+        } else {
+          blocksHtml = this.renderBlock(payload);
+        }
+        return `<div class="genui-container">${blocksHtml}</div>`;
+      } catch (err) {
+        console.warn("GenUI render error:", err);
+        return "";
+      }
+    },
+
+    renderBlock(block) {
+      if (!block || typeof block !== "object") return "";
+      const type = (block.type || "").toLowerCase().replace(/_card$/, "");
+
+      switch (type) {
+        case "product":
+          return this.renderProductCard(block);
+        case "info":
+        case "information":
+        case "fact":
+          return this.renderInfoCard(block);
+        case "weather":
+          return this.renderWeatherCard(block);
+        case "stats":
+        case "statistic":
+        case "metric":
+        case "metrics":
+          return this.renderStatsCard(block);
+        case "comparison":
+        case "compare":
+          return this.renderComparisonCard(block);
+        case "profile":
+        case "persona":
+          return this.renderProfileCard(block);
+        case "recommendation":
+        case "recommendations":
+        case "picks":
+          return this.renderRecommendationCard(block);
+        case "chart":
+          return this.renderChartCard(block);
+        case "actions":
+        case "buttons":
+        case "chips":
+          return this.renderActionsCard(block);
+        case "accordion":
+        case "expandable":
+          return this.renderAccordionCard(block);
+        case "image":
+        case "media":
+          return this.renderImageCard(block);
+        default:
+          return this.renderGenericCard(block);
+      }
+    },
+
+    renderProductCard(b) {
+      const title = escapeHtml(b.title || "Product");
+      const subtitle = b.subtitle || b.category ? escapeHtml(b.subtitle || b.category) : "";
+      const badge = b.badge ? `<span class="genui-badge primary">${escapeHtml(b.badge)}</span>` : "";
+      const price = b.price ? escapeHtml(b.price) : "";
+      const origPrice = b.originalPrice ? `<span class="genui-product-original-price">${escapeHtml(b.originalPrice)}</span>` : "";
+      const discount = b.discount ? `<span class="genui-badge success">${escapeHtml(b.discount)}</span>` : "";
+      const rating = b.rating ? `⭐ ${escapeHtml(String(b.rating))} ${b.ratingCount ? `<span class="text-xs text-muted-foreground font-normal">(${escapeHtml(String(b.ratingCount))})</span>` : ""}` : "";
+      const imgUrl = b.image || b.imageUrl;
+      const imgHtml = imgUrl ? `
+        <div class="genui-product-image-wrap">
+          <img src="${escapeHtml(imgUrl)}" alt="${title}" class="genui-product-image" loading="lazy" onerror="this.parentElement.style.display='none'"/>
+        </div>` : "";
+
+      let featuresHtml = "";
+      if (Array.isArray(b.features) && b.features.length) {
+        featuresHtml = `<div class="genui-product-features">` +
+          b.features.map(f => `
+            <div class="genui-feature-item">
+              <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 fill-none stroke-current" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>${escapeHtml(f)}</span>
+            </div>
+          `).join("") +
+        `</div>`;
+      }
+
+      const actionsHtml = this.renderActionsRow(b.actions || [
+        { label: "Specifications", prompt: `Explain full specifications of ${b.title || "this product"}` },
+        { label: "Compare Alternatives", prompt: `What are the best alternatives to ${b.title || "this product"}?` }
+      ]);
+
+      return `
+        <div class="genui-card genui-product-card">
+          ${imgHtml}
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">${title}</div>
+              ${subtitle ? `<div class="genui-card-subtitle">${subtitle}</div>` : ""}
+            </div>
+            ${badge}
+          </div>
+          <div class="genui-card-body">
+            ${rating ? `<div class="genui-product-rating">${rating}</div>` : ""}
+            ${price ? `<div class="genui-product-price-row"><span class="genui-product-price">${price}</span>${origPrice}${discount}</div>` : ""}
+            ${featuresHtml}
+            ${actionsHtml}
+          </div>
+        </div>`;
+    },
+
+    renderInfoCard(b) {
+      const title = escapeHtml(b.title || "Information");
+      const icon = b.icon ? `<span class="text-lg mr-1.5">${escapeHtml(b.icon)}</span>` : "ℹ️ ";
+      const badge = b.badge ? `<span class="genui-badge ${b.status === 'warning' ? 'warning' : b.status === 'success' ? 'success' : 'primary'}">${escapeHtml(b.badge)}</span>` : "";
+      const desc = b.description ? `<p class="text-sm text-foreground/90 mt-1 leading-relaxed">${renderInlineFormatting(escapeHtml(b.description))}</p>` : "";
+
+      let metaHtml = "";
+      const items = b.metadata || b.items;
+      if (items) {
+        metaHtml = `<div class="genui-meta-grid">`;
+        if (Array.isArray(items)) {
+          metaHtml += items.map(it => `
+            <div class="genui-meta-item">
+              <span class="genui-meta-label">${escapeHtml(it.label || "")}</span>
+              <span class="genui-meta-value">${escapeHtml(String(it.value || ""))}</span>
+            </div>
+          `).join("");
+        } else if (typeof items === "object") {
+          metaHtml += Object.entries(items).map(([k, v]) => `
+            <div class="genui-meta-item">
+              <span class="genui-meta-label">${escapeHtml(k)}</span>
+              <span class="genui-meta-value">${escapeHtml(String(v))}</span>
+            </div>
+          `).join("");
+        }
+        metaHtml += `</div>`;
+      }
+
+      const actionsHtml = this.renderActionsRow(b.actions);
+
+      return `
+        <div class="genui-card genui-info-card">
+          <div class="genui-card-header">
+            <div class="flex items-center">
+              <span class="genui-card-title">${icon}${title}</span>
+            </div>
+            ${badge}
+          </div>
+          <div class="genui-card-body">
+            ${desc}
+            ${metaHtml}
+            ${actionsHtml}
+          </div>
+        </div>`;
+    },
+
+    renderWeatherCard(b) {
+      const loc = escapeHtml(b.location || b.city || "Current Location");
+      const temp = escapeHtml(b.temp || b.temperature || "--");
+      const condition = escapeHtml(b.condition || "Clear");
+      const icon = b.icon || (condition.toLowerCase().includes("cloud") ? "⛅" : condition.toLowerCase().includes("rain") ? "🌧️" : "☀️");
+      const highLow = (b.high || b.low) ? `H: ${escapeHtml(b.high || "--")} • L: ${escapeHtml(b.low || "--")}` : "";
+
+      let forecastHtml = "";
+      if (Array.isArray(b.forecast) && b.forecast.length) {
+        forecastHtml = `<div class="genui-weather-forecast-row">` +
+          b.forecast.map(f => `
+            <div class="genui-forecast-day-box">
+              <span class="text-xs text-muted-foreground font-medium">${escapeHtml(f.day || "")}</span>
+              <span class="text-xl">${f.icon || "☀️"}</span>
+              <span class="text-xs font-semibold text-foreground">${escapeHtml(f.temp || "")}</span>
+            </div>
+          `).join("") +
+        `</div>`;
+      }
+
+      return `
+        <div class="genui-card genui-weather-card">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">${loc}</div>
+              <div class="genui-card-subtitle">${condition} ${highLow ? `• ${highLow}` : ""}</div>
+            </div>
+            <span class="genui-badge primary">Live Weather</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-weather-main">
+              <div class="genui-weather-temp">${temp}</div>
+              <div class="genui-weather-icon">${icon}</div>
+            </div>
+            <div class="genui-weather-grid">
+              ${b.humidity ? `<div class="genui-weather-stat-box"><span class="genui-weather-stat-label">Humidity</span><span class="genui-weather-stat-val">${escapeHtml(b.humidity)}</span></div>` : ""}
+              ${b.wind ? `<div class="genui-weather-stat-box"><span class="genui-weather-stat-label">Wind</span><span class="genui-weather-stat-val">${escapeHtml(b.wind)}</span></div>` : ""}
+              ${b.feelsLike ? `<div class="genui-weather-stat-box"><span class="genui-weather-stat-label">Feels Like</span><span class="genui-weather-stat-val">${escapeHtml(b.feelsLike)}</span></div>` : ""}
+              ${b.uvIndex ? `<div class="genui-weather-stat-box"><span class="genui-weather-stat-label">UV Index</span><span class="genui-weather-stat-val">${escapeHtml(b.uvIndex)}</span></div>` : ""}
+            </div>
+            ${forecastHtml}
+          </div>
+        </div>`;
+    },
+
+    renderStatsCard(b) {
+      const title = escapeHtml(b.title || "Key Metrics");
+      const metrics = Array.isArray(b.metrics) ? b.metrics : [b];
+
+      const itemsHtml = metrics.map(m => {
+        const val = escapeHtml(String(m.value || m.val || "--"));
+        const lbl = escapeHtml(String(m.label || "Metric"));
+        const delta = m.delta ? escapeHtml(String(m.delta)) : "";
+        const deltaType = m.deltaType === "down" || (delta && delta.startsWith("-")) ? "down" : "up";
+        const deltaHtml = delta ? `<div class="genui-stat-delta ${deltaType}">${deltaType === "up" ? "↑" : "↓"} ${delta}</div>` : "";
+        const progressHtml = m.progress !== undefined ? `
+          <div class="genui-progress-track">
+            <div class="genui-progress-bar" style="width: ${Math.max(0, Math.min(100, Number(m.progress)))}%;"></div>
+          </div>` : "";
+
+        return `
+          <div class="genui-stat-item">
+            <span class="genui-stat-label">${lbl}</span>
+            <span class="genui-stat-val">${val}</span>
+            ${deltaHtml}
+            ${progressHtml}
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-stats-card">
+          <div class="genui-card-header">
+            <div class="genui-card-title">📊 ${title}</div>
+            ${b.subtitle ? `<span class="genui-card-subtitle">${escapeHtml(b.subtitle)}</span>` : ""}
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-stats-grid">
+              ${itemsHtml}
+            </div>
+            ${this.renderActionsRow(b.actions)}
+          </div>
+        </div>`;
+    },
+
+    renderComparisonCard(b) {
+      const title = escapeHtml(b.title || "Comparison");
+      const itemA = b.itemA || (b.items && b.items[0]) || { title: "Option A" };
+      const itemB = b.itemB || (b.items && b.items[1]) || { title: "Option B" };
+      const winA = itemA.winner === true;
+      const winB = itemB.winner === true;
+
+      let rowsHtml = "";
+      if (Array.isArray(b.features)) {
+        rowsHtml = b.features.map(f => `
+          <div class="genui-compare-row">
+            <div>
+              <div class="text-xs text-muted-foreground">${escapeHtml(f.feature || "")}</div>
+              <div class="font-medium text-foreground ${f.winner === 'A' ? 'text-indigo-400 font-bold' : ''}">${escapeHtml(String(f.valA !== undefined ? f.valA : f.valueA || ""))}</div>
+            </div>
+            <div>
+              <div class="text-xs text-muted-foreground">${escapeHtml(f.feature || "")}</div>
+              <div class="font-medium text-foreground ${f.winner === 'B' ? 'text-indigo-400 font-bold' : ''}">${escapeHtml(String(f.valB !== undefined ? f.valB : f.valueB || ""))}</div>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      const verdictHtml = b.verdict ? `
+        <div class="genui-verdict-box">
+          <div class="font-semibold text-xs text-indigo-400 mb-0.5 uppercase tracking-wide">🏆 Lumi Recommendation</div>
+          <div>${renderInlineFormatting(escapeHtml(b.verdict))}</div>
+        </div>` : "";
+
+      return `
+        <div class="genui-card genui-comparison-card">
+          <div class="genui-card-header">
+            <div class="genui-card-title">⚖️ ${title}</div>
+            <span class="genui-badge primary">Head-to-Head</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-comparison-wrap">
+              <div class="genui-compare-headers">
+                <div class="genui-compare-col-header ${winA ? 'winner' : ''}">
+                  ${winA ? `<span class="genui-badge success mb-1">Winner</span>` : ""}
+                  <div class="font-semibold text-foreground">${escapeHtml(itemA.title || "Option A")}</div>
+                  ${itemA.subtitle ? `<div class="text-xs text-muted-foreground mt-0.5">${escapeHtml(itemA.subtitle)}</div>` : ""}
+                </div>
+                <div class="genui-compare-col-header ${winB ? 'winner' : ''}">
+                  ${winB ? `<span class="genui-badge success mb-1">Winner</span>` : ""}
+                  <div class="font-semibold text-foreground">${escapeHtml(itemB.title || "Option B")}</div>
+                  ${itemB.subtitle ? `<div class="text-xs text-muted-foreground mt-0.5">${escapeHtml(itemB.subtitle)}</div>` : ""}
+                </div>
+              </div>
+              <div class="flex flex-col gap-1">
+                ${rowsHtml}
+              </div>
+              ${verdictHtml}
+              ${this.renderActionsRow(b.actions)}
+            </div>
+          </div>
+        </div>`;
+    },
+
+    renderProfileCard(b) {
+      const name = escapeHtml(b.name || "User Profile");
+      const role = b.role || b.title ? escapeHtml(b.role || b.title) : "";
+      const bio = b.bio ? `<p class="text-sm text-foreground/90 mt-2 leading-relaxed">${escapeHtml(b.bio)}</p>` : "";
+      const avatar = b.avatar ? `<img src="${escapeHtml(b.avatar)}" alt="${name}" class="size-12 rounded-full object-cover border border-border" />` : `<div class="size-12 rounded-full bg-accent border border-border flex items-center justify-center font-bold text-lg text-foreground">${name[0] || "👤"}</div>`;
+
+      let tagsHtml = "";
+      if (Array.isArray(b.tags) && b.tags.length) {
+        tagsHtml = `<div class="flex flex-wrap gap-1.5 mt-2.5">` +
+          b.tags.map(t => `<span class="genui-badge">${escapeHtml(t)}</span>`).join("") +
+        `</div>`;
+      }
+
+      return `
+        <div class="genui-card genui-profile-card">
+          <div class="genui-card-body pt-5">
+            <div class="flex items-center gap-3.5">
+              ${avatar}
+              <div>
+                <div class="genui-card-title text-base">${name}</div>
+                ${role ? `<div class="genui-card-subtitle">${role}</div>` : ""}
+              </div>
+            </div>
+            ${bio}
+            ${tagsHtml}
+            ${this.renderActionsRow(b.actions)}
+          </div>
+        </div>`;
+    },
+
+    renderRecommendationCard(b) {
+      const title = escapeHtml(b.title || "Top Recommendations");
+      const items = Array.isArray(b.items) ? b.items : [];
+
+      const itemsHtml = items.map((it, idx) => {
+        const rank = it.rank || (idx + 1);
+        const rankClass = rank === 1 ? "gold" : "";
+        const itemTitle = escapeHtml(it.title || "Pick");
+        const score = it.score ? `<span class="text-xs text-amber-500 font-semibold">★ ${escapeHtml(String(it.score))}</span>` : "";
+        const tag = it.tag ? `<span class="genui-badge primary ml-2 text-[10px]">${escapeHtml(it.tag)}</span>` : "";
+        const desc = it.reason || it.description ? `<p class="text-xs text-muted-foreground mt-1 leading-relaxed">${escapeHtml(it.reason || it.description)}</p>` : "";
+        const promptBtn = it.prompt ? `
+          <button type="button" class="genui-action-btn mt-2 text-xs py-1 px-2.5" data-genui-prompt="${escapeHtml(it.prompt)}">
+            Explore ${itemTitle} →
+          </button>` : "";
+
+        return `
+          <div class="genui-recom-item">
+            <div class="genui-recom-rank ${rankClass}">#${rank}</div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <span class="font-semibold text-sm text-foreground">${itemTitle}${tag}</span>
+                ${score}
+              </div>
+              ${desc}
+              ${promptBtn}
+            </div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-recommendation-card">
+          <div class="genui-card-header">
+            <div class="genui-card-title">🎯 ${title}</div>
+            <span class="genui-badge primary">Top Picks</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-recom-list">
+              ${itemsHtml}
+            </div>
+            ${this.renderActionsRow(b.actions)}
+          </div>
+        </div>`;
+    },
+
+    renderChartCard(b) {
+      const title = escapeHtml(b.title || "Data Visualization");
+      const subtitle = b.subtitle ? `<div class="genui-card-subtitle">${escapeHtml(b.subtitle)}</div>` : "";
+      const chartType = (b.chartType || b.chart_type || "bar").toLowerCase();
+      const data = Array.isArray(b.data) ? b.data : [];
+
+      let svgHtml = "";
+      if (chartType === "bar") {
+        svgHtml = this.generateSvgBarChart(data);
+      } else if (chartType === "donut" || chartType === "pie") {
+        svgHtml = this.generateSvgDonutChart(data);
+      } else if (chartType === "line" || chartType === "area") {
+        svgHtml = this.generateSvgLineChart(data);
+      } else {
+        svgHtml = this.generateSvgBarChart(data);
+      }
+
+      return `
+        <div class="genui-card genui-chart-card">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">📈 ${title}</div>
+              ${subtitle}
+            </div>
+            <span class="genui-badge primary">${chartType.toUpperCase()}</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-chart-box">
+              ${svgHtml}
+            </div>
+            ${this.renderActionsRow(b.actions)}
+          </div>
+        </div>`;
+    },
+
+    generateSvgBarChart(data, width = 360, height = 180) {
+      if (!Array.isArray(data) || !data.length) return `<div class="text-xs text-muted-foreground p-3">No chart data provided</div>`;
+      const padding = { top: 20, right: 15, bottom: 35, left: 35 };
+      const chartW = width - padding.left - padding.right;
+      const chartH = height - padding.top - padding.bottom;
+      const maxVal = Math.max(...data.map(d => Number(d.value) || 0), 10);
+      const barW = Math.max(14, Math.min(38, Math.floor(chartW / data.length) - 8));
+
+      let bars = "";
+      let labels = "";
+      data.forEach((d, i) => {
+        const val = Number(d.value) || 0;
+        const barH = Math.round((val / maxVal) * chartH);
+        const x = padding.left + i * (chartW / data.length) + (chartW / data.length - barW) / 2;
+        const y = padding.top + (chartH - barH);
+        const color = d.color || (i % 2 === 0 ? "#6366f1" : "#8b5cf6");
+
+        bars += `
+          <g>
+            <rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="4" fill="${color}" opacity="0.9">
+              <title>${escapeHtml(d.label || "")}: ${val}</title>
+            </rect>
+            <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor" opacity="0.9">${val}</text>
+          </g>`;
+        labels += `<text x="${x + barW / 2}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml(d.label || "")}</text>`;
+      });
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" class="w-full" style="max-height:${height}px;">
+          <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" stroke="currentColor" stroke-opacity="0.15" stroke-width="1" />
+          ${bars}
+          ${labels}
+        </svg>`;
+    },
+
+    generateSvgDonutChart(data, size = 180) {
+      if (!Array.isArray(data) || !data.length) return "";
+      const total = data.reduce((sum, d) => sum + (Number(d.value) || 0), 0) || 1;
+      const radius = 60;
+      const cx = 90;
+      const cy = 90;
+      const circumference = 2 * Math.PI * radius;
+      let offset = 0;
+      const colors = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#3b82f6", "#8b5cf6", "#14b8a6"];
+
+      let circles = "";
+      let legend = `<div class="flex flex-wrap gap-2.5 mt-3 justify-center">`;
+      data.forEach((d, i) => {
+        const val = Number(d.value) || 0;
+        const pct = val / total;
+        const strokeDash = `${pct * circumference} ${circumference}`;
+        const strokeOffset = -offset;
+        offset += pct * circumference;
+        const color = d.color || colors[i % colors.length];
+
+        circles += `
+          <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${color}" stroke-width="22"
+            stroke-dasharray="${strokeDash}" stroke-dashoffset="${strokeOffset}" stroke-linecap="round">
+            <title>${escapeHtml(d.label || "")}: ${val} (${Math.round(pct * 100)}%)</title>
+          </circle>`;
+
+        legend += `
+          <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span class="w-2.5 h-2.5 rounded-full" style="background:${color};"></span>
+            <span>${escapeHtml(d.label || "")} (${Math.round(pct * 100)}%)</span>
+          </div>`;
+      });
+      legend += `</div>`;
+
+      return `
+        <div class="flex flex-col items-center">
+          <svg viewBox="0 0 180 180" width="${size}" height="${size}" style="transform: rotate(-90deg);">
+            ${circles}
+          </svg>
+          ${legend}
+        </div>`;
+    },
+
+    generateSvgLineChart(data, width = 360, height = 180) {
+      if (!Array.isArray(data) || !data.length) return "";
+      const padding = { top: 25, right: 20, bottom: 35, left: 35 };
+      const chartW = width - padding.left - padding.right;
+      const chartH = height - padding.top - padding.bottom;
+      const maxVal = Math.max(...data.map(d => Number(d.value) || 0), 10);
+      const minVal = Math.min(...data.map(d => Number(d.value) || 0), 0);
+      const range = maxVal - minVal || 1;
+
+      const points = data.map((d, i) => {
+        const val = Number(d.value) || 0;
+        const x = padding.left + (i / Math.max(data.length - 1, 1)) * chartW;
+        const y = padding.top + chartH - ((val - minVal) / range) * chartH;
+        return { x, y, val, label: d.label || "" };
+      });
+
+      const polyPoints = points.map(p => `${p.x},${p.y}`).join(" ");
+      const areaPoints = `${points[0].x},${padding.top + chartH} ${polyPoints} ${points[points.length - 1].x},${padding.top + chartH}`;
+
+      let dots = "";
+      let labels = "";
+      points.forEach(p => {
+        dots += `
+          <circle cx="${p.x}" cy="${p.y}" r="4" fill="#6366f1" stroke="#ffffff" stroke-width="1.5">
+            <title>${escapeHtml(p.label)}: ${p.val}</title>
+          </circle>`;
+        labels += `<text x="${p.x}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml(p.label)}</text>`;
+      });
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" class="w-full" style="max-height:${height}px;">
+          <defs>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#6366f1" stop-opacity="0.25" />
+              <stop offset="100%" stop-color="#6366f1" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
+          <polygon points="${areaPoints}" fill="url(#lineGrad)" />
+          <polyline points="${polyPoints}" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          ${dots}
+          ${labels}
+        </svg>`;
+    },
+
+    renderActionsCard(b) {
+      const actions = Array.isArray(b.actions) ? b.actions : Array.isArray(b.buttons) ? b.buttons : Array.isArray(b.chips) ? b.chips : [];
+      return `<div class="genui-card genui-actions-card p-3">${this.renderActionsRow(actions)}</div>`;
+    },
+
+    renderAccordionCard(b) {
+      const title = escapeHtml(b.title || "FAQ / Expandable Sections");
+      const items = Array.isArray(b.items) ? b.items : [];
+
+      const itemsHtml = items.map((it, idx) => {
+        const itemTitle = escapeHtml(it.title || "Section");
+        const content = renderInlineFormatting(escapeHtml(it.content || it.body || ""));
+        const isOpen = it.defaultOpen ? "open" : "";
+        return `
+          <div class="genui-accordion-item ${isOpen}">
+            <div class="genui-accordion-header">
+              <span class="genui-accordion-title">${itemTitle}</span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="size-4 genui-accordion-icon text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <div class="genui-accordion-content">${content}</div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-accordion-card">
+          <div class="genui-card-header">
+            <div class="genui-card-title">${title}</div>
+          </div>
+          <div class="genui-card-body pt-0">
+            ${itemsHtml}
+          </div>
+        </div>`;
+    },
+
+    renderImageCard(b) {
+      const title = escapeHtml(b.title || "Generated Media");
+      const imgUrl = escapeHtml(b.image || b.imageUrl || "");
+      const caption = b.caption || b.prompt ? escapeHtml(b.caption || b.prompt) : "";
+
+      return `
+        <div class="genui-card genui-image-card">
+          <div class="genui-product-image-wrap" style="height:220px;">
+            <img src="${imgUrl}" alt="${title}" class="genui-product-image" loading="lazy" />
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-card-title text-sm">${title}</div>
+            ${caption ? `<p class="text-xs text-muted-foreground mt-1">${caption}</p>` : ""}
+            ${this.renderActionsRow(b.actions || [{ label: "Download Image", action: "download", url: imgUrl }])}
+          </div>
+        </div>`;
+    },
+
+    renderGenericCard(b) {
+      const title = escapeHtml(b.title || "Summary");
+      const desc = b.description || b.content ? `<p class="text-sm text-foreground/90 mt-1">${renderInlineFormatting(escapeHtml(b.description || b.content))}</p>` : "";
+      return `
+        <div class="genui-card">
+          <div class="genui-card-header">
+            <div class="genui-card-title">${title}</div>
+            <span class="genui-badge primary">Card</span>
+          </div>
+          <div class="genui-card-body">
+            ${desc}
+            ${this.renderActionsRow(b.actions)}
+          </div>
+        </div>`;
+    },
+
+    renderActionsRow(actions) {
+      if (!Array.isArray(actions) || !actions.length) return "";
+      return `<div class="genui-actions-row">` +
+        actions.map(act => {
+          const lbl = escapeHtml(act.label || "Action");
+          const prompt = act.prompt ? escapeHtml(act.prompt) : "";
+          const isPrimary = act.primary ? "primary" : "";
+          const icon = act.icon ? `<span class="mr-1">${escapeHtml(act.icon)}</span>` : "";
+          if (act.url) {
+            return `<a href="${escapeHtml(act.url)}" target="_blank" rel="noopener" class="genui-action-btn ${isPrimary}">${icon}${lbl} ↗</a>`;
+          }
+          return `<button type="button" class="genui-action-btn ${isPrimary}" ${prompt ? `data-genui-prompt="${prompt}"` : `title="${lbl}"`}>${icon}${lbl}</button>`;
+        }).join("") +
+      `</div>`;
+    }
+  };
+
   // --- Markdown Parser with Code Block Copying & Math Support ---
   function renderMarkdown(content) {
     if (!content) return "";
@@ -440,13 +1249,55 @@
       return `<span class="math-inline">${escapeHtml(math.trim())}</span>`;
     });
 
-    // 3. Fenced Code Blocks with IDE Syntax Highlighting, Sandbox Run & Copy
-    const codeBlocks = [];
-    text = text.replace(/```([a-zA-Z0-9_\-\.]*)\n([\s\S]*?)```/g, (match, lang, code) => {
-      const id = "code-" + Math.random().toString(36).slice(2, 9);
+    // 0. Support GenUI XML / Inline tags: <genui> ... </genui>
+    text = text.replace(/<genui>([\s\S]*?)<\/genui>/gi, (match, innerJson) => {
+      try {
+        const parsed = JSON.parse(innerJson.trim());
+        const id = "genui-" + Math.random().toString(36).slice(2, 9);
+        codeBlocks.push(`<div id="${id}">${GenUIRenderer.render(parsed)}</div>`);
+        return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+      } catch {
+        return match;
+      }
+    });
+
+    // 0.1 Handle active unclosed streaming GenUI block seamlessly
+    text = text.replace(/```(?:ui|genui|json:ui)\s*\{?[^`]*$/i, (match) => {
+      return `\n<div class="genui-card p-3.5 my-2 flex items-center gap-3 border border-indigo-500/30 bg-indigo-500/5 rounded-xl"><div class="size-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div><span class="text-xs text-muted-foreground font-medium">Rendering interactive GenUI card…</span></div>\n`;
+    });
+
+    // 3. Fenced Code Blocks with IDE Syntax Highlighting, GenUI Interception, Sandbox Run & Copy
+    text = text.replace(/```([a-zA-Z0-9_\-\.:]*)\n([\s\S]*?)```/g, (match, lang, code) => {
       const cleanLang = (lang || "").trim().toLowerCase();
-      const displayLang = cleanLang || "code";
       const rawCode = code.trim();
+
+      // Check if this is a Generative UI block
+      const isExplicitGenUi = ["ui", "genui", "json:ui", "card", "cards", "widget"].includes(cleanLang);
+      if (isExplicitGenUi || cleanLang === "json") {
+        try {
+          const parsed = JSON.parse(rawCode);
+          if (
+            isExplicitGenUi ||
+            (parsed &&
+              (parsed.type === "rich_message" ||
+                Array.isArray(parsed.blocks) ||
+                GenUIRenderer.isRecognizedType(parsed.type) ||
+                (Array.isArray(parsed) && parsed.length > 0 && GenUIRenderer.isRecognizedType(parsed[0].type))))
+          ) {
+            const renderedGenUi = GenUIRenderer.render(parsed);
+            if (renderedGenUi) {
+              const id = "genui-" + Math.random().toString(36).slice(2, 9);
+              codeBlocks.push(`<div id="${id}">${renderedGenUi}</div>`);
+              return `__CODE_BLOCK_${codeBlocks.length - 1}__`;
+            }
+          }
+        } catch (e) {
+          // If JSON parse fails or is normal json code, continue to normal syntax highlighter
+        }
+      }
+
+      const id = "code-" + Math.random().toString(36).slice(2, 9);
+      const displayLang = cleanLang || "code";
       const highlighted = highlightCodeSyntax(rawCode, cleanLang);
       const isPython = cleanLang === "python" || cleanLang === "py";
       const isHtml = cleanLang === "html" || cleanLang.includes("html");
@@ -747,8 +1598,8 @@
         </div>
 
         <!-- User Profile Footer -->
-        <div class="flex items-center gap-2.5 border-t border-sidebar-border px-4 py-3 bg-card/40">
-          <span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold uppercase text-primary-foreground select-none">
+        <div class="flex items-center gap-2 border-t border-sidebar-border px-3.5 py-3 bg-card/40">
+          <span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold uppercase text-primary-foreground select-none shrink-0">
             ${escapeHtml((currentUser.email || "Y")[0])}
           </span>
           <span class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
@@ -756,7 +1607,15 @@
           </span>
           <button
             type="button"
-            class="rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            class="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors cursor-pointer shrink-0"
+            title="Settings (Dark/White Mode)"
+            id="open-settings-btn"
+          >
+            ${ICONS.settings}
+          </button>
+          <button
+            type="button"
+            class="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors cursor-pointer shrink-0"
             title="Sign out"
             id="sign-out-btn"
           >
@@ -948,6 +1807,119 @@
       </div>`;
   }
 
+  function renderSettingsModal() {
+    if (!settingsModalOpen) return "";
+    return `
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" id="settings-modal-overlay">
+        <div class="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl text-foreground flex flex-col gap-4 animate-in fade-in zoom-in-95" onclick="event.stopPropagation()">
+          <!-- Header -->
+          <div class="flex items-center justify-between border-b border-border pb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-base text-primary">${ICONS.settings}</span>
+              <h3 class="font-semibold text-sm">Settings</h3>
+            </div>
+            <button
+              type="button"
+              class="rounded-lg p-1 text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer transition-colors"
+              id="close-settings-modal-btn"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          <!-- Mode / Theme Options -->
+          <div class="flex flex-col gap-2">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Appearance / Theme</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                class="theme-toggle-btn flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border transition-all cursor-pointer ${
+                  currentTheme === "light"
+                    ? "border-primary bg-primary/10 text-foreground font-semibold shadow-xs"
+                    : "border-border bg-secondary/30 hover:bg-secondary/60 text-muted-foreground"
+                }"
+                data-set-theme="light"
+              >
+                <span class="text-lg">☀️</span>
+                <span class="text-xs font-medium">White Mode</span>
+              </button>
+              <button
+                type="button"
+                class="theme-toggle-btn flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border transition-all cursor-pointer ${
+                  currentTheme === "dark"
+                    ? "border-primary bg-primary/10 text-foreground font-semibold shadow-xs"
+                    : "border-border bg-secondary/30 hover:bg-secondary/60 text-muted-foreground"
+                }"
+                data-set-theme="dark"
+              >
+                <span class="text-lg">🌙</span>
+                <span class="text-xs font-medium">Dark Mode</span>
+              </button>
+              <button
+                type="button"
+                class="theme-toggle-btn flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border transition-all cursor-pointer ${
+                  currentTheme === "system"
+                    ? "border-primary bg-primary/10 text-foreground font-semibold shadow-xs"
+                    : "border-border bg-secondary/30 hover:bg-secondary/60 text-muted-foreground"
+                }"
+                data-set-theme="system"
+              >
+                <span class="text-lg">💻</span>
+                <span class="text-xs font-medium">Auto System</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- AI & Providers -->
+          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">AI & Models</label>
+            <a
+              href="#/providers"
+              class="flex items-center justify-between p-2.5 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/50 transition-colors text-xs"
+              id="settings-goto-providers"
+            >
+              <div class="flex items-center gap-2.5">
+                <span class="text-base">⚡</span>
+                <div>
+                  <div class="font-medium text-foreground">AI Providers & API Keys</div>
+                  <div class="text-[10px] text-muted-foreground">Gemini Vision, OpenAI, Ollama, Groq</div>
+                </div>
+              </div>
+              <span class="text-muted-foreground text-xs font-bold">→</span>
+            </a>
+          </div>
+
+          <!-- Chat Data Management -->
+          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
+            <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Chat History</label>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="flex-1 inline-flex items-center justify-center gap-1 text-xs py-2 px-2.5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary text-foreground font-medium transition-colors cursor-pointer"
+                id="settings-export-chats-btn"
+              >
+                ${ICONS.export} <span>Export All</span>
+              </button>
+              <button
+                type="button"
+                class="flex-1 inline-flex items-center justify-center gap-1 text-xs py-2 px-2.5 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-destructive font-medium transition-colors cursor-pointer"
+                id="settings-clear-chats-btn"
+              >
+                ${ICONS.trash} <span>Clear Chats</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="pt-2 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Lumi AI Studio v1.2</span>
+            <span class="text-emerald-500 font-medium">● Free Engine Active</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
   // 3. PROMPT COMPOSER & MODEL SELECTOR
   function renderModelPicker(placement = "composer") {
     const label = getActiveModelLabel();
@@ -1086,6 +2058,15 @@
                 title="${webSearchEnabled ? "Live Web Search: Active (Click to disable)" : "Live Web Search: Off (Click to enable)"}"
               >
                 ${ICONS.globe}
+              </button>
+
+              <button
+                type="button"
+                id="image-gen-btn"
+                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors backdrop-blur shadow-xs cursor-pointer"
+                title="Generate AI Image (/image)"
+              >
+                ${ICONS.image}
               </button>
             </div>
 
@@ -1238,25 +2219,45 @@
                         ${isCurrentlyStreaming && rawText ? `<span class="streaming-cursor"></span>` : ""}
                       </div>
 
-                      <!-- AI Image Generation Result Card -->
+                      <!-- AI Image Generation Result / Loading Card -->
                       ${
-                        msg.imageUrl
+                        msg.imageLoading
                           ? `
-                        <div class="ai-image-card">
-                          <img src="${escapeHtml(msg.imageUrl)}" alt="${escapeHtml(msg.imagePrompt || "Generated Image")}" loading="lazy" />
+                        <div class="ai-image-card p-6 flex flex-col items-center justify-center gap-3 text-center my-3 border border-border bg-card/60 rounded-2xl">
+                          <div class="relative size-12 flex items-center justify-center">
+                            <div class="absolute inset-0 rounded-full border-2 border-primary/20 border-t-primary animate-spin"></div>
+                            <span class="text-xl">🎨</span>
+                          </div>
+                          <div class="text-sm font-medium text-foreground">Generating high-definition AI image...</div>
+                          <div class="text-xs text-muted-foreground truncate max-w-xs font-mono">"${escapeHtml(msg.imagePrompt || "")}"</div>
+                        </div>`
+                          : msg.imageUrl
+                          ? `
+                        <div class="ai-image-card my-3">
+                          <img src="${escapeHtml(msg.imageUrl)}" alt="${escapeHtml(msg.imagePrompt || "Generated Image")}" loading="lazy" class="cursor-pointer" data-action="zoom-image" data-src="${escapeHtml(msg.imageUrl)}" />
                           <div class="ai-image-overlay">
-                            <span class="text-xs text-white/90 truncate max-w-[260px] font-medium drop-shadow">
-                              ${escapeHtml(msg.imagePrompt || "AI Generated Image")}
+                            <span class="text-xs text-white/90 truncate max-w-[200px] font-medium drop-shadow">
+                              🎨 ${escapeHtml(msg.imagePrompt || "AI Generated Image")}
                             </span>
-                            <div class="flex items-center gap-2">
-                              <a
-                                href="${escapeHtml(msg.imageUrl)}"
-                                download="lumi-ai-image.jpg"
-                                target="_blank"
-                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-xs backdrop-blur font-medium transition-colors"
+                            <div class="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer"
+                                data-action="download-image"
+                                data-url="${escapeHtml(msg.imageUrl)}"
+                                data-name="${escapeHtml(msg.imagePrompt || "image")}"
                               >
                                 ${ICONS.download} <span>Download</span>
-                              </a>
+                              </button>
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer"
+                                data-action="regen-image"
+                                data-prompt="${escapeHtml(msg.imagePrompt || "")}"
+                                title="Regenerate variation"
+                              >
+                                ${ICONS.refreshCw}
+                              </button>
                             </div>
                           </div>
                         </div>`
@@ -1961,18 +2962,52 @@
       scrollToBottom();
     }
 
-    // 1. FREE IMAGE GENERATION (/image or image prompt)
-    const isImageCommand = /^\/(?:image|img)\s+/i.test(prompt) || prompt.toLowerCase().startsWith("generate image") || prompt.toLowerCase().startsWith("image of ");
+    // 1. FREE HIGH-RESOLUTION IMAGE GENERATION (/image, /imagine, or visual prompt)
+    const isImageCommand =
+      /^\/(?:image|img|imagine)\s+/i.test(prompt) ||
+      /^(?:generate image of|generate image|image of|draw a|draw an|paint a|create an image of|create image of)\s*/i.test(prompt) ||
+      /\b(photo banao|image bana do|image banao|tasveer banao|picture bana do|photo generate karo)\b/i.test(prompt) ||
+      activePersona === "artist";
+
     if (isImageCommand) {
-      const imagePrompt = prompt.replace(/^\/(?:image|img)\s+/i, "").replace(/^(?:generate image of|generate image|image of)\s*/i, "").trim();
+      let imagePrompt = prompt
+        .replace(/^\/(?:image|img|imagine)\s+/i, "")
+        .replace(/^(?:generate image of|generate image|image of|draw a|draw an|paint a|create an image of|create image of)\s*/i, "")
+        .replace(/\b(photo banao|image bana do|image banao|tasveer banao|picture bana do|photo generate karo)\b/i, "")
+        .trim();
+      if (!imagePrompt) imagePrompt = prompt.trim();
+
       assistantMsg.imagePrompt = imagePrompt;
-      const seed = Math.floor(Math.random() * 999999);
-      assistantMsg.imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1024&height=1024&nologo=true&model=flux&seed=${seed}`;
-      assistantMsg.content = `✨ **Flux AI Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+      assistantMsg.imageLoading = true;
+      assistantMsg.content = `🎨 **Generating Flux AI Image** for: *"**${escapeHtml(imagePrompt)}**"*...`;
       saveJson(STORAGE.CHATS, conversations);
-      AudioEffects.play("success");
       render();
       scrollToBottom();
+
+      const seed = Math.floor(Math.random() * 999999);
+      const targetUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1024&height=1024&nologo=true&model=flux&seed=${seed}`;
+
+      const preloader = new Image();
+      preloader.onload = () => {
+        assistantMsg.imageUrl = targetUrl;
+        assistantMsg.imageLoading = false;
+        assistantMsg.content = `✨ **Flux AI Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+        isStreaming = false;
+        saveJson(STORAGE.CHATS, conversations);
+        AudioEffects.play("success");
+        render();
+        scrollToBottom();
+      };
+      preloader.onerror = () => {
+        assistantMsg.imageUrl = targetUrl;
+        assistantMsg.imageLoading = false;
+        assistantMsg.content = `✨ **Flux AI Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+        isStreaming = false;
+        saveJson(STORAGE.CHATS, conversations);
+        render();
+        scrollToBottom();
+      };
+      preloader.src = targetUrl;
       return;
     }
 
@@ -2071,7 +3106,7 @@
 
         let streamedSuccessfully = false;
         try {
-          const systemPrompt = PERSONA_PROMPTS[activePersona] || PERSONA_PROMPTS.general;
+          const systemPrompt = (PERSONA_PROMPTS[activePersona] || PERSONA_PROMPTS.general) + "\n" + GENUI_SYSTEM_INSTRUCTION;
           const chatHistory = [
             { role: "system", content: systemPrompt },
             ...thread.messages
@@ -2388,6 +3423,9 @@
     }
 
     root.innerHTML += renderHtmlModal();
+    if (settingsModalOpen) {
+      root.innerHTML += renderSettingsModal();
+    }
     attachEventListeners();
   }
 
@@ -2461,8 +3499,28 @@
       });
     });
 
-    // Close menus on outside click
+    // Close menus on outside click & GenUI interactive event delegation
     document.addEventListener("click", (e) => {
+      // 1. GenUI interactive quick prompt button clicks
+      const promptBtn = e.target.closest("[data-genui-prompt]");
+      if (promptBtn) {
+        const promptText = promptBtn.getAttribute("data-genui-prompt");
+        if (promptText) {
+          sendMessage(promptText);
+          return;
+        }
+      }
+
+      // 2. GenUI Accordion Expand / Collapse
+      const accordionHeader = e.target.closest(".genui-accordion-header");
+      if (accordionHeader) {
+        const item = accordionHeader.closest(".genui-accordion-item");
+        if (item) {
+          item.classList.toggle("open");
+        }
+        return;
+      }
+
       if (!e.target.closest(".model-dropdown-menu") && !e.target.closest(".model-picker-toggle-btn")) {
         document.querySelectorAll(".model-dropdown-menu").forEach((m) => m.classList.add("hidden"));
         document.querySelectorAll(".model-picker-toggle-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
@@ -3140,6 +4198,145 @@
         showToast("Signed out.");
         navigate("/auth");
       });
+    }
+
+    // 15. Settings & Theme Handlers
+    const openSettingsBtn = document.querySelector("#open-settings-btn");
+    if (openSettingsBtn) {
+      openSettingsBtn.addEventListener("click", () => {
+        settingsModalOpen = true;
+        render();
+      });
+    }
+
+    const closeSettingsBtn = document.querySelector("#close-settings-modal-btn");
+    if (closeSettingsBtn) {
+      closeSettingsBtn.addEventListener("click", () => {
+        settingsModalOpen = false;
+        render();
+      });
+    }
+
+    const settingsOverlay = document.querySelector("#settings-modal-overlay");
+    if (settingsOverlay) {
+      settingsOverlay.addEventListener("click", (e) => {
+        if (e.target === settingsOverlay) {
+          settingsModalOpen = false;
+          render();
+        }
+      });
+    }
+
+    document.querySelectorAll("[data-set-theme]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const theme = btn.getAttribute("data-set-theme");
+        applyTheme(theme);
+        render();
+        showToast(`Theme changed to ${theme.toUpperCase()}`);
+      });
+    });
+
+    const exportChatsBtn = document.querySelector("#settings-export-chats-btn");
+    if (exportChatsBtn) {
+      exportChatsBtn.addEventListener("click", () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(conversations, null, 2));
+        const a = document.createElement("a");
+        a.href = dataStr;
+        a.download = `lumi_conversations_${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast("✔ All chats exported successfully!");
+      });
+    }
+
+    const clearChatsBtn = document.querySelector("#settings-clear-chats-btn");
+    if (clearChatsBtn) {
+      clearChatsBtn.addEventListener("click", () => {
+        if (confirm("Are you sure you want to delete all chat history? This cannot be undone.")) {
+          conversations = [];
+          saveJson(STORAGE.CHATS, conversations);
+          settingsModalOpen = false;
+          showToast("Chat history cleared.");
+          navigate("/chat");
+        }
+      });
+    }
+
+    // 16. Image Generator Toolbar Button
+    const imageGenBtn = document.querySelector("#image-gen-btn");
+    if (imageGenBtn) {
+      imageGenBtn.addEventListener("click", () => {
+        const ta = document.querySelector("#composer-textarea");
+        if (ta) {
+          const val = ta.value.trim();
+          if (val) {
+            if (!val.startsWith("/image ")) {
+              ta.value = `/image ${val}`;
+            }
+            const form = document.querySelector("#chat-composer-form");
+            if (form) {
+              if (form.requestSubmit) form.requestSubmit();
+              else form.dispatchEvent(new Event("submit"));
+            }
+          } else {
+            ta.value = "/image ";
+            ta.focus();
+            showToast("🎨 Type your image prompt (e.g. /image a cybernetic dragon)");
+          }
+        }
+      });
+    }
+
+    // 17. Image Action Delegation (Download, Regenerate, Zoom)
+    document.querySelectorAll("[data-action='download-image']").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const url = btn.getAttribute("data-url");
+        const name = btn.getAttribute("data-name") || "image";
+        downloadImageFile(url, name);
+      });
+    });
+
+    document.querySelectorAll("[data-action='regen-image']").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const prompt = btn.getAttribute("data-prompt");
+        if (prompt) {
+          sendMessage(`/image ${prompt}`);
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-action='zoom-image']").forEach((img) => {
+      img.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const src = img.getAttribute("data-src") || img.src;
+        if (src) {
+          window.open(src, "_blank");
+        }
+      });
+    });
+  }
+
+  // --- Image Downloader Helper ---
+  async function downloadImageFile(url, prompt = "lumi-image") {
+    try {
+      showToast("Downloading image...");
+      const safeName = (prompt || "lumi-image").replace(/[^a-z0-9_-]/gi, "_").slice(0, 30) + ".jpg";
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = safeName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      showToast("✔ Image downloaded successfully!");
+    } catch (err) {
+      window.open(url, "_blank");
     }
   }
 
