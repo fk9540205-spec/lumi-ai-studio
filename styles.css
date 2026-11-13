@@ -1549,6 +1549,9 @@ html.dark .genui-recom-rank.gold {
   align-items: center;
   gap: 0.4rem;
   padding: 0.45rem 0.85rem;
+  min-height: 36px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   border-radius: 0.6rem;
   font-size: 0.8rem;
   font-weight: 500;

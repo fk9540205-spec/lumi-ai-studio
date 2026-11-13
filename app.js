@@ -611,6 +611,22 @@ RULE: Always include clear, friendly conversational text before and/or after the
       ].includes(clean);
     },
 
+    parseNum(val, fallback = 0) {
+      if (typeof val === "number" && !isNaN(val)) return val;
+      if (typeof val === "string") {
+        const trimmed = val.trim();
+        let multiplier = 1;
+        if (/[kK]$/.test(trimmed)) multiplier = 1000;
+        else if (/[mM]$/.test(trimmed)) multiplier = 1000000;
+        else if (/[bB]$/.test(trimmed)) multiplier = 1000000000;
+        else if (/[tT]$/.test(trimmed)) multiplier = 1000000000000;
+        const cleaned = trimmed.replace(/[^0-9.\-]/g, "");
+        const n = parseFloat(cleaned);
+        return isNaN(n) ? fallback : n * multiplier;
+      }
+      return fallback;
+    },
+
     render(payload) {
       if (!payload) return "";
       try {
@@ -1031,13 +1047,14 @@ RULE: Always include clear, friendly conversational text before and/or after the
       const padding = { top: 20, right: 15, bottom: 35, left: 35 };
       const chartW = width - padding.left - padding.right;
       const chartH = height - padding.top - padding.bottom;
-      const maxVal = Math.max(...data.map(d => Number(d.value) || 0), 10);
+      const maxVal = Math.max(...data.map(d => this.parseNum(d.value) || 0), 10);
       const barW = Math.max(14, Math.min(38, Math.floor(chartW / data.length) - 8));
 
       let bars = "";
       let labels = "";
       data.forEach((d, i) => {
-        const val = Number(d.value) || 0;
+        const val = this.parseNum(d.value);
+        const displayVal = d.value !== undefined ? escapeHtml(String(d.value)) : String(val);
         const barH = Math.round((val / maxVal) * chartH);
         const x = padding.left + i * (chartW / data.length) + (chartW / data.length - barW) / 2;
         const y = padding.top + (chartH - barH);
@@ -1046,11 +1063,11 @@ RULE: Always include clear, friendly conversational text before and/or after the
         bars += `
           <g>
             <rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="4" fill="${color}" opacity="0.9">
-              <title>${escapeHtml(d.label || "")}: ${val}</title>
+              <title>${escapeHtml(d.label || "")}: ${displayVal}</title>
             </rect>
-            <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor" opacity="0.9">${val}</text>
+            <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor" opacity="0.9">${displayVal}</text>
           </g>`;
-        labels += `<text x="${x + barW / 2}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml(d.label || "")}</text>`;
+        labels += `<text x="${x + barW / 2}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml((d.label || "").slice(0, 8))}</text>`;
       });
 
       return `
@@ -1063,7 +1080,7 @@ RULE: Always include clear, friendly conversational text before and/or after the
 
     generateSvgDonutChart(data, size = 180) {
       if (!Array.isArray(data) || !data.length) return "";
-      const total = data.reduce((sum, d) => sum + (Number(d.value) || 0), 0) || 1;
+      const total = data.reduce((sum, d) => sum + (this.parseNum(d.value) || 0), 0) || 1;
       const radius = 60;
       const cx = 90;
       const cy = 90;
@@ -1074,7 +1091,7 @@ RULE: Always include clear, friendly conversational text before and/or after the
       let circles = "";
       let legend = `<div class="flex flex-wrap gap-2.5 mt-3 justify-center">`;
       data.forEach((d, i) => {
-        const val = Number(d.value) || 0;
+        const val = this.parseNum(d.value);
         const pct = val / total;
         const strokeDash = `${pct * circumference} ${circumference}`;
         const strokeOffset = -offset;
@@ -1084,7 +1101,7 @@ RULE: Always include clear, friendly conversational text before and/or after the
         circles += `
           <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${color}" stroke-width="22"
             stroke-dasharray="${strokeDash}" stroke-dashoffset="${strokeOffset}" stroke-linecap="round">
-            <title>${escapeHtml(d.label || "")}: ${val} (${Math.round(pct * 100)}%)</title>
+            <title>${escapeHtml(d.label || "")}: ${escapeHtml(String(d.value || val))} (${Math.round(pct * 100)}%)</title>
           </circle>`;
 
         legend += `
@@ -1109,15 +1126,15 @@ RULE: Always include clear, friendly conversational text before and/or after the
       const padding = { top: 25, right: 20, bottom: 35, left: 35 };
       const chartW = width - padding.left - padding.right;
       const chartH = height - padding.top - padding.bottom;
-      const maxVal = Math.max(...data.map(d => Number(d.value) || 0), 10);
-      const minVal = Math.min(...data.map(d => Number(d.value) || 0), 0);
+      const maxVal = Math.max(...data.map(d => this.parseNum(d.value) || 0), 10);
+      const minVal = Math.min(...data.map(d => this.parseNum(d.value) || 0), 0);
       const range = maxVal - minVal || 1;
 
       const points = data.map((d, i) => {
-        const val = Number(d.value) || 0;
+        const val = this.parseNum(d.value);
         const x = padding.left + (i / Math.max(data.length - 1, 1)) * chartW;
         const y = padding.top + chartH - ((val - minVal) / range) * chartH;
-        return { x, y, val, label: d.label || "" };
+        return { x, y, val, label: d.label || "", rawVal: d.value !== undefined ? String(d.value) : String(val) };
       });
 
       const polyPoints = points.map(p => `${p.x},${p.y}`).join(" ");
@@ -1128,9 +1145,9 @@ RULE: Always include clear, friendly conversational text before and/or after the
       points.forEach(p => {
         dots += `
           <circle cx="${p.x}" cy="${p.y}" r="4" fill="#6366f1" stroke="#ffffff" stroke-width="1.5">
-            <title>${escapeHtml(p.label)}: ${p.val}</title>
+            <title>${escapeHtml(p.label)}: ${escapeHtml(p.rawVal)}</title>
           </circle>`;
-        labels += `<text x="${p.x}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml(p.label)}</text>`;
+        labels += `<text x="${p.x}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml(p.label.slice(0, 8))}</text>`;
       });
 
       return `
@@ -1237,6 +1254,7 @@ RULE: Always include clear, friendly conversational text before and/or after the
   function renderMarkdown(content) {
     if (!content) return "";
 
+    const codeBlocks = [];
     let text = content;
 
     // 1. Math block: $$ ... $$
@@ -3079,7 +3097,7 @@ RULE: Always include clear, friendly conversational text before and/or after the
 
     const onChunk = (chunk) => {
       assistantMsg.content += chunk;
-      updateStreamingMessageUI(threadId, assistantMsg.content);
+      updateStreamingMessageUI(threadId, assistantMsg.content, assistantMsg.id);
       scrollToBottom();
     };
 
@@ -3369,14 +3387,19 @@ RULE: Always include clear, friendly conversational text before and/or after the
     }
   }
 
-  function updateStreamingMessageUI(threadId, currentText) {
-    const container = document.querySelector("#chat-messages-container");
-    if (!container) return;
-    const lastMsgMarkdown = container.querySelector(
-      ".space-y-7 > div:last-child .markdown-body"
-    );
-    if (lastMsgMarkdown) {
-      lastMsgMarkdown.innerHTML = `${renderMarkdown(currentText)}<span class="streaming-cursor"></span>`;
+  function updateStreamingMessageUI(threadId, currentText, msgId) {
+    let targetEl = null;
+    if (msgId) {
+      targetEl = document.querySelector(`#msg-body-${msgId}`);
+    }
+    if (!targetEl) {
+      const container = document.querySelector("#chat-messages-container");
+      if (container) {
+        targetEl = container.querySelector(".space-y-7 > div:last-child .markdown-body");
+      }
+    }
+    if (targetEl) {
+      targetEl.innerHTML = `${renderMarkdown(currentText)}<span class="streaming-cursor"></span>`;
     }
   }
 
