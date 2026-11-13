@@ -938,21 +938,48 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._json_response({"status": "offline", "error": str(e)}, 503)
 
     # -----------------------------------------------------------------------
-    # Real-Time Web Search (Live Wikipedia & Web Knowledge)
+    # Real-Time Web Search (Multi-source: DuckDuckGo + Wikipedia)
     # -----------------------------------------------------------------------
     def _handle_search(self, q: str):
         if not q.strip():
             self._json_response({"query": "", "results": []})
             return
         results = []
+        import html, re
+
+        # 1. DuckDuckGo Instant Answer API
         try:
-            import html, re
+            ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(q)}&format=json&no_html=1&skip_disambig=1"
+            req = urllib.request.Request(ddg_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            with urllib.request.urlopen(req, timeout=4, context=_get_ssl_context()) as resp:
+                d = json.loads(resp.read().decode())
+                abstract = d.get("AbstractText", "") or d.get("Abstract", "")
+                heading = d.get("Heading", "")
+                source_url = d.get("AbstractURL", "")
+                if abstract:
+                    results.append({
+                        "title": heading or q,
+                        "snippet": abstract[:350],
+                        "url": source_url or "https://duckduckgo.com/?q=" + urllib.parse.quote(q)
+                    })
+                for rel in d.get("RelatedTopics", [])[:3]:
+                    if isinstance(rel, dict) and "Text" in rel:
+                        results.append({
+                            "title": rel.get("Text", "").split(" - ")[0][:60],
+                            "snippet": rel.get("Text", "")[:250],
+                            "url": rel.get("FirstURL", "")
+                        })
+        except Exception:
+            pass
+
+        # 2. Wikipedia Search API
+        try:
             url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(q)}&format=json&utf8="
             req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0 (Linux; en)"})
-            with urllib.request.urlopen(req, timeout=6, context=_get_ssl_context()) as resp:
+            with urllib.request.urlopen(req, timeout=5, context=_get_ssl_context()) as resp:
                 data = json.loads(resp.read().decode())
                 items = data.get("query", {}).get("search", [])
-                for it in items[:5]:
+                for it in items[:4]:
                     snippet = html.unescape(re.sub(r"<[^>]+>", "", it.get("snippet", ""))).strip()
                     title = it.get("title", "")
                     results.append({
@@ -961,8 +988,10 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         "url": f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
                     })
         except Exception as e:
-            results.append({"title": f"Search: {q}", "snippet": f"Could not retrieve live search results: {str(e)}", "url": ""})
-        self._json_response({"query": q, "results": results})
+            if not results:
+                results.append({"title": f"Search: {q}", "snippet": f"Web search could not reach external engines: {str(e)}", "url": ""})
+
+        self._json_response({"query": q, "results": results[:6]})
 
     # -----------------------------------------------------------------------
     # Python Code Runner (Secure Sandbox Subprocess)

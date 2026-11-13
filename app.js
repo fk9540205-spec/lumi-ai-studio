@@ -196,6 +196,7 @@
 
   // Super-Feature States: Audio, Voice, Runner & Active Project
   let soundEnabled = loadJson("lumi_sound_enabled", true);
+  let webSearchEnabled = loadJson("lumi_web_search_enabled", false);
   let isListening = false;
   let recognitionInstance = null;
   let currentlySpeakingId = null;
@@ -851,6 +852,15 @@
                 title="${isListening ? "Listening... click to stop" : "Voice input (Hindi & English)"}"
               >
                 ${ICONS.mic}
+              </button>
+
+              <button
+                type="button"
+                id="toggle-web-search-btn"
+                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs ${webSearchEnabled ? "text-primary border-primary/60 bg-primary/10 shadow-xs ring-1 ring-primary/40" : "text-muted-foreground hover:text-foreground"} transition-all backdrop-blur shadow-xs cursor-pointer"
+                title="${webSearchEnabled ? "Live Web Search: Active (Click to disable)" : "Live Web Search: Off (Click to enable)"}"
+              >
+                ${ICONS.globe}
               </button>
             </div>
 
@@ -2276,6 +2286,8 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       timestamp: Date.now(),
     });
 
+    const assistantMsg = thread.messages.find((m) => m.id === assistantMsgId);
+
     saveJson(STORAGE.CHATS, conversations);
     render();
     scrollToBottom();
@@ -2296,26 +2308,46 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       return;
     }
 
-    // 2. LIVE WEB SEARCH (/search <query>)
+    // 2. LIVE REAL-TIME WEB SEARCH (Globe toggle, /search command, or search query)
     let webContext = "";
-    const isSearchCommand = /^\/search\s+/i.test(prompt);
-    if (isSearchCommand) {
-      const searchQuery = prompt.replace(/^\/search\s+/i, "").trim();
+    const isSearchExplicit = /^\/search\s+/i.test(prompt);
+    const hasSearchIntent =
+      webSearchEnabled ||
+      isSearchExplicit ||
+      /^(search|google|dhoondo|khojo|find|who is|what is|when is|where is|latest|current|today'?s|news about|weather|live score)\b/i.test(prompt.trim()) ||
+      /\b(search karo|search karke|latest news|aaj ki|today|ipl score|weather report)\b/i.test(prompt);
+
+    if (hasSearchIntent) {
+      const cleanSearchQuery = prompt
+        .replace(/^\/search\s+/i, "")
+        .replace(/^(search\s+for|search|google|dhoondo|khojo|find)\s+/i, "")
+        .replace(/\s+(search karo|search karke|dhoondo)$/i, "")
+        .trim();
+      const searchQuery = cleanSearchQuery || prompt;
+
       try {
-        const searchResp = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
-        const searchData = await searchResp.json();
-        if (searchData.results && searchData.results.length > 0) {
-          assistantMsg.searchResults = searchData.results;
-          webContext = "\n\nLive Web Knowledge Sources:\n" + searchData.results.map(r => `- ${r.title}: ${r.snippet} (${r.url})`).join("\n");
+        const apiBase =
+          window.location.origin && window.location.origin.startsWith("http")
+            ? ""
+            : "https://lumi-backend-v4-production.up.railway.app";
+        const searchResp = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(searchQuery)}`);
+        if (searchResp.ok) {
+          const searchData = await searchResp.json();
+          if (searchData.results && searchData.results.length > 0) {
+            assistantMsg.searchResults = searchData.results;
+            webContext = "\n\n[Live Real-time Web Knowledge Sources]:\n" + searchData.results.map(r => `- ${r.title}: ${r.snippet} (${r.url})`).join("\n");
+            render();
+            scrollToBottom();
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.warn("Live web search failed:", err);
+      }
     }
 
     // Start Streaming
     isStreaming = true;
     streamAbortController = new AbortController();
-
-    const assistantMsg = thread.messages.find((m) => m.id === assistantMsgId);
 
     const onChunk = (chunk) => {
       assistantMsg.content += chunk;
@@ -3081,6 +3113,18 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
       micBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         toggleSpeechRecognition();
+      });
+    }
+
+    const toggleWebSearchBtn = document.querySelector("#toggle-web-search-btn");
+    if (toggleWebSearchBtn) {
+      toggleWebSearchBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        webSearchEnabled = !webSearchEnabled;
+        saveJson("lumi_web_search_enabled", webSearchEnabled);
+        AudioEffects.play("click");
+        showToast(webSearchEnabled ? "🌐 Live Web Search ON" : "🌐 Live Web Search OFF");
+        render();
       });
     }
 
