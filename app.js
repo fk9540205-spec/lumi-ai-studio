@@ -2406,32 +2406,19 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
           console.warn("Backend real-free-AI streaming attempt failed:", backendErr);
         }
 
-        // If backend wasn't running or had issue, fallback to built-in generator
+        // If backend had issue or returned empty
         if (!streamedSuccessfully && !streamAbortController.signal.aborted) {
-          const fullReply = generateBuiltInResponse(prompt, selectedModel.model);
-          const chunkSize = 4;
-          let offset = 0;
-
-          await new Promise((resolve) => {
-            const interval = setInterval(() => {
-              if (streamAbortController.signal.aborted || offset >= fullReply.length) {
-                clearInterval(interval);
-                resolve();
-                return;
-              }
-              const nextSlice = fullReply.slice(offset, offset + chunkSize);
-              offset += chunkSize;
-              onChunk(nextSlice);
-            }, 24);
-          });
+          assistantMsg.content = "⚠️ AI server se reply connect nahi ho paaya. Kripya apna internet connection check karein ya thodi der baad dobara try karein.";
+          showToast("AI reply connect nahi ho paaya. Please try again.");
         }
       }
     } catch (err) {
       if (!streamAbortController.signal.aborted) {
         console.error("Streaming error:", err);
-        showToast("Couldn't get a live reply. Falling back to built-in Lumi knowledge.");
-        const fallback = generateBuiltInResponse(prompt, selectedModel.model);
-        assistantMsg.content = fallback;
+        showToast("AI network error. Please try again.");
+        if (!assistantMsg.content) {
+          assistantMsg.content = "⚠️ AI server network error. Kripya dobara try karein.";
+        }
       }
     } finally {
       isStreaming = false;

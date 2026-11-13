@@ -377,32 +377,44 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 import g4f.Provider
                 provider = g4f.Provider.Cloudflare
                 if stream:
-                    self._start_sse()
-                    response = _g4f_client.chat.completions.create(
+                    gen = _g4f_client.chat.completions.create(
                         model=target_model,
                         provider=provider,
                         messages=messages,
                         stream=True,
                     )
-                    has_content = False
-                    for chunk in response:
-                        content = ""
+                    first_content = None
+                    # Verify first chunk before sending SSE headers
+                    for chunk in gen:
+                        c = ""
                         if hasattr(chunk, "choices") and chunk.choices:
-                            content = getattr(chunk.choices[0].delta, "content", "") or ""
-                        if content:
-                            has_content = True
-                            chunk_payload = {
-                                "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
-                                "provider": "free-hub",
-                                "model": target_model,
-                            }
-                            self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                    if has_content:
+                            c = getattr(chunk.choices[0].delta, "content", "") or ""
+                        if c:
+                            first_content = c
+                            break
+
+                    if first_content is not None:
+                        self._start_sse()
+                        chunk_payload = {
+                            "choices": [{"index": 0, "delta": {"content": first_content}, "finish_reason": None}],
+                            "provider": "g4f-cloudflare",
+                            "model": target_model,
+                        }
+                        self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                        for chunk in gen:
+                            c = ""
+                            if hasattr(chunk, "choices") and chunk.choices:
+                                c = getattr(chunk.choices[0].delta, "content", "") or ""
+                            if c:
+                                chunk_payload = {
+                                    "choices": [{"index": 0, "delta": {"content": c}, "finish_reason": None}],
+                                    "provider": "g4f-cloudflare",
+                                    "model": target_model,
+                                }
+                                self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
                         self._send_chunk(b"data: [DONE]\n\n")
                         self._end_chunks()
                         return
-                    else:
-                        self._end_chunks()
                 else:
                     response = _g4f_client.chat.completions.create(
                         model=target_model,
@@ -414,15 +426,112 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     if content and "moved to a new app" not in content:
                         self._json_response({
                             "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
-                            "provider": "free-hub",
+                            "provider": "g4f-cloudflare",
                             "model": target_model,
                         })
                         return
             except Exception as e:
-                sys.stderr.write(f"In-process Cloudflare G4F failed, trying fallback: {e}\n")
+                sys.stderr.write(f"In-process Cloudflare G4F attempt failed, trying fallback: {e}\n")
 
         # 2. Secondary fallback: Pollinations Free Hub
-        self._stream_or_buffer_free_hub("openai", messages, stream)
+        try:
+            req = urllib.request.Request(
+                FREE_HUB_URL,
+                data=json.dumps({"model": "openai", "messages": messages, "stream": stream}).encode("utf-8"),
+                headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
+                method="POST",
+            )
+            resp = urllib.request.urlopen(req, timeout=30, context=_get_ssl_context())
+            if stream:
+                self._start_sse()
+                for raw_line in resp:
+                    line = raw_line.decode(errors="replace").strip()
+                    if line.startswith("data: "):
+                        data_part = line[6:].strip()
+                        if data_part == "[DONE]":
+                            break
+                        try:
+                            parsed = json.loads(data_part)
+                            delta = parsed.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content") or delta.get("reasoning")
+                            if content:
+                                chunk_payload = {
+                                    "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
+                                    "provider": "pollinations-hub",
+                                    "model": target_model,
+                                }
+                                self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                        except Exception:
+                            pass
+                self._send_chunk(b"data: [DONE]\n\n")
+                self._end_chunks()
+                return
+            else:
+                data_resp = json.loads(resp.read().decode())
+                self._json_response(data_resp)
+                return
+        except Exception as e:
+            sys.stderr.write(f"Pollinations hub attempt failed: {e}\n")
+
+        # 3. Third fallback: Direct text endpoint with prompt
+        try:
+            last_prompt = ""
+            for m in reversed(messages):
+                if m.get("role") == "user":
+                    last_prompt = m.get("content", "")
+                    break
+            if not last_prompt:
+                last_prompt = "Hello"
+
+            enc_prompt = urllib.parse.quote(last_prompt[:500])
+            url = f"https://text.pollinations.ai/{enc_prompt}?model=openai&system=You+are+Lumi+AI"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            resp = urllib.request.urlopen(req, timeout=20, context=_get_ssl_context())
+            text = resp.read().decode(errors="replace")
+            if text and "Free limit reached" not in text:
+                if stream:
+                    self._start_sse()
+                    words = text.split(" ")
+                    for i, w in enumerate(words):
+                        space = " " if i > 0 else ""
+                        chunk_payload = {
+                            "choices": [{"index": 0, "delta": {"content": space + w}, "finish_reason": None}],
+                            "provider": "pollinations-direct",
+                            "model": target_model,
+                        }
+                        self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                        time.sleep(0.015)
+                    self._send_chunk(b"data: [DONE]\n\n")
+                    self._end_chunks()
+                    return
+                else:
+                    self._json_response({
+                        "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
+                        "provider": "pollinations-direct",
+                        "model": target_model,
+                    })
+                    return
+        except Exception as e:
+            sys.stderr.write(f"Direct text fallback failed: {e}\n")
+
+        # If all free providers failed, send a clean friendly error without crash
+        if stream:
+            self._start_sse()
+            err_msg = "⚠️ AI server is currently busy. Please retry in a few moments."
+            chunk_payload = {
+                "choices": [{"index": 0, "delta": {"content": err_msg}, "finish_reason": "stop"}],
+                "provider": "error",
+                "model": target_model,
+            }
+            self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+            self._send_chunk(b"data: [DONE]\n\n")
+            self._end_chunks()
+        else:
+            self._json_response({
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": "⚠️ AI server is busy. Please retry in a few moments."}, "finish_reason": "stop"}],
+                "provider": "error",
+                "model": target_model,
+            }, 503)
 
     # -----------------------------------------------------------------------
     # 2. GPT4Free (xtekky/gpt4free) Integration
@@ -727,25 +836,34 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._stream_or_buffer_free_hub("gemini", messages, stream)
 
     def _stream_or_buffer_free_hub(self, model, messages, stream):
-        req = urllib.request.Request(
-            FREE_HUB_URL,
-            data=json.dumps({"model": model, "messages": messages, "stream": stream}).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
-            method="POST",
-        )
-        resp = urllib.request.urlopen(req, timeout=90, context=_get_ssl_context())
-        if stream:
-            self._start_sse()
-            for raw_line in resp:
-                line = raw_line.decode(errors="replace").strip()
-                if line.startswith("data: "):
-                    self._send_chunk(f"{line}\n\n".encode("utf-8"))
-                    if line.strip() == "data: [DONE]":
-                        break
-            self._send_chunk(b"data: [DONE]\n\n")
-            self._end_chunks()
-        else:
-            self._json_response(json.loads(resp.read().decode()))
+        try:
+            req = urllib.request.Request(
+                FREE_HUB_URL,
+                data=json.dumps({"model": "openai", "messages": messages, "stream": stream}).encode("utf-8"),
+                headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
+                method="POST",
+            )
+            resp = urllib.request.urlopen(req, timeout=30, context=_get_ssl_context())
+            if stream:
+                self._start_sse()
+                for raw_line in resp:
+                    line = raw_line.decode(errors="replace").strip()
+                    if line.startswith("data: "):
+                        self._send_chunk(f"{line}\n\n".encode("utf-8"))
+                        if line.strip() == "data: [DONE]":
+                            break
+                self._send_chunk(b"data: [DONE]\n\n")
+                self._end_chunks()
+            else:
+                self._json_response(json.loads(resp.read().decode()))
+        except Exception as e:
+            if stream:
+                self._start_sse()
+                self._send_chunk(f"data: {json.dumps({'choices': [{'index': 0, 'delta': {'content': f'⚠️ Error: {str(e)[:50]}'}, 'finish_reason': 'stop'}]})}\n\n".encode('utf-8'))
+                self._send_chunk(b"data: [DONE]\n\n")
+                self._end_chunks()
+            else:
+                self._json_response({"error": str(e)}, 500)
 
     # -----------------------------------------------------------------------
     # 5. Awesome Reverse-Engineered Generic OpenAI-compatible Proxy
