@@ -217,112 +217,16 @@
   };
 
   const GENUI_SYSTEM_INSTRUCTION = `
-[GENUI CAPABILITY: CHATGPT-STYLE INTERACTIVE RICH CARDS]
-You can generate rich, interactive UI cards using fenced code blocks tagged with \`\`\`json:ui ... \`\`\`.
-Use this format whenever the user asks for comparisons, product details/pricing, weather forecasts, statistical metrics, top recommendations, data charts, or interactive action options.
-Supported card schemas:
-1. Product Card:
-\`\`\`json:ui
-{
-  "type": "product",
-  "title": "Sony WH-1000XM5",
-  "subtitle": "Wireless Noise Cancelling Headphones",
-  "price": "$399",
-  "originalPrice": "$449",
-  "discount": "11% OFF",
-  "rating": 4.8,
-  "ratingCount": "3,420",
-  "badge": "Best Seller",
-  "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500",
-  "features": ["Industry-leading Noise Cancellation", "30-hour battery life", "Multipoint connection"],
-  "actions": [
-    { "label": "Full Specifications", "prompt": "Give me detailed specifications of Sony WH-1000XM5" },
-    { "label": "Compare with Bose", "prompt": "Compare Sony WH-1000XM5 with Bose QuietComfort Ultra" }
-  ]
-}
-\`\`\`
-2. Weather Card:
-\`\`\`json:ui
-{
-  "type": "weather",
-  "city": "Mumbai",
-  "temp": "31°C",
-  "condition": "Partly Cloudy",
-  "humidity": "68%",
-  "wind": "14 km/h",
-  "feelsLike": "34°C",
-  "forecast": [
-    { "day": "Tomorrow", "temp": "32°C", "icon": "☀️" },
-    { "day": "Friday", "temp": "30°C", "icon": "⛅" },
-    { "day": "Saturday", "temp": "29°C", "icon": "🌧️" }
-  ]
-}
-\`\`\`
-3. Statistics Card:
-\`\`\`json:ui
-{
-  "type": "stats",
-  "title": "Q3 Performance Growth",
-  "metrics": [
-    { "label": "Revenue", "value": "$1.42M", "delta": "+18.2%", "progress": 85 },
-    { "label": "Active Users", "value": "248.5K", "delta": "+24.0%", "progress": 72 },
-    { "label": "Server Uptime", "value": "99.98%", "delta": "+0.02%", "progress": 99 }
-  ]
-}
-\`\`\`
-4. Comparison Card:
-\`\`\`json:ui
-{
-  "type": "comparison",
-  "title": "iPhone 16 Pro vs Galaxy S24 Ultra",
-  "itemA": { "title": "iPhone 16 Pro", "subtitle": "Apple A18 Pro", "winner": false },
-  "itemB": { "title": "Galaxy S24 Ultra", "subtitle": "Snapdragon 8 Gen 3", "winner": true },
-  "features": [
-    { "feature": "Camera Zoom", "valA": "5x Optical", "valB": "5x + 10x Quad", "winner": "B" },
-    { "feature": "Battery Life", "valA": "3,582 mAh", "valB": "5,000 mAh", "winner": "B" },
-    { "feature": "Video Recording", "valA": "4K 120fps ProRes", "valB": "8K 30fps", "winner": "A" }
-  ],
-  "verdict": "Choose **Galaxy S24 Ultra** for superior zoom, stylus, and battery life. Choose **iPhone 16 Pro** for compact form factor and cinematic ProRes video."
-}
-\`\`\`
-5. Chart Card (chartType: "bar", "donut", "line"):
-\`\`\`json:ui
-{
-  "type": "chart",
-  "chartType": "bar",
-  "title": "Tech Giants Market Cap (Trillion USD)",
-  "data": [
-    { "label": "Apple", "value": 3.4 },
-    { "label": "Nvidia", "value": 3.3 },
-    { "label": "Microsoft", "value": 3.1 },
-    { "label": "Google", "value": 2.1 }
-  ]
-}
-\`\`\`
-6. Top Recommendations Card:
-\`\`\`json:ui
-{
-  "type": "recommendation",
-  "title": "Top Recommended Laptops",
-  "items": [
-    { "rank": 1, "title": "MacBook Air M3", "score": "9.6/10", "tag": "Best Overall", "reason": "Unmatched battery life, silent fanless design, and premium build.", "prompt": "Tell me more about MacBook Air M3" },
-    { "rank": 2, "title": "Dell XPS 13", "score": "9.1/10", "tag": "Best Windows", "reason": "Sleek infinity edge display and lightweight portability.", "prompt": "Tell me more about Dell XPS 13" }
-  ]
-}
-\`\`\`
-7. Multiple Blocks in One Response:
-\`\`\`json:ui
-{
-  "type": "rich_message",
-  "title": "Comprehensive Overview",
-  "blocks": [
-    { "type": "stats", ... },
-    { "type": "chart", ... },
-    { "type": "actions", "actions": [{ "label": "Deep Dive", "prompt": "..." }] }
-  ]
-}
-\`\`\`
-RULE: Always include clear, friendly conversational text before and/or after the card block. When normal conversation is requested, reply normally in markdown without forcing cards.
+[GENUI CAPABILITY: INTERACTIVE RICH CARDS]
+When helpful (for products, comparisons, weather, statistics, top recommendations, or charts), provide a compact UI block using \`\`\`json:ui ... \`\`\`.
+SPEED OPTIMIZATION RULE: Keep JSON compact, fast, and minimal (maximum 40-75 tokens). Only use essential keys so cards render in under 1 second:
+- Product: {"type":"product","title":"Sony WH-1000XM5","price":"$399","rating":4.8,"features":["30h Battery","Active Noise Cancelling"],"actions":[{"label":"Specifications","prompt":"Specifications of Sony WH-1000XM5"}]}
+- Weather: {"type":"weather","city":"Mumbai","temp":"31°C","condition":"Sunny","humidity":"65%","forecast":[{"day":"Tomorrow","temp":"32°C","icon":"☀️"},{"day":"Fri","temp":"30°C","icon":"⛅"}]}
+- Stats: {"type":"stats","title":"Growth","metrics":[{"label":"Users","value":"240K","delta":"+18%","progress":80}]}
+- Comparison: {"type":"comparison","title":"iPhone 16 vs S24 Ultra","itemA":{"title":"iPhone 16 Pro"},"itemB":{"title":"S24 Ultra","winner":true},"features":[{"feature":"Camera Zoom","valA":"5x","valB":"10x","winner":"B"}],"verdict":"S24 Ultra wins on zoom."}
+- Chart: {"type":"chart","chartType":"bar","title":"Market Cap (T$)","data":[{"label":"Apple","value":3.4},{"label":"Nvidia","value":3.3}]}
+- Recommendations: {"type":"recommendation","title":"Top Laptops","items":[{"rank":1,"title":"MacBook Air M3","score":"9.6/10","reason":"Best battery & build.","prompt":"Tell me more about MacBook Air M3"}]}
+Always write a short friendly conversational sentence before or after the card.
 `;
 
   const PERSONA_LABELS = {
@@ -1250,6 +1154,50 @@ RULE: Always include clear, friendly conversational text before and/or after the
     }
   };
 
+  // --- Fast Resilient Partial JSON Parser for Live Streaming GenUI ---
+  function tryParsePartialJson(raw) {
+    if (!raw || typeof raw !== "string") return null;
+    let s = raw.trim();
+    let idx = s.indexOf("{");
+    if (idx === -1) {
+      idx = s.indexOf("[");
+      if (idx === -1) return null;
+    }
+    s = s.slice(idx);
+
+    let inStr = false;
+    let esc = false;
+    const stack = [];
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === "\\") esc = true;
+        else if (ch === '"') inStr = false;
+      } else {
+        if (ch === '"') inStr = true;
+        else if (ch === '{') stack.push('}');
+        else if (ch === '[') stack.push(']');
+        else if (ch === '}' || ch === ']') {
+          if (stack.length && stack[stack.length - 1] === ch) stack.pop();
+        }
+      }
+    }
+
+    let fixed = s;
+    if (inStr) fixed += '"';
+    fixed = fixed.replace(/,\s*$/, "");
+    while (stack.length) {
+      fixed += stack.pop();
+    }
+
+    try {
+      return JSON.parse(fixed);
+    } catch {
+      return null;
+    }
+  }
+
   // --- Markdown Parser with Code Block Copying & Math Support ---
   function renderMarkdown(content) {
     if (!content) return "";
@@ -1279,9 +1227,14 @@ RULE: Always include clear, friendly conversational text before and/or after the
       }
     });
 
-    // 0.1 Handle active unclosed streaming GenUI block seamlessly
-    text = text.replace(/```(?:ui|genui|json:ui)\s*\{?[^`]*$/i, (match) => {
-      return `\n<div class="genui-card p-3.5 my-2 flex items-center gap-3 border border-indigo-500/30 bg-indigo-500/5 rounded-xl"><div class="size-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div><span class="text-xs text-muted-foreground font-medium">Rendering interactive GenUI card…</span></div>\n`;
+    // 0.1 Progressive live streaming GenUI card rendering (Zero-wait instant rendering)
+    text = text.replace(/```(?:ui|genui|json:ui)\s*([\s\S]*?)$/i, (match, innerStream) => {
+      if (innerStream.includes("```")) return match;
+      const partialParsed = tryParsePartialJson(innerStream);
+      if (partialParsed && (partialParsed.type || partialParsed.blocks)) {
+        return `\n<div class="genui-streaming-live-wrap relative">${GenUIRenderer.render(partialParsed)}<div class="genui-live-badge"><span class="size-1.5 rounded-full bg-indigo-500 animate-ping"></span> Live building…</div></div>\n`;
+      }
+      return `\n<div class="genui-card p-3.5 my-2 flex items-center gap-3 border border-indigo-500/30 bg-indigo-500/5 rounded-xl"><div class="size-4 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div><span class="text-xs text-muted-foreground font-medium">Generating interactive card…</span></div>\n`;
     });
 
     // 3. Fenced Code Blocks with IDE Syntax Highlighting, GenUI Interception, Sandbox Run & Copy

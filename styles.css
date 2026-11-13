@@ -1670,3 +1670,28 @@ html.dark .genui-recom-rank.gold {
   color: var(--foreground);
 }
 
+
+/* Live Progressive Streaming Badge */
+.genui-streaming-live-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.genui-live-badge {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  pointer-events: none;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
