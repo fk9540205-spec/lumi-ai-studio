@@ -471,13 +471,28 @@ Always write a short friendly conversational sentence before or after the card.
   function highlightCodeSyntax(code, lang) {
     if (!code) return "";
     let safe = escapeHtml(code);
-    safe = safe.replace(/(\/\*[\s\S]*?\*\/|\/\/.*$|#.*$)/gm, '<span class="tok-comment">$1</span>');
-    safe = safe.replace(/(&quot;.*?&quot;|&#39;.*?&#39;|`.*?`)/g, '<span class="tok-str">$1</span>');
-    safe = safe.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
+
+    const tokens = [];
+    const pushToken = (html) => {
+      tokens.push(html);
+      return `___TOK_${tokens.length - 1}___`;
+    };
+
+    // 1. Comments
+    safe = safe.replace(/(\/\*[\s\S]*?\*\/|\/\/.*$|#.*$)/gm, (m) => pushToken(`<span class="tok-comment">${m}</span>`));
+    // 2. Strings
+    safe = safe.replace(/(&quot;[\s\S]*?&quot;|&#39;[\s\S]*?&#39;|`[\s\S]*?`)/g, (m) => pushToken(`<span class="tok-str">${m}</span>`));
+    // 3. Numbers
+    safe = safe.replace(/\b(\d+(?:\.\d+)?)\b/g, (m) => pushToken(`<span class="tok-num">${m}</span>`));
+    // 4. Keywords
     const kwRegex = /\b(def|class|return|import|from|as|if|elif|else|for|while|try|except|finally|with|raise|lambda|async|await|const|let|var|function|new|switch|case|break|continue|default|typeof|instanceof|interface|type|public|private|protected|extends|implements|static|yield)\b/g;
-    safe = safe.replace(kwRegex, '<span class="tok-kw">$1</span>');
+    safe = safe.replace(kwRegex, (m) => pushToken(`<span class="tok-kw">${m}</span>`));
+    // 5. Types
     const typeRegex = /\b(int|float|str|bool|list|dict|set|tuple|void|Promise|Array|Object|String|Number|Boolean|null|undefined|None|True|False)\b/g;
-    safe = safe.replace(typeRegex, '<span class="tok-type">$1</span>');
+    safe = safe.replace(typeRegex, (m) => pushToken(`<span class="tok-type">${m}</span>`));
+
+    // Restore tokens
+    safe = safe.replace(/___TOK_(\d+)___/g, (match, idx) => tokens[Number(idx)] || "");
     return safe;
   }
 
@@ -1198,6 +1213,29 @@ Always write a short friendly conversational sentence before or after the card.
     }
   }
 
+  // --- Auto-Repairing Resilient JSON Parser for LLM Outputs ---
+  function tryParseJson(raw) {
+    if (!raw || typeof raw !== "string") return null;
+    let s = raw.trim();
+    try {
+      return JSON.parse(s);
+    } catch {}
+
+    try {
+      let fixed = s
+        .replace(/:\s*([A-Za-z][A-Za-z0-9_-]*)\s*([,\}\]])/g, (m, val, post) => {
+          if (["true", "false", "null"].includes(val.toLowerCase())) {
+            return `: ${val}${post}`;
+          }
+          return `: "${val}"${post}`;
+        })
+        .replace(/,\s*([}\]])/g, "$1");
+      return JSON.parse(fixed);
+    } catch {}
+
+    return tryParsePartialJson(s);
+  }
+
   // --- Markdown Parser with Code Block Copying & Math Support ---
   function renderMarkdown(content) {
     if (!content) return "";
@@ -1246,7 +1284,7 @@ Always write a short friendly conversational sentence before or after the card.
       const isExplicitGenUi = ["ui", "genui", "json:ui", "card", "cards", "widget"].includes(cleanLang);
       if (isExplicitGenUi || cleanLang === "json") {
         try {
-          const parsed = JSON.parse(rawCode);
+          const parsed = tryParseJson(rawCode);
           if (
             isExplicitGenUi ||
             (parsed &&
