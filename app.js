@@ -786,6 +786,33 @@
       </div>`;
   }
 
+  function updateAttachmentChipsUI() {
+    const container = document.querySelector("#attachment-chips-container");
+    const chipsHtml = renderAttachmentChips();
+    if (container) {
+      if (!chipsHtml) {
+        container.remove();
+      } else {
+        container.outerHTML = chipsHtml;
+      }
+    } else if (chipsHtml) {
+      const form = document.querySelector("#chat-composer-form");
+      if (form) {
+        form.insertAdjacentHTML("afterbegin", chipsHtml);
+      }
+    }
+    document.querySelectorAll("[data-remove-attachment]").forEach((btn) => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute("data-remove-attachment"), 10);
+        if (!isNaN(idx) && idx >= 0 && idx < attachedFiles.length) {
+          attachedFiles.splice(idx, 1);
+          updateAttachmentChipsUI();
+        }
+      };
+    });
+  }
+
   function renderPersonaPicker() {
     const icon = PERSONA_ICONS[activePersona] || "🌟";
     const rawLabel = PERSONA_LABELS[activePersona] || "General AI";
@@ -971,7 +998,7 @@
             id="file-upload-input"
             class="hidden"
             multiple
-            accept=".pdf,.txt,.py,.js,.jsx,.ts,.tsx,.json,.csv,.md,.html,.css,.sql,.sh,.log"
+            accept="*/*"
           />
           <textarea
             id="composer-textarea"
@@ -1023,26 +1050,23 @@
               </button>
             </div>
 
-            <div class="flex items-center gap-1.5">
-              ${
-                isStreaming
-                  ? `<button
-                      type="button"
-                      id="stop-generation-btn"
-                      class="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer"
-                      title="Stop generation"
-                    >
-                      ${ICONS.square}
-                    </button>`
-                  : `<button
-                      type="submit"
-                      id="submit-prompt-btn"
-                      class="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                      title="Send message"
-                    >
-                      ${ICONS.cornerDownLeft}
-                    </button>`
-              }
+            <div class="flex items-center gap-1.5" id="composer-submit-wrapper">
+              <button
+                type="submit"
+                id="submit-prompt-btn"
+                class="${isStreaming ? "hidden" : "inline-flex"} size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Send message"
+              >
+                ${ICONS.cornerDownLeft}
+              </button>
+              <button
+                type="button"
+                id="stop-generation-btn"
+                class="${isStreaming ? "inline-flex" : "hidden"} size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer"
+                title="Stop generation"
+              >
+                ${ICONS.square}
+              </button>
             </div>
           </div>
         </form>
@@ -1851,23 +1875,14 @@
 
       // In-place switch send button to stop button
       const submitBtn = document.querySelector("#submit-prompt-btn");
+      const stopBtn = document.querySelector("#stop-generation-btn");
       if (submitBtn) {
-        submitBtn.outerHTML = `
-          <button
-            type="button"
-            id="stop-generation-btn"
-            class="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer"
-            title="Stop generation"
-          >
-            ${ICONS.square}
-          </button>`;
-        const newStop = document.querySelector("#stop-generation-btn");
-        if (newStop) {
-          newStop.addEventListener("click", () => {
-            if (streamAbortController) streamAbortController.abort();
-            isStreaming = false;
-          });
-        }
+        submitBtn.classList.add("hidden");
+        submitBtn.classList.remove("inline-flex");
+      }
+      if (stopBtn) {
+        stopBtn.classList.remove("hidden");
+        stopBtn.classList.add("inline-flex");
       }
       scrollToBottom();
     } else {
@@ -2114,30 +2129,16 @@
       }
 
       const stopBtn = document.querySelector("#stop-generation-btn");
+      const submitBtn = document.querySelector("#submit-prompt-btn");
       if (stopBtn) {
-        stopBtn.outerHTML = `
-          <button
-            type="submit"
-            id="submit-prompt-btn"
-            class="inline-flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            title="Send message"
-          >
-            ${ICONS.cornerDownLeft}
-          </button>`;
+        stopBtn.classList.add("hidden");
+        stopBtn.classList.remove("inline-flex");
+      }
+      if (submitBtn) {
+        submitBtn.classList.remove("hidden");
+        submitBtn.classList.add("inline-flex");
       }
 
-          document.addEventListener("click", () => {
-      const pMenu = document.querySelector("#persona-dropdown-menu");
-      if (pMenu && !pMenu.classList.contains("hidden")) pMenu.classList.add("hidden");
-      const eMenu = document.querySelector("#export-dropdown-menu");
-      if (eMenu && !eMenu.classList.contains("hidden")) eMenu.classList.add("hidden");
-      const mMenu = document.querySelector("#model-dropdown-menu");
-      if (mMenu) {
-        modelMenuOpen = null;
-        mMenu.remove();
-      }
-    });
-    attachEventListeners();
       scrollToBottom();
     }
   }
@@ -2785,7 +2786,7 @@
                       isPdf: true,
                       pages: data.pages || 1,
                     });
-                    render();
+                    updateAttachmentChipsUI();
                     showToast(`✔ Extracted ${data.pages || 1} pages from ${file.name}`);
                   }
                 } catch (pdfErr) {
@@ -2802,7 +2803,7 @@
                   content: ev.target.result || "",
                   isPdf: false,
                 });
-                render();
+                updateAttachmentChipsUI();
                 showToast(`✔ Attached ${file.name}`);
               };
               reader.readAsText(file);
@@ -2821,7 +2822,7 @@
         const idx = parseInt(btn.getAttribute("data-remove-attachment"), 10);
         if (!isNaN(idx) && idx >= 0 && idx < attachedFiles.length) {
           attachedFiles.splice(idx, 1);
-          render();
+          updateAttachmentChipsUI();
         }
       });
     });
