@@ -198,18 +198,18 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-transform")
         self.send_header("Connection", "keep-alive")
-        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
 
     def _send_chunk(self, data: bytes):
-        self.wfile.write(f"{len(data):x}\r\n".encode("latin-1"))
-        self.wfile.write(data)
-        self.wfile.write(b"\r\n")
-        self.wfile.flush()
+        try:
+            self.wfile.write(data)
+            self.wfile.flush()
+        except Exception:
+            pass
 
     def _end_chunks(self):
         try:
-            self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
         except Exception:
             pass
