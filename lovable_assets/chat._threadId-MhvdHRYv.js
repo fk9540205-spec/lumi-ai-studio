@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-NZYk81nU.js";var t=e(),n=()=>(0,t.jsx)(`div`,{className:`flex flex-1 items-center justify-center text-muted-foreground`,children:`This chat doesn't exist.`});export{n as notFoundComponent};
