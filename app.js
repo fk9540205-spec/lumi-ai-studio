@@ -31,7 +31,7 @@
     {
       name: "🚀 Free AI Hub (Zero Setup)",
       protocol: "openai",
-      base_url: "http://localhost:3456/api/free",
+      base_url: "/api/free",
       default_model: "openai",
       models: ["openai", "deepseek-r1", "claude-hybridspace", "gemini", "qwen-coder", "llama", "mistral"],
       group: "Free & Reverse-Engineered",
@@ -40,7 +40,7 @@
     {
       name: "⚡ GPT4Free (g4f)",
       protocol: "openai",
-      base_url: "http://localhost:3456/api/g4f",
+      base_url: "/api/g4f",
       default_model: "gpt-4o-mini",
       models: ["gpt-4o", "gpt-4o-mini", "claude-3.5-sonnet", "deepseek-r1", "gemini-2.0-flash", "llama-3.3-70b", "blackbox"],
       group: "Free & Reverse-Engineered",
@@ -49,7 +49,7 @@
     {
       name: "🦆 Duck.ai Free API",
       protocol: "openai",
-      base_url: "http://localhost:3456/api/duck",
+      base_url: "/api/duck",
       default_model: "gpt-4o-mini",
       models: ["gpt-4o-mini", "claude-3-haiku-20240307", "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", "mistralai/Mixtral-8x7B-Instruct-v0.1"],
       group: "Free & Reverse-Engineered",
@@ -58,7 +58,7 @@
     {
       name: "💎 Gemini Web to API",
       protocol: "openai",
-      base_url: "http://localhost:3456/api/gemini",
+      base_url: "/api/gemini",
       default_model: "gemini-2.0-flash",
       models: ["gemini-2.0-flash", "gemini-2.0-pro", "gemini-1.5-flash", "gemini-1.5-pro"],
       group: "Free & Reverse-Engineered",
@@ -67,7 +67,7 @@
     {
       name: "🌐 Awesome Reverse Proxy",
       protocol: "openai",
-      base_url: "http://localhost:3456/api/proxy",
+      base_url: "/api/proxy",
       default_model: "gpt-4o",
       models: ["gpt-4o", "claude-3.5-sonnet", "deepseek-chat"],
       group: "Free & Reverse-Engineered",
@@ -2169,14 +2169,14 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
     }
 
     // Default: OpenAI-compatible (works with Free AI Hub, GPT4Free, Duck.ai, Gemini Web, Ollama, Groq, etc.)
-    const backendOrigin =
+    const apiBase =
       window.location.origin && window.location.origin.startsWith("http")
-        ? window.location.origin
+        ? ""
         : "https://lumi-backend-v2-production.up.railway.app";
 
     let rawBase = (provider.base_url || "").trim().replace(/\/+$/, "");
     if (rawBase.startsWith("/")) {
-      rawBase = `${backendOrigin}${rawBase}`;
+      rawBase = `${apiBase}${rawBase}`;
     }
 
     let url = rawBase;
@@ -2345,9 +2345,9 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
         );
       } else {
         // Built-in Real Free AI Streaming via backend /api/free/chat
-        const backendOrigin =
+        const apiBase =
           window.location.origin && window.location.origin.startsWith("http")
-            ? window.location.origin
+            ? ""
             : "https://lumi-backend-v2-production.up.railway.app";
 
         let streamedSuccessfully = false;
@@ -2360,7 +2360,7 @@ Let me know if you would like me to expand on any specific aspect or dive deeper
             chatHistory[chatHistory.length - 1].content += webContext;
           }
 
-          const resp = await fetch(`${backendOrigin}/api/free/chat`, {
+          const resp = await fetch(`${apiBase}/api/free/chat`, {
             method: "POST",
             signal: streamAbortController.signal,
             headers: { "Content-Type": "application/json" },
