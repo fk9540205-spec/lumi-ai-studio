@@ -3970,15 +3970,15 @@
   // Exact match to frame_339.png from official user video + AI Voice Selector
   // ==========================================================================
   const LIVE_VOICES = [
-    { id: "nova", name: "Nova", tag: "Warm & Natural", desc: "Conversational, soothing tone (OpenAI style)", icon: "🌸" },
-    { id: "alloy", name: "Alloy", tag: "Dynamic & Friendly", desc: "Balanced, expressive companion (OpenAI style)", icon: "⚡" },
-    { id: "shimmer", name: "Shimmer", tag: "Bright & Clear", desc: "Cheerful, melodious female tone (OpenAI style)", icon: "✨" },
-    { id: "onyx", name: "Onyx", tag: "Deep & Grounded", desc: "Warm, resonant male tone (OpenAI style)", icon: "🎙️" },
-    { id: "swara", name: "Swara", tag: "Natural Hindi", desc: "Fluent, authentic Hindi female (IndicF5)", icon: "🇮🇳" },
-    { id: "madhur", name: "Madhur", tag: "Natural Hindi", desc: "Fluent, warm Hindi male (IndicF5)", icon: "🇮🇳" },
-    { id: "rachel", name: "Rachel", tag: "Calm & Realistic", desc: "Gentle, authentic voice (ElevenLabs style)", icon: "🌿" },
-    { id: "adam", name: "Adam", tag: "Narrative & Deep", desc: "Articulate storytelling voice (ElevenLabs style)", icon: "📖" },
-    { id: "neerja", name: "Neerja", tag: "Indian Accent", desc: "Natural Indian English female", icon: "💫" }
+    { id: "nova", name: "Nova", provider: "OpenAI", desc: "Warm, natural conversational tone" },
+    { id: "alloy", name: "Alloy", provider: "OpenAI", desc: "Dynamic and expressive balanced voice" },
+    { id: "shimmer", name: "Shimmer", provider: "OpenAI", desc: "Clear, cheerful and melodic tone" },
+    { id: "onyx", name: "Onyx", provider: "OpenAI", desc: "Deep, warm and grounded male voice" },
+    { id: "swara", name: "Swara", provider: "IndicF5", desc: "Natural native Hindi & Hinglish female voice" },
+    { id: "madhur", name: "Madhur", provider: "IndicF5", desc: "Natural warm Hindi & Hinglish male voice" },
+    { id: "rachel", name: "Rachel", provider: "ElevenLabs", desc: "Calm, realistic everyday conversational voice" },
+    { id: "adam", name: "Adam", provider: "ElevenLabs", desc: "Deep, articulate storytelling male voice" },
+    { id: "neerja", name: "Neerja", provider: "Indic Neural", desc: "Expressive Indian accent English voice" }
   ];
 
   const LumiVoiceCall = {
@@ -4070,19 +4070,31 @@
             </button>
           </div>
 
-          <!-- Voice Selector Bottom Sheet Modal -->
-          <div id="live-voice-sheet" class="gemini-live-voice-sheet hidden">
-            <div class="voice-sheet-backdrop" id="voice-sheet-backdrop"></div>
-            <div class="voice-sheet-panel">
-              <div class="voice-sheet-handle"></div>
-              <div class="voice-sheet-title-row">
-                <h3>Choose AI Voice</h3>
-                <button type="button" class="voice-sheet-close-btn" id="voice-sheet-close-btn" title="Close">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          <!-- Clean Professional AI Voice Selector Modal (Matches Lumi Studio Design System) -->
+          <div id="live-voice-sheet" class="voice-picker-modal-overlay hidden">
+            <div class="voice-picker-backdrop" id="voice-sheet-backdrop"></div>
+            <div class="voice-picker-card">
+              <div class="voice-picker-header">
+                <div class="flex items-center gap-2.5">
+                  <div class="voice-picker-header-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3>AI Voice Model</h3>
+                    <p>Select a voice for Lumi. Tap ▶ to test.</p>
+                  </div>
+                </div>
+                <button type="button" class="voice-picker-close-btn" id="voice-sheet-close-btn" title="Close">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
                 </button>
               </div>
-              <p class="voice-sheet-subtitle">Select a voice for Lumi. Tap ▶ to hear a sample.</p>
-              <div class="voice-sheet-list" id="voice-sheet-list"></div>
+              <div class="voice-picker-list" id="voice-sheet-list"></div>
             </div>
           </div>
         </div>
@@ -4139,49 +4151,35 @@
         const isSelected = v.id === activeVoice;
         const isPlaying = this.currentlyPlayingSampleId === v.id;
         return `
-          <div class="voice-sheet-item ${isSelected ? "selected" : ""}" data-voice-id="${v.id}">
-            <div class="voice-item-avatar">${v.icon}</div>
-            <div class="voice-item-info">
-              <div class="voice-item-name-row">
-                <span class="voice-item-name">${v.name}</span>
-                <span class="voice-item-tag">${v.tag}</span>
+          <div class="voice-picker-item ${isSelected ? "is-active" : ""}" data-voice-id="${v.id}">
+            <button type="button" class="voice-play-btn ${isPlaying ? "is-playing" : ""}" data-sample-btn="${v.id}" title="Preview Voice">
+              ${isPlaying ? ICONS.square : ICONS.play}
+            </button>
+            <div class="voice-picker-meta">
+              <div class="voice-picker-title-row">
+                <span class="voice-picker-name">${v.name}</span>
+                <span class="voice-picker-badge">${v.provider}</span>
               </div>
-              <div class="voice-item-desc">${v.desc}</div>
+              <span class="voice-picker-desc">${v.desc}</span>
             </div>
-            <div class="voice-item-actions">
-              <button type="button" class="voice-sample-btn ${isPlaying ? "playing" : ""}" data-sample-btn="${v.id}" title="Play preview">
-                ${isPlaying ? `
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="6" y="4" width="4" height="16" rx="1"/>
-                    <rect x="14" y="4" width="4" height="16" rx="1"/>
-                  </svg>
-                ` : `
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="5 3 19 12 5 21 5 3"/>
-                  </svg>
-                `}
-              </button>
-              <div class="voice-item-radio">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-              </div>
+            <div class="voice-picker-check">
+              ${isSelected ? ICONS.check : ""}
             </div>
           </div>
         `;
       }).join("");
 
       // Wire item selection
-      list.querySelectorAll(".voice-sheet-item").forEach((el) => {
+      list.querySelectorAll(".voice-picker-item").forEach((el) => {
         el.addEventListener("click", (e) => {
-          if (e.target.closest(".voice-sample-btn")) return;
+          if (e.target.closest(".voice-play-btn")) return;
           const vid = el.getAttribute("data-voice-id");
           if (vid) this.selectVoice(vid);
         });
       });
 
       // Wire sample preview play button
-      list.querySelectorAll(".voice-sample-btn").forEach((btn) => {
+      list.querySelectorAll(".voice-play-btn").forEach((btn) => {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           const vid = btn.getAttribute("data-sample-btn");
@@ -4218,9 +4216,9 @@
         try { window.AndroidAudio.stop(); } catch {}
       }
       this.currentlyPlayingSampleId = null;
-      document.querySelectorAll(".voice-sample-btn").forEach((btn) => {
-        btn.classList.remove("playing");
-        btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+      document.querySelectorAll(".voice-play-btn").forEach((btn) => {
+        btn.classList.remove("is-playing");
+        btn.innerHTML = ICONS.play;
       });
     },
 
@@ -4234,8 +4232,8 @@
 
       const btn = document.querySelector(`[data-sample-btn="${voiceId}"]`);
       if (btn) {
-        btn.classList.add("playing");
-        btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`;
+        btn.classList.add("is-playing");
+        btn.innerHTML = ICONS.square;
       }
 
       const sampleUrl = `assets/voices/${voiceId}.mp3`;
