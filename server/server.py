@@ -65,6 +65,7 @@ WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # Free AI Hub (Zero Setup / 100% Free)
 # ---------------------------------------------------------------------------
 FREE_HUB_URL = "https://text.pollinations.ai/openai/chat/completions"
+_pollinations_blocked_until = 0
 FREE_MODELS = [
     {"id": "qwen-2.5-coder-32b", "name": "Qwen 2.5 Coder 32B (Free Coding)", "provider": "free-hub", "description": "Top-tier AI coding model (Fast & Free)"},
     {"id": "llama-3.3-70b", "name": "Llama 3.3 70B (Free Fast)", "provider": "free-hub", "description": "Flagship Meta Llama 3.3 70B (Fluent Hindi/English)"},
@@ -375,7 +376,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         elif "mistral" in raw_model:
             target_model = "mistral-small-3.1-24b"
         else:
-            target_model = "gpt-4o-mini"
+            target_model = "llama-3.3-70b"
 
         messages = data.get("messages", [])
         stream = data.get("stream", True)
@@ -425,44 +426,47 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 sys.stderr.write(f"Vision streaming attempt failed: {vision_err}\n")
 
         # 1. Primary: High-Capacity Free AI Hub (Full 4,096 tokens, no truncation, zero cutoffs)
-        try:
-            req = urllib.request.Request(
-                FREE_HUB_URL,
-                data=json.dumps({"model": "openai", "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
-                headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
-                method="POST",
-            )
-            resp = urllib.request.urlopen(req, timeout=120, context=_get_ssl_context())
-            if stream:
-                self._start_sse()
-                for raw_line in resp:
-                    line = raw_line.decode(errors="replace").strip()
-                    if line.startswith("data: "):
-                        data_part = line[6:].strip()
-                        if data_part == "[DONE]":
-                            break
-                        try:
-                            parsed = json.loads(data_part)
-                            delta = parsed.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content") or ""
-                            if content:
-                                chunk_payload = {
-                                    "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
-                                    "provider": "free-ai-hub",
-                                    "model": target_model,
-                                }
-                                self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                        except Exception:
-                            pass
-                self._send_chunk(b"data: [DONE]\n\n")
-                self._end_chunks()
-                return
-            else:
-                data_resp = json.loads(resp.read().decode())
-                self._json_response(data_resp)
-                return
-        except Exception as e:
-            sys.stderr.write(f"Primary Free AI Hub attempt failed, falling back to in-process engine: {e}\n")
+        global _pollinations_blocked_until
+        if time.time() > _pollinations_blocked_until:
+            try:
+                req = urllib.request.Request(
+                    FREE_HUB_URL,
+                    data=json.dumps({"model": "openai", "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
+                    method="POST",
+                )
+                resp = urllib.request.urlopen(req, timeout=2.0, context=_get_ssl_context())
+                if stream:
+                    self._start_sse()
+                    for raw_line in resp:
+                        line = raw_line.decode(errors="replace").strip()
+                        if line.startswith("data: "):
+                            data_part = line[6:].strip()
+                            if data_part == "[DONE]":
+                                break
+                            try:
+                                parsed = json.loads(data_part)
+                                delta = parsed.get("choices", [{}])[0].get("delta", {})
+                                content = delta.get("content") or ""
+                                if content:
+                                    chunk_payload = {
+                                        "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
+                                        "provider": "free-ai-hub",
+                                        "model": target_model,
+                                    }
+                                    self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                            except Exception:
+                                pass
+                    self._send_chunk(b"data: [DONE]\n\n")
+                    self._end_chunks()
+                    return
+                else:
+                    data_resp = json.loads(resp.read().decode())
+                    self._json_response(data_resp)
+                    return
+            except Exception as e:
+                _pollinations_blocked_until = time.time() + 120
+                sys.stderr.write(f"Primary Free AI Hub attempt failed (circuit open 120s), falling back to in-process engine: {e}\n")
 
         # 2. Secondary fallback: In-process Cloudflare G4F Engine
         if G4F_AVAILABLE and _g4f_client:
@@ -1302,8 +1306,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 "nova": ("en-US-AvaMultilingualNeural", "+4Hz", "+5%"),
                 "shimmer": ("en-US-EmmaMultilingualNeural", "+8Hz", "+6%"),
                 "swara": ("hi-IN-SwaraNeural", "+0Hz", "+0%"),
-                "rachel": ("hi-IN-SwaraNeural", "+3Hz", "+2%"),
-                "neerja": ("en-US-AvaMultilingualNeural", "+2Hz", "+1%"),
+                "rachel": ("en-US-EmmaMultilingualNeural", "+2Hz", "+1%"),
+                "neerja": ("en-IN-NeerjaExpressiveNeural", "+0Hz", "+0%"),
                 "alloy": ("en-US-AndrewMultilingualNeural", "-2Hz", "+2%"),
                 "onyx": ("en-US-BrianMultilingualNeural", "-10Hz", "-4%"),
                 "madhur": ("hi-IN-MadhurNeural", "-4Hz", "+0%"),

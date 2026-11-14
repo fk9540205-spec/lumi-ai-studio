@@ -4441,11 +4441,11 @@
             if (final.trim()) {
               this.silenceTimer = setTimeout(() => {
                 this.submitUserSpeech();
-              }, 400);
+              }, 220);
             } else {
               this.silenceTimer = setTimeout(() => {
                 this.submitUserSpeech();
-              }, 900);
+              }, 650);
             }
           }
         };
@@ -4538,23 +4538,25 @@
 
       this.sessionTurns.push({ role: "user", content: cleanPrompt });
 
+      const hasDevanagari = /[\u0900-\u097F]/.test(cleanPrompt);
+      const hinglishPatterns = /\b(kya|kaise|kaisa|kaisi|hai|ho|haan|nahin|nahi|bhai|yaar|sab|theek|thik|accha|achha|badhiya|bolo|batao|kuch|kaha|kidhar|kar|raha|rahe|rahi|aaya|gaya|mere|mera|meri|hum|tum|aap|apna|apni|chal|dekh|sun|sunna|yr)\b/i;
+      const isHinglish = hinglishPatterns.test(cleanPrompt);
+
+      let langDirective = "The user spoke English. Reply in natural, friendly English.";
+      if (hasDevanagari) {
+        langDirective = "STRICT: The user spoke Hindi (Devanagari). YOU MUST REPLY IN PURE HINDI (DEVANAGARI SCRIPT ONLY). Example: 'नमस्ते! मैं बहुत बढ़िया हूँ, आप बताइए कैसा चल रहा है?'. Never use English words.";
+      } else if (isHinglish) {
+        langDirective = "STRICT: The user spoke Hinglish (Roman/Latin script). YOU MUST REPLY IN FRIENDLY CASUAL HINGLISH (ROMAN SCRIPT ONLY). Example: 'Sab theek hai bhai! Tu bata sab kaisa chal raha hai?'. Never reply in English.";
+      }
+
       const messages = [
         {
           role: "system",
-          content: "You are Lumi in a real-time phone call. Speak in warm, natural, human conversational tone (1-2 short sentences per turn). Answer directly as if talking on a phone call. Never use markdown symbols, asterisks (**), bullet points, numbered lists, or headers."
+          content: `You are Lumi on a real-time live phone call. Speak naturally, warmly, and instantly.\nRules:\n1. ULTRA SHORT: Exactly 1 single concise conversational sentence (under 12 words). Answer immediately. Never use bullet points, numbered lists, asterisks (**), or markdown.\n2. LANGUAGE: ${langDirective}`
         }
       ];
 
-      const conv = getActiveConversation();
-      if (conv && conv.messages) {
-        for (const m of conv.messages.slice(-4)) {
-          if (m.role === "user" || m.role === "assistant") {
-            messages.push({ role: m.role, content: m.content });
-          }
-        }
-      }
-
-      for (const t of this.sessionTurns.slice(-4)) {
+      for (const t of this.sessionTurns.slice(-3)) {
         messages.push({ role: t.role, content: t.content });
       }
 
@@ -4568,26 +4570,26 @@
       try {
         const chatEndpoints = [
           "http://127.0.0.1:3456/api/free/chat",
+          "https://lumi-backend-v4-production.up.railway.app/api/free/chat",
           "http://10.188.22.242:3456/api/free/chat",
-          "https://text.pollinations.ai/openai/chat/completions",
-          "https://lumi-backend-v4-production.up.railway.app/api/free/chat"
+          "https://text.pollinations.ai/openai/chat/completions"
         ];
 
         let resp = null;
         for (const ep of chatEndpoints) {
           try {
             const ctrl = new AbortController();
-            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 2500 : 8000;
+            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 12000 : 9000;
             const timer = setTimeout(() => ctrl.abort(), timeoutMs);
             const r = await fetch(ep, {
               method: "POST",
               signal: ctrl.signal,
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                model: "openai",
+                model: "llama-3.3-70b",
                 messages: messages,
                 stream: true,
-                max_tokens: 200
+                max_tokens: 60
               })
             });
             clearTimeout(timer);
@@ -4632,13 +4634,23 @@
                 fullAssistantReply += cleanDelta;
                 sentenceBuffer += cleanDelta;
 
+                // Ultra-fast clause chunking: split on sentence end [.?!।\n] OR if buffer has >= 4 words and hits a comma/pause [,;]
+                const words = sentenceBuffer.trim().split(/\s+/);
+                let toSpeak = "";
                 const sentenceEndMatch = sentenceBuffer.match(/^([\s\S]+?[.?!।\n])\s*([\s\S]*)$/);
                 if (sentenceEndMatch) {
-                  const toSpeak = sentenceEndMatch[1].trim();
+                  toSpeak = sentenceEndMatch[1].trim();
                   sentenceBuffer = sentenceEndMatch[2];
-                  if (toSpeak) {
-                    this.speakCallChunk(toSpeak);
+                } else if (words.length >= 4) {
+                  const commaMatch = sentenceBuffer.match(/^([\s\S]+?[,;])\s*([\s\S]*)$/);
+                  if (commaMatch) {
+                    toSpeak = commaMatch[1].trim();
+                    sentenceBuffer = commaMatch[2];
                   }
+                }
+
+                if (toSpeak) {
+                  this.speakCallChunk(toSpeak);
                 }
               }
             } catch {}
@@ -4677,10 +4689,42 @@
       }
     },
 
+    ttsCache: new Map(),
+
+    async prefetchTTS(text, activeVoice) {
+      if (!text || this.ttsCache.has(text)) return;
+      const ttsEndpoints = [
+        "http://127.0.0.1:3456/api/tts",
+        "http://10.188.22.242:3456/api/tts"
+      ];
+      for (const ep of ttsEndpoints) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 5000);
+          const r = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input: text, voice: activeVoice }),
+            signal: ctrl.signal
+          });
+          clearTimeout(timer);
+          if (r.ok) {
+            const b = await r.blob();
+            if (b && b.size > 200) {
+              this.ttsCache.set(text, b);
+              break;
+            }
+          }
+        } catch {}
+      }
+    },
+
     speakCallChunk(sentence) {
       const clean = sentence.replace(/\*\*/g, "").replace(/[`#_*~]/g, "").trim();
       if (!clean) return;
 
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
+      this.prefetchTTS(clean, activeVoice);
       this.speechQueue.push(clean);
       if (!this.isPlayingSpeech) {
         this.playNextQueuedSpeech();
@@ -4708,6 +4752,11 @@
       const hasHindi = /[\u0900-\u097F]/.test(text);
       const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
 
+      // If next items exist in queue, pre-fetch their audio now
+      if (this.speechQueue.length > 0) {
+        this.prefetchTTS(this.speechQueue[0], activeVoice);
+      }
+
       // Safety watchdog: generous 15-second window prevents ANY freeze while allowing full TTS playback
       let watchdog = setTimeout(() => {
         if (this.isOpen && this.isPlayingSpeech) {
@@ -4723,31 +4772,34 @@
         }
       };
 
-      const ttsEndpoints = [
-        "http://127.0.0.1:3456/api/tts",
-        "http://10.188.22.242:3456/api/tts"
-      ];
+      let audioBlob = this.ttsCache.get(text) || null;
+      if (!audioBlob) {
+        const ttsEndpoints = [
+          "http://127.0.0.1:3456/api/tts",
+          "http://10.188.22.242:3456/api/tts"
+        ];
 
-      let audioBlob = null;
-      for (const ep of ttsEndpoints) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 6000);
-          const r = await fetch(ep, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: text, voice: activeVoice }),
-            signal: ctrl.signal
-          });
-          clearTimeout(timer);
-          if (r.ok) {
-            const b = await r.blob();
-            if (b && b.size > 200) {
-              audioBlob = b;
-              break;
+        for (const ep of ttsEndpoints) {
+          try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 6000);
+            const r = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ input: text, voice: activeVoice }),
+              signal: ctrl.signal
+            });
+            clearTimeout(timer);
+            if (r.ok) {
+              const b = await r.blob();
+              if (b && b.size > 200) {
+                audioBlob = b;
+                this.ttsCache.set(text, b);
+                break;
+              }
             }
-          }
-        } catch {}
+          } catch {}
+        }
       }
 
       if (!this.isOpen) {
