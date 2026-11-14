@@ -2065,213 +2065,163 @@ html.dark .genui-recom-rank.gold {
 /* ==========================================================================
    Clean Professional AI Voice Picker Modal (Matches Lumi Studio Design System)
    ========================================================================== */
-.voice-picker-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
+/* --------------------------------------------------------------------------
+   Gemini Live Floating AI Voice Dropdown (Matches Lumi Studio Design System)
+   -------------------------------------------------------------------------- */
+.live-voice-dropdown {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  width: min(320px, calc(100vw - 32px));
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  background: rgba(24, 24, 27, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 10005;
+  padding: 0.6rem 0.5rem;
+  animation: 0.16s cubic-bezier(0.16, 1, 0.3, 1) rise-in;
 }
 
-.voice-picker-modal-overlay.hidden {
+.live-voice-dropdown.hidden {
   display: none !important;
 }
 
-.voice-picker-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  animation: fadeIn 0.15s ease-out;
+.live-voice-dropdown-header {
+  padding: 0.35rem 0.6rem 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.35rem;
 }
 
-.voice-picker-card {
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  max-width: 420px;
-  max-height: 82vh;
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 1.25rem;
-  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  color: #f4f4f5;
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.voice-picker-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.9rem 1.15rem;
-  border-bottom: 1px solid #27272a;
-  background: #18181b;
-}
-
-.voice-picker-header h3 {
-  color: #ffffff !important;
-  font-size: 0.92rem;
+.live-voice-dropdown-title {
+  font-size: 0.88rem;
   font-weight: 600;
-  margin: 0;
-  letter-spacing: -0.01em;
-}
-
-.voice-picker-header p {
-  color: #a1a1aa !important;
-  font-size: 0.75rem;
-  margin: 0.15rem 0 0 0;
-}
-
-.voice-picker-header-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: rgba(56, 139, 253, 0.15);
-  color: #388bfd;
+  color: #f4f4f5;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 0.4rem;
 }
 
-.voice-picker-close-btn {
-  background: transparent;
-  border: none;
+.live-voice-dropdown-sub {
+  font-size: 0.72rem;
   color: #a1a1aa;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 9999px;
-  transition: all 0.15s ease;
+  margin-top: 0.15rem;
+  display: block;
 }
 
-.voice-picker-close-btn:hover,
-.voice-picker-close-btn:active {
-  background: #27272a;
-  color: #ffffff;
-}
-
-.voice-picker-list {
+.live-voice-dropdown-list {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  padding: 0.5rem;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.voice-picker-item {
+.live-voice-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.75rem;
-  background: transparent;
-  border: 1px solid transparent;
+  gap: 0.65rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.65rem;
   cursor: pointer;
   transition: all 0.12s ease;
+  user-select: none;
 }
 
-.voice-picker-item:hover {
-  background: #27272a;
+.live-voice-row:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.voice-picker-item.is-active {
+.live-voice-row.is-active {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
 }
 
-.voice-play-btn {
-  width: 32px;
-  height: 32px;
+.live-voice-play-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   border-radius: 50%;
-  border: 1px solid #3f3f46;
-  background: #27272a;
-  color: #a1a1aa;
-  cursor: pointer;
-  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f4f4f5;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  cursor: pointer;
   transition: all 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
 }
 
-.voice-play-btn:hover {
+.live-voice-play-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: scale(1.06);
+}
+
+.live-voice-play-btn.is-playing {
+  background: #10b981;
+  border-color: #10b981;
   color: #ffffff;
-  border-color: #ffffff;
-  background: #3f3f46;
+  animation: pulse-ring 1.4s infinite;
 }
 
-.voice-play-btn.is-playing {
-  color: #388bfd;
-  border-color: #388bfd;
-  background: rgba(56, 139, 253, 0.2);
+.live-voice-play-btn svg {
+  width: 12px;
+  height: 12px;
 }
 
-.voice-picker-meta {
+.live-voice-info {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.15rem;
 }
 
-.voice-picker-title-row {
+.live-voice-title-line {
   display: flex;
   align-items: center;
   gap: 0.45rem;
 }
 
-.voice-picker-name {
-  font-size: 0.88rem;
+.live-voice-name {
+  font-size: 0.84rem;
   font-weight: 600;
   color: #f4f4f5;
 }
 
-.voice-picker-badge {
-  font-size: 0.65rem;
+.live-voice-provider-tag {
+  font-size: 0.64rem;
   font-weight: 500;
-  padding: 0.08rem 0.4rem;
+  padding: 0.1rem 0.35rem;
   border-radius: 9999px;
-  background: #27272a;
+  background: rgba(255, 255, 255, 0.08);
   color: #a1a1aa;
-  border: 1px solid #3f3f46;
 }
 
-.voice-picker-desc {
-  font-size: 0.75rem;
-  color: #a1a1aa;
+.live-voice-desc {
+  font-size: 0.72rem;
+  color: #71717a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.voice-picker-check {
+.live-voice-check {
   width: 20px;
   height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #10b981;
   flex-shrink: 0;
 }
 
-.voice-picker-check svg {
+.live-voice-check svg {
   width: 16px;
   height: 16px;
   stroke: #10b981;
-  stroke-width: 2.5;
+  stroke-width: 2.4;
 }

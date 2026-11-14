@@ -3993,6 +3993,7 @@
     sessionTurns: [],
     speechQueue: [],
     isPlayingSpeech: false,
+    isGeneratingResponse: false,
     streamAbortCtrl: null,
     silenceTimer: null,
     activeAudioEl: null,
@@ -4070,32 +4071,13 @@
             </button>
           </div>
 
-          <!-- Clean Professional AI Voice Selector Modal (Matches Lumi Studio Design System) -->
-          <div id="live-voice-sheet" class="voice-picker-modal-overlay hidden">
-            <div class="voice-picker-backdrop" id="voice-sheet-backdrop"></div>
-            <div class="voice-picker-card">
-              <div class="voice-picker-header">
-                <div class="flex items-center gap-2.5">
-                  <div class="voice-picker-header-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3>AI Voice Model</h3>
-                    <p>Select a voice for Lumi. Tap ▶ to test.</p>
-                  </div>
-                </div>
-                <button type="button" class="voice-picker-close-btn" id="voice-sheet-close-btn" title="Close">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-              </div>
-              <div class="voice-picker-list" id="voice-sheet-list"></div>
+          <!-- Clean Floating AI Voice Dropdown (Matches Lumi Studio model-dropdown-menu) -->
+          <div id="live-voice-menu" class="live-voice-dropdown hidden">
+            <div class="live-voice-dropdown-header">
+              <div class="live-voice-dropdown-title">AI Voice Model</div>
+              <div class="live-voice-dropdown-sub">Tap ▶ to test voice sample</div>
             </div>
+            <div class="live-voice-dropdown-list" id="live-voice-dropdown-list"></div>
           </div>
         </div>
       `;
@@ -4126,24 +4108,40 @@
         showToast("Audio call active");
       });
 
-      // 3-dots: Open Voice Selector Modal
+      // 3-dots: Toggle Voice Selector Dropdown
       document.querySelector("#live-more-options-btn")?.addEventListener("click", (e) => {
         e.stopPropagation();
-        this.openVoiceSheet();
+        this.toggleVoiceMenu();
       });
 
-      document.querySelector("#voice-sheet-close-btn")?.addEventListener("click", () => {
-        this.closeVoiceSheet();
-      });
-      document.querySelector("#voice-sheet-backdrop")?.addEventListener("click", () => {
-        this.closeVoiceSheet();
+      // Close dropdown when tapping outside
+      document.addEventListener("click", (e) => {
+        const menu = document.querySelector("#live-voice-menu");
+        if (menu && !menu.classList.contains("hidden")) {
+          if (!e.target.closest("#live-voice-menu") && !e.target.closest("#live-more-options-btn")) {
+            this.closeVoiceMenu();
+          }
+        }
       });
     },
 
-    openVoiceSheet() {
-      const sheet = document.querySelector("#live-voice-sheet");
-      const list = document.querySelector("#voice-sheet-list");
-      if (!sheet || !list) return;
+    toggleVoiceMenu() {
+      const menu = document.querySelector("#live-voice-menu");
+      if (!menu) return;
+      if (menu.classList.contains("hidden")) {
+        this.openVoiceMenu();
+      } else {
+        this.closeVoiceMenu();
+      }
+    },
+
+    openVoiceMenu() {
+      const menu = document.querySelector("#live-voice-menu");
+      const list = document.querySelector("#live-voice-dropdown-list");
+      if (!menu || !list) return;
+
+      // Temporarily stop microphone so speech recognizer doesn't capture preview clicks
+      this.stopListening();
 
       const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
 
@@ -4151,18 +4149,18 @@
         const isSelected = v.id === activeVoice;
         const isPlaying = this.currentlyPlayingSampleId === v.id;
         return `
-          <div class="voice-picker-item ${isSelected ? "is-active" : ""}" data-voice-id="${v.id}">
-            <button type="button" class="voice-play-btn ${isPlaying ? "is-playing" : ""}" data-sample-btn="${v.id}" title="Preview Voice">
+          <div class="live-voice-row ${isSelected ? "is-active" : ""}" data-voice-id="${v.id}">
+            <button type="button" class="live-voice-play-btn ${isPlaying ? "is-playing" : ""}" data-sample-btn="${v.id}" title="Preview Voice">
               ${isPlaying ? ICONS.square : ICONS.play}
             </button>
-            <div class="voice-picker-meta">
-              <div class="voice-picker-title-row">
-                <span class="voice-picker-name">${v.name}</span>
-                <span class="voice-picker-badge">${v.provider}</span>
+            <div class="live-voice-info">
+              <div class="live-voice-title-line">
+                <span class="live-voice-name">${v.name}</span>
+                <span class="live-voice-provider-tag">${v.provider}</span>
               </div>
-              <span class="voice-picker-desc">${v.desc}</span>
+              <span class="live-voice-desc">${v.desc}</span>
             </div>
-            <div class="voice-picker-check">
+            <div class="live-voice-check">
               ${isSelected ? ICONS.check : ""}
             </div>
           </div>
@@ -4170,16 +4168,16 @@
       }).join("");
 
       // Wire item selection
-      list.querySelectorAll(".voice-picker-item").forEach((el) => {
+      list.querySelectorAll(".live-voice-row").forEach((el) => {
         el.addEventListener("click", (e) => {
-          if (e.target.closest(".voice-play-btn")) return;
+          if (e.target.closest(".live-voice-play-btn")) return;
           const vid = el.getAttribute("data-voice-id");
           if (vid) this.selectVoice(vid);
         });
       });
 
       // Wire sample preview play button
-      list.querySelectorAll(".voice-play-btn").forEach((btn) => {
+      list.querySelectorAll(".live-voice-play-btn").forEach((btn) => {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           const vid = btn.getAttribute("data-sample-btn");
@@ -4187,13 +4185,16 @@
         });
       });
 
-      sheet.classList.remove("hidden");
+      menu.classList.remove("hidden");
     },
 
-    closeVoiceSheet() {
-      const sheet = document.querySelector("#live-voice-sheet");
-      if (sheet) sheet.classList.add("hidden");
+    closeVoiceMenu() {
+      const menu = document.querySelector("#live-voice-menu");
+      if (menu) menu.classList.add("hidden");
       this.stopSamplePlayback();
+      if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+        this.startListening();
+      }
     },
 
     selectVoice(voiceId) {
@@ -4201,7 +4202,7 @@
       localStorage.setItem("lumi_live_voice", voiceId);
       const voice = LIVE_VOICES.find((v) => v.id === voiceId);
       showToast(`Voice set to: ${voice ? voice.name : voiceId}`);
-      this.openVoiceSheet();
+      this.openVoiceMenu(); // re-render checkmark in-place
     },
 
     stopSamplePlayback() {
@@ -4216,7 +4217,7 @@
         try { window.AndroidAudio.stop(); } catch {}
       }
       this.currentlyPlayingSampleId = null;
-      document.querySelectorAll(".voice-play-btn").forEach((btn) => {
+      document.querySelectorAll(".live-voice-play-btn").forEach((btn) => {
         btn.classList.remove("is-playing");
         btn.innerHTML = ICONS.play;
       });
@@ -4236,31 +4237,38 @@
         btn.innerHTML = ICONS.square;
       }
 
-      const sampleUrl = `assets/voices/${voiceId}.mp3`;
+      // Ensure microphone is stopped during sample playback so it doesn't interrupt or freeze
+      this.stopListening();
+
+      const b64 = window.LUMI_VOICE_SAMPLES ? window.LUMI_VOICE_SAMPLES[voiceId] : null;
+      const sampleUrl = b64 ? `data:audio/mp3;base64,${b64}` : `assets/voices/${voiceId}.mp3`;
+
       try {
         const audio = new Audio(sampleUrl);
         this.previewAudio = audio;
         audio.onended = () => this.stopSamplePlayback();
         audio.onerror = () => {
           if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
-            window.AndroidAudio.playUrl(sampleUrl);
+            window.__lumiOnAudioDone = () => this.stopSamplePlayback();
+            window.AndroidAudio.playUrl(`assets/voices/${voiceId}.mp3`);
           } else {
             this.stopSamplePlayback();
           }
         };
-        audio.play().catch(() => {
-          if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
-            window.AndroidAudio.playUrl(sampleUrl);
-          } else {
-            this.stopSamplePlayback();
-          }
-        });
-      } catch (err) {
-        if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
-          window.AndroidAudio.playUrl(sampleUrl);
-        } else {
-          this.stopSamplePlayback();
+        const p = audio.play();
+        if (p && p.catch) {
+          p.catch((err) => {
+            console.warn("Audio preview error:", err);
+            if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
+              window.__lumiOnAudioDone = () => this.stopSamplePlayback();
+              window.AndroidAudio.playUrl(`assets/voices/${voiceId}.mp3`);
+            } else {
+              this.stopSamplePlayback();
+            }
+          });
         }
+      } catch (err) {
+        this.stopSamplePlayback();
       }
     },
 
@@ -4374,7 +4382,8 @@
     },
 
     startListening() {
-      if (this.isMuted) return;
+      if (!this.isOpen || this.isMuted) return;
+      if (this.state === "speaking" || this.isPlayingSpeech) return;
 
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
@@ -4396,6 +4405,9 @@
         rec.lang = this.currentLang;
 
         rec.onresult = (event) => {
+          // If AI is currently speaking, disregard mic to prevent acoustic feedback loop
+          if (this.state === "speaking" || this.isPlayingSpeech) return;
+
           let interim = "";
           let final = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -4408,11 +4420,6 @@
           if (currentText) {
             this.updateAuroraState("listening");
             this.updateUI("listening", currentText);
-
-            // Instant Duplex Interruption: user speaks while AI speaks -> stop immediately
-            if (this.state === "speaking" || this.isPlayingSpeech) {
-              this.interrupt();
-            }
 
             clearTimeout(this.silenceTimer);
             this.silenceTimer = setTimeout(() => {
@@ -4466,6 +4473,7 @@
     interrupt() {
       this.speechQueue = [];
       this.isPlayingSpeech = false;
+      this.isGeneratingResponse = false;
       if (this.streamAbortCtrl) {
         this.streamAbortCtrl.abort();
         this.streamAbortCtrl = null;
@@ -4477,21 +4485,24 @@
       if (window.AndroidAudio && typeof window.AndroidAudio.stop === "function") {
         try { window.AndroidAudio.stop(); } catch {}
       }
+      if (window.AndroidTTS && typeof window.AndroidTTS.stop === "function") {
+        try { window.AndroidTTS.stop(); } catch {}
+      }
       if (typeof window.stopSpeechSynthesis === "function") {
         window.stopSpeechSynthesis();
       }
-      if (this.state === "speaking") {
-        this.updateUI("listening", "");
-        this.startListening();
-      }
+      this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+      this.startListening();
     },
 
     async handleUserSpeech(transcript) {
       if (!transcript || !transcript.trim()) return;
       const cleanPrompt = transcript.trim();
 
+      // Immediately shut off microphone so AI voice does not leak into recognizer
       this.stopListening();
       this.updateUI("thinking", cleanPrompt);
+      this.isGeneratingResponse = true;
 
       this.sessionTurns.push({ role: "user", content: cleanPrompt });
 
@@ -4587,8 +4598,20 @@
 
         const finalClean = fullAssistantReply.replace(/\*\*/g, "").trim();
         this.sessionTurns.push({ role: "assistant", content: finalClean });
+        this.isGeneratingResponse = false;
+
+        // If audio finished playing while LLM was streaming last chunk, check if queue is now empty
+        if (!this.isPlayingSpeech && this.speechQueue.length === 0) {
+          setTimeout(() => {
+            if (this.isOpen && !this.isPlayingSpeech && !this.isGeneratingResponse && this.speechQueue.length === 0) {
+              this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+              this.startListening();
+            }
+          }, 400);
+        }
 
       } catch (err) {
+        this.isGeneratingResponse = false;
         if (err.name === "AbortError") return;
         this.updateUI("speaking", "Ek second...");
         setTimeout(() => {
@@ -4613,18 +4636,22 @@
     async playNextQueuedSpeech() {
       if (!this.isOpen || this.speechQueue.length === 0) {
         this.isPlayingSpeech = false;
-        if (this.isOpen && this.state === "speaking") {
+        // Only return to listening once LLM has completely finished generating AND speech queue is drained!
+        if (this.isOpen && !this.isGeneratingResponse && this.state === "speaking") {
           setTimeout(() => {
-            if (this.isOpen && this.state === "speaking" && !this.isPlayingSpeech) {
+            if (this.isOpen && !this.isGeneratingResponse && !this.isPlayingSpeech && this.speechQueue.length === 0) {
               this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
               this.startListening();
             }
-          }, 350);
+          }, 400);
         }
         return;
       }
 
       this.isPlayingSpeech = true;
+      // ALWAYS keep microphone OFF while AI speaks to prevent acoustic self-interruption
+      this.stopListening();
+
       const text = this.speechQueue.shift();
       const hasHindi = /[\u0900-\u097F]/.test(text);
       const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
@@ -4633,15 +4660,15 @@
 
       const endpoints = [
         "http://127.0.0.1:3456/api/tts",
-        "http://localhost:3456/api/tts",
-        "https://lumi-backend-v4-production.up.railway.app/api/tts"
+        "http://10.188.22.242:3456/api/tts",
+        "http://localhost:3456/api/tts"
       ];
 
       let audioBlob = null;
       for (const ep of endpoints) {
         try {
           const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 4000);
+          const timer = setTimeout(() => ctrl.abort(), 2500);
           const r = await fetch(ep, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -4661,40 +4688,53 @@
 
       if (!this.isOpen || this.state !== "speaking") return;
 
-      const audioSrc = audioBlob
-        ? URL.createObjectURL(audioBlob)
-        : `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${hasHindi ? "hi" : "en"}&client=tw-ob`;
-
-      // Play via AndroidAudio (hardware MediaPlayer) if available, or HTML5 Audio
-      if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function" && !audioBlob) {
-        window.__lumiOnAudioDone = () => {
+      if (audioBlob) {
+        const audioSrc = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioSrc);
+        this.activeAudioEl = audio;
+        audio.onended = () => {
+          URL.revokeObjectURL(audioSrc);
+          this.activeAudioEl = null;
           this.playNextQueuedSpeech();
         };
-        try {
-          window.AndroidAudio.playUrl(audioSrc);
-          return;
-        } catch (e) {
-          console.warn("AndroidAudio error:", e);
-        }
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioSrc);
+          this.activeAudioEl = null;
+          this.fallbackSpeak(text, hasHindi);
+        };
+        audio.play().catch((err) => {
+          console.warn("Audio play error, falling back to TTS:", err);
+          URL.revokeObjectURL(audioSrc);
+          this.activeAudioEl = null;
+          this.fallbackSpeak(text, hasHindi);
+        });
+      } else {
+        // Fallback: If network / server is unavailable, use Android native TTS or Web Speech API
+        this.fallbackSpeak(text, hasHindi);
       }
+    },
 
-      const audio = new Audio(audioSrc);
-      this.activeAudioEl = audio;
-      audio.onended = () => {
-        if (audioBlob) URL.revokeObjectURL(audioSrc);
-        this.activeAudioEl = null;
-        this.playNextQueuedSpeech();
-      };
-      audio.onerror = () => {
-        if (audioBlob) URL.revokeObjectURL(audioSrc);
-        this.activeAudioEl = null;
-        this.playNextQueuedSpeech();
-      };
-      audio.play().catch((err) => {
-        console.warn("Audio play error:", err);
-        if (audioBlob) URL.revokeObjectURL(audioSrc);
-        this.playNextQueuedSpeech();
-      });
+    fallbackSpeak(text, hasHindi) {
+      if (!this.isOpen || this.state !== "speaking") return;
+      const lang = hasHindi ? "hi-IN" : "en-US";
+
+      if (window.AndroidTTS && typeof window.AndroidTTS.speak === "function") {
+        const msgId = "live_tts_" + Date.now();
+        window.__lumiOnTTSDone = (doneId) => {
+          if (doneId === msgId) {
+            this.playNextQueuedSpeech();
+          }
+        };
+        window.AndroidTTS.speak(msgId, text, lang);
+      } else if ("speechSynthesis" in window) {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.lang = lang;
+        utt.onend = () => this.playNextQueuedSpeech();
+        utt.onerror = () => this.playNextQueuedSpeech();
+        window.speechSynthesis.speak(utt);
+      } else {
+        setTimeout(() => this.playNextQueuedSpeech(), 1000);
+      }
     }
   };
 
