@@ -1138,7 +1138,12 @@ body {
   }
   .model-dropdown-menu {
     max-width: calc(100vw - 24px) !important;
-    width: 280px !important;
+    width: min(290px, 92vw) !important;
+  }
+  .model-dropdown-menu.placement-topbar {
+    right: -75px !important;
+    left: auto !important;
+    max-width: calc(100vw - 24px) !important;
   }
   .topbar-dropdown-menu {
     max-width: calc(100vw - 24px) !important;

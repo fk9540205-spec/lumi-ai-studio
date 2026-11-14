@@ -19,8 +19,8 @@
 
   // --- Built-in Models ---
   const BUILT_IN_MODELS = [
+    { id: "llama-3.3-70b", label: "Llama 3.3 70B (Free Ultra Fast)", group: "Free AI Engine" },
     { id: "qwen-2.5-coder-32b", label: "Qwen 2.5 Coder 32B (Free Coding)", group: "Free AI Engine" },
-    { id: "llama-3.3-70b", label: "Llama 3.3 70B (Free Fast)", group: "Free AI Engine" },
     { id: "gpt-4o-mini", label: "GPT-4o Mini (Free)", group: "Free AI Engine" },
     { id: "deepseek-distill-qwen-32b", label: "DeepSeek Reasoning (Free)", group: "Free AI Engine" },
     { id: "mistral-small-3.1-24b", label: "Mistral Small (Free)", group: "Free AI Engine" },
@@ -180,8 +180,13 @@
   let providers = loadJson(STORAGE.PROVIDERS, []);
   let selectedModel = loadJson(STORAGE.MODEL, {
     provider_id: null,
-    model: "qwen-2.5-coder-32b",
+    model: "llama-3.3-70b",
   });
+  // Auto-upgrade to ultra-fast Llama 3.3 70B if user had slow/thinking gpt-4o-mini
+  if (!selectedModel.provider_id && (selectedModel.model === "gpt-4o-mini" || selectedModel.model === "qwen-2.5-coder-32b")) {
+    selectedModel.model = "llama-3.3-70b";
+    saveJson(STORAGE.MODEL, selectedModel);
+  }
   let currentUser = loadJson(STORAGE.USER, {
     email: "creator@lovable.app",
     name: "Lumi Creator",
@@ -226,7 +231,10 @@ SPEED OPTIMIZATION RULE: Keep JSON compact, fast, and minimal (maximum 40-75 tok
 - Comparison: {"type":"comparison","title":"iPhone 16 vs S24 Ultra","itemA":{"title":"iPhone 16 Pro"},"itemB":{"title":"S24 Ultra","winner":true},"features":[{"feature":"Camera Zoom","valA":"5x","valB":"10x","winner":"B"}],"verdict":"S24 Ultra wins on zoom."}
 - Chart: {"type":"chart","chartType":"bar","title":"Market Cap (T$)","data":[{"label":"Apple","value":3.4},{"label":"Nvidia","value":3.3}]}
 - Recommendations: {"type":"recommendation","title":"Top Laptops","items":[{"rank":1,"title":"MacBook Air M3","score":"9.6/10","reason":"Best battery & build.","prompt":"Tell me more about MacBook Air M3"}]}
-Always write a short friendly conversational sentence before or after the card.
+CRITICAL OUTPUT RULES:
+1. NEVER output internal thoughts, deliberation, planning, reasoning steps, or self-dialogue.
+2. NEVER discuss system prompt rules, policies, or tokens.
+3. Directly answer the user's question with natural friendly sentences and the rich card.
 `;
 
   const PERSONA_LABELS = {
@@ -1242,6 +1250,13 @@ Always write a short friendly conversational sentence before or after the card.
 
     const codeBlocks = [];
     let text = content;
+
+    // Strip internal thinking tags <think>...</think> or unclosed <think> during streaming
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
+    text = text.replace(/<think>[\s\S]*$/gi, "");
+
+    // Strip accidental internal deliberation / scratchpad leaks from models
+    text = text.replace(/^(?:We need to provide|Given the instructions|The spec says|Given TOS|I think better to output|We have no real-time)[\s\S]*?(?=(?:```|Here|The weather|It seems|Today's|\n\n))/i, "");
 
     // 1. Math block: $$ ... $$
     text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
@@ -3044,40 +3059,92 @@ Always write a short friendly conversational sentence before or after the card.
       return;
     }
 
-    // 2. LIVE REAL-TIME WEB SEARCH (Globe toggle, /search command, or search query)
+    // 2. LIVE REAL-TIME WEATHER & WEB SEARCH
     let webContext = "";
     const isSearchExplicit = /^\/search\s+/i.test(prompt);
-    const hasSearchIntent =
-      webSearchEnabled ||
-      isSearchExplicit ||
-      /^(search|google|dhoondo|khojo|find|who is|what is|when is|where is|latest|current|today'?s|news about|weather|live score)\b/i.test(prompt.trim()) ||
-      /\b(search karo|search karke|latest news|aaj ki|today|ipl score|weather report)\b/i.test(prompt);
+    const isWeatherQuery = /\b(weather|mausam|temperature|forecast|temp)\b/i.test(prompt);
 
-    if (hasSearchIntent) {
-      const cleanSearchQuery = prompt
-        .replace(/^\/search\s+/i, "")
-        .replace(/^(search\s+for|search|google|dhoondo|khojo|find)\s+/i, "")
-        .replace(/\s+(search karo|search karke|dhoondo)$/i, "")
-        .trim();
-      const searchQuery = cleanSearchQuery || prompt;
-
+    if (isWeatherQuery) {
+      // Instant Live Real-Time Weather Fetch (< 300ms via wttr.in)
       try {
-        const apiBase =
-          window.location.origin && window.location.origin.startsWith("http")
-            ? ""
-            : "https://lumi-backend-v4-production.up.railway.app";
-        const searchResp = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(searchQuery)}`);
-        if (searchResp.ok) {
-          const searchData = await searchResp.json();
-          if (searchData.results && searchData.results.length > 0) {
-            assistantMsg.searchResults = searchData.results;
-            webContext = "\n\n[Live Real-time Web Knowledge Sources]:\n" + searchData.results.map(r => `- ${r.title}: ${r.snippet} (${r.url})`).join("\n");
-            render();
-            scrollToBottom();
-          }
+        const cityMatch =
+          prompt.match(/(?:in|of|at|for|ka|ki)\s+([A-Za-z\s]+)/i) ||
+          prompt.match(/([A-Za-z]+)\s+(?:weather|mausam|temp)/i);
+        let city = cityMatch ? cityMatch[1].replace(/\b(today|now|tomorrow|report|kaisa|hai|batao|the|current)\b/gi, "").trim() : "Delhi";
+        if (!city) city = "Delhi";
+
+        const weatherController = new AbortController();
+        const timeoutId = setTimeout(() => weatherController.abort(), 2500);
+        const wResp = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`, {
+          signal: weatherController.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (wResp.ok) {
+          const wData = await wResp.json();
+          const curr = (wData.current_condition && wData.current_condition[0]) || {};
+          const tempC = curr.temp_C || "25";
+          const desc = (curr.weatherDesc && curr.weatherDesc[0] && curr.weatherDesc[0].value) || "Clear";
+          const hum = curr.humidity || "50";
+          const wind = curr.windspeedKmph || "5";
+          const forecastList = (wData.weather || []).slice(0, 3).map((f) => {
+            const dayDesc = (f.hourly && f.hourly[0] && f.hourly[0].weatherDesc && f.hourly[0].weatherDesc[0].value) || "Partly Cloudy";
+            return `${f.date}: ${f.maxtempC}°C / ${f.mintempC}°C (${dayDesc})`;
+          });
+
+          assistantMsg.searchResults = [
+            {
+              title: `Live Weather: ${city.charAt(0).toUpperCase() + city.slice(1)} (${tempC}°C, ${desc})`,
+              snippet: `Current Temperature: ${tempC}°C, ${desc}. Humidity: ${hum}%, Wind: ${wind} km/h. 3-day forecast: ${forecastList.join(", ")}`,
+              url: `https://wttr.in/${encodeURIComponent(city)}`,
+            },
+          ];
+          webContext = `\n\n[Live Real-time Verified Weather for ${city}]:\n- Current: ${tempC}°C, ${desc}, Humidity: ${hum}%, Wind: ${wind} km/h\n- 3-Day Forecast: ${forecastList.join("; ")}\n`;
+          render();
+          scrollToBottom();
         }
-      } catch (err) {
-        console.warn("Live web search failed:", err);
+      } catch (weatherErr) {
+        console.warn("Live weather fetch timed out or failed:", weatherErr);
+      }
+    } else {
+      const hasSearchIntent =
+        webSearchEnabled ||
+        isSearchExplicit ||
+        /^(search|google|dhoondo|khojo|find|who is|what is|when is|where is|latest|current|today'?s|news about|live score)\b/i.test(prompt.trim()) ||
+        /\b(search karo|search karke|latest news|aaj ki|today|ipl score)\b/i.test(prompt);
+
+      if (hasSearchIntent) {
+        const cleanSearchQuery = prompt
+          .replace(/^\/search\s+/i, "")
+          .replace(/^(search\s+for|search|google|dhoondo|khojo|find)\s+/i, "")
+          .replace(/\s+(search karo|search karke|dhoondo)$/i, "")
+          .trim();
+        const searchQuery = cleanSearchQuery || prompt;
+
+        try {
+          const apiBase =
+            window.location.origin && window.location.origin.startsWith("http")
+              ? ""
+              : "https://lumi-backend-v4-production.up.railway.app";
+          const searchController = new AbortController();
+          const searchTimeout = setTimeout(() => searchController.abort(), 2500);
+          const searchResp = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(searchQuery)}`, {
+            signal: searchController.signal,
+          });
+          clearTimeout(searchTimeout);
+
+          if (searchResp.ok) {
+            const searchData = await searchResp.json();
+            if (searchData.results && searchData.results.length > 0) {
+              assistantMsg.searchResults = searchData.results;
+              webContext = "\n\n[Live Real-time Web Knowledge Sources]:\n" + searchData.results.map(r => `- ${r.title}: ${r.snippet} (${r.url})`).join("\n");
+              render();
+              scrollToBottom();
+            }
+          }
+        } catch (err) {
+          console.warn("Live web search failed:", err);
+        }
       }
     }
 
@@ -3568,39 +3635,42 @@ Always write a short friendly conversational sentence before or after the card.
       });
     });
 
-    // Close menus on outside click & GenUI interactive event delegation
-    document.addEventListener("click", (e) => {
-      // 1. GenUI interactive quick prompt button clicks
-      const promptBtn = e.target.closest("[data-genui-prompt]");
-      if (promptBtn) {
-        const promptText = promptBtn.getAttribute("data-genui-prompt");
-        if (promptText) {
-          sendMessage(promptText);
+    // Close menus on outside click & GenUI interactive event delegation (Bind exactly once)
+    if (!window.__lumiDocClickBound) {
+      window.__lumiDocClickBound = true;
+      document.addEventListener("click", (e) => {
+        // 1. GenUI interactive quick prompt button clicks
+        const promptBtn = e.target.closest("[data-genui-prompt]");
+        if (promptBtn) {
+          const promptText = promptBtn.getAttribute("data-genui-prompt");
+          if (promptText) {
+            sendMessage(promptText);
+            return;
+          }
+        }
+
+        // 2. GenUI Accordion Expand / Collapse
+        const accordionHeader = e.target.closest(".genui-accordion-header");
+        if (accordionHeader) {
+          const item = accordionHeader.closest(".genui-accordion-item");
+          if (item) {
+            item.classList.toggle("open");
+          }
           return;
         }
-      }
 
-      // 2. GenUI Accordion Expand / Collapse
-      const accordionHeader = e.target.closest(".genui-accordion-header");
-      if (accordionHeader) {
-        const item = accordionHeader.closest(".genui-accordion-item");
-        if (item) {
-          item.classList.toggle("open");
+        if (!e.target.closest(".model-dropdown-menu") && !e.target.closest(".model-picker-toggle-btn")) {
+          document.querySelectorAll(".model-dropdown-menu").forEach((m) => m.classList.add("hidden"));
+          document.querySelectorAll(".model-picker-toggle-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
         }
-        return;
-      }
-
-      if (!e.target.closest(".model-dropdown-menu") && !e.target.closest(".model-picker-toggle-btn")) {
-        document.querySelectorAll(".model-dropdown-menu").forEach((m) => m.classList.add("hidden"));
-        document.querySelectorAll(".model-picker-toggle-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
-      }
-      if (!e.target.closest(".topbar-dropdown-menu") && !e.target.closest("#toggle-persona-btn") && !e.target.closest("#toggle-export-btn")) {
-        const pMenu = document.querySelector("#persona-dropdown-menu");
-        if (pMenu) pMenu.classList.add("hidden");
-        const eMenu = document.querySelector("#export-dropdown-menu");
-        if (eMenu) eMenu.classList.add("hidden");
-      }
-    });
+        if (!e.target.closest(".topbar-dropdown-menu") && !e.target.closest("#toggle-persona-btn") && !e.target.closest("#toggle-export-btn")) {
+          const pMenu = document.querySelector("#persona-dropdown-menu");
+          if (pMenu) pMenu.classList.add("hidden");
+          const eMenu = document.querySelector("#export-dropdown-menu");
+          if (eMenu) eMenu.classList.add("hidden");
+        }
+      });
+    }
 
     // Model selection click (In-place, no full refresh!)
     document.querySelectorAll("[data-select-model]").forEach((btn) => {

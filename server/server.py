@@ -502,7 +502,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         try:
                             parsed = json.loads(data_part)
                             delta = parsed.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content") or delta.get("reasoning")
+                            content = delta.get("content") or ""
                             if content:
                                 chunk_payload = {
                                     "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
@@ -993,6 +993,35 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             return
         results = []
         import html, re
+
+        # 0. Live Real-Time Weather Check (Instant wttr.in Integration)
+        weather_match = re.search(r"\b(?:weather|mausam|temperature|forecast|temp)\b", q, re.I)
+        if weather_match:
+            city_match = re.search(r"(?:in|of|at|for|ka|ki)\s+([A-Za-z\s]+)", q, re.I) or re.search(r"([A-Za-z]+)\s+(?:weather|mausam|temp)", q, re.I)
+            city = city_match.group(1).strip() if city_match else q.replace("weather", "").replace("mausam", "").strip()
+            city = re.sub(r"\b(today|now|tomorrow|report|kaisa|hai|batao|the|current)\b", "", city, flags=re.I).strip()
+            if city:
+                try:
+                    w_url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
+                    req = urllib.request.Request(w_url, headers={"User-Agent": "curl/7.68.0"})
+                    with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
+                        wdata = json.loads(resp.read().decode())
+                        curr = wdata.get("current_condition", [{}])[0]
+                        temp_c = curr.get("temp_C", "")
+                        desc = curr.get("weatherDesc", [{}])[0].get("value", "")
+                        humidity = curr.get("humidity", "")
+                        wind = curr.get("windspeedKmph", "")
+                        forecast_days = []
+                        for fd in wdata.get("weather", [])[:3]:
+                            forecast_days.append(f"{fd.get('date')}: {fd.get('maxtempC')}°C/{fd.get('mintempC')}°C ({fd.get('hourly', [{}])[0].get('weatherDesc', [{}])[0].get('value', '')})")
+                        snippet = f"Current Live Weather in {city.title()}: {temp_c}°C, {desc}. Humidity: {humidity}%, Wind: {wind} km/h. 3-Day Forecast: {'; '.join(forecast_days)}"
+                        results.append({
+                            "title": f"Live Weather: {city.title()} ({temp_c}°C, {desc})",
+                            "snippet": snippet,
+                            "url": f"https://wttr.in/{urllib.parse.quote(city)}"
+                        })
+                except Exception:
+                    pass
 
         # 1. DuckDuckGo Instant Answer API
         try:
