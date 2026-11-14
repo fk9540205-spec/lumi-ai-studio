@@ -1297,26 +1297,25 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             clean_text = re.sub(r'[*_`#~]', '', text).strip()
             has_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
 
-            # Voice mapping: each voice has its own authentic neural model
-            voice_map = {
-                "nova": "en-US-AvaMultilingualNeural",
-                "alloy": "en-US-AndrewMultilingualNeural",
-                "shimmer": "en-US-EmmaMultilingualNeural",
-                "onyx": "en-US-BrianMultilingualNeural",
-                "echo": "en-US-AndrewMultilingualNeural",
-                "fable": "en-GB-SoniaNeural",
-                "swara": "hi-IN-SwaraNeural",
-                "madhur": "hi-IN-MadhurNeural",
-                "rachel": "en-US-JennyNeural" if not has_hindi else "en-US-AvaMultilingualNeural",
-                "adam": "en-US-ChristopherNeural" if not has_hindi else "en-US-BrianMultilingualNeural",
-                "neerja": "en-IN-NeerjaExpressiveNeural"
+            # Voice mapping: each voice has its own authentic neural model, pitch, and cadence
+            voice_config = {
+                "nova": ("en-US-AvaMultilingualNeural", "+4Hz", "+5%"),
+                "shimmer": ("en-US-EmmaMultilingualNeural", "+8Hz", "+6%"),
+                "swara": ("hi-IN-SwaraNeural", "+0Hz", "+0%"),
+                "rachel": ("hi-IN-SwaraNeural", "+3Hz", "+2%"),
+                "neerja": ("en-US-AvaMultilingualNeural", "+2Hz", "+1%"),
+                "alloy": ("en-US-AndrewMultilingualNeural", "-2Hz", "+2%"),
+                "onyx": ("en-US-BrianMultilingualNeural", "-10Hz", "-4%"),
+                "madhur": ("hi-IN-MadhurNeural", "-4Hz", "+0%"),
+                "adam": ("en-AU-WilliamMultilingualNeural", "-6Hz", "-2%"),
             }
 
-            voice = voice_map.get(raw_voice.lower(), raw_voice)
-            if not voice:
-                voice = "en-US-AvaMultilingualNeural"
+            v_cfg = voice_config.get(raw_voice.lower())
+            if not v_cfg:
+                v_cfg = ("en-US-AvaMultilingualNeural", "+0Hz", "+0%")
+            voice, pitch, rate = v_cfg
 
-            cache_key = (voice, clean_text)
+            cache_key = (voice, pitch, rate, clean_text)
             if cache_key in _TTS_CACHE:
                 audio_bytes = _TTS_CACHE[cache_key]
             else:
@@ -1324,6 +1323,19 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 import edge_tts
 
                 async def _synth():
+                    for attempt in range(2):
+                        try:
+                            comm = edge_tts.Communicate(clean_text, voice, pitch=pitch, rate=rate)
+                            mp3 = bytearray()
+                            async for chunk in comm.stream():
+                                if chunk["type"] == "audio":
+                                    mp3.extend(chunk["data"])
+                            if len(mp3) > 200:
+                                return bytes(mp3)
+                        except Exception:
+                            if attempt == 0:
+                                await asyncio.sleep(0.3)
+                    # Safe fallback without pitch modulation
                     comm = edge_tts.Communicate(clean_text, voice)
                     mp3 = bytearray()
                     async for chunk in comm.stream():
@@ -1349,9 +1361,15 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "public, max-age=86400")
             self._cors_headers()
             self.end_headers()
-            self.wfile.write(audio_bytes)
+            try:
+                self.wfile.write(audio_bytes)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
         except Exception as e:
-            self._error(500, f"TTS synthesis failed: {str(e)}")
+            try:
+                self._error(500, f"TTS synthesis failed: {str(e)}")
+            except Exception:
+                pass
 
 # ---------------------------------------------------------------------------
 # Threaded Server

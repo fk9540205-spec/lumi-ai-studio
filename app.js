@@ -4554,6 +4554,9 @@
         messages.push({ role: t.role, content: t.content });
       }
 
+      if (this.streamAbortCtrl) {
+        try { this.streamAbortCtrl.abort(); } catch {}
+      }
       this.streamAbortCtrl = new AbortController();
       let fullAssistantReply = "";
       let sentenceBuffer = "";
@@ -4561,6 +4564,8 @@
       try {
         const chatEndpoints = [
           "http://127.0.0.1:3456/api/free/chat",
+          "http://10.188.22.242:3456/api/free/chat",
+          "https://text.pollinations.ai/openai/chat/completions",
           "https://lumi-backend-v4-production.up.railway.app/api/free/chat"
         ];
 
@@ -4568,13 +4573,14 @@
         for (const ep of chatEndpoints) {
           try {
             const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 3500);
+            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 2500 : 8000;
+            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
             const r = await fetch(ep, {
               method: "POST",
               signal: ctrl.signal,
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                model: "llama-3.3-70b",
+                model: "openai",
                 messages: messages,
                 stream: true,
                 max_tokens: 200
@@ -4595,6 +4601,7 @@
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let streamDone = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -4608,7 +4615,10 @@
             const trimmed = line.trim();
             if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:")) continue;
             const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") continue;
+            if (dataStr === "[DONE]") {
+              streamDone = true;
+              break;
+            }
 
             try {
               const parsed = JSON.parse(dataStr);
@@ -4629,6 +4639,10 @@
               }
             } catch {}
           }
+          if (streamDone) {
+            try { reader.cancel(); } catch {}
+            break;
+          }
         }
 
         if (sentenceBuffer.trim()) {
@@ -4636,7 +4650,10 @@
         }
 
         const finalClean = fullAssistantReply.replace(/\*\*/g, "").trim();
-        this.sessionTurns.push({ role: "assistant", content: finalClean });
+        if (!finalClean && this.speechQueue.length === 0) {
+          this.speakCallChunk("Haan ji, kahiye, mai sun rahi hu.");
+        }
+        this.sessionTurns.push({ role: "assistant", content: finalClean || "Haan ji, kahiye, mai sun rahi hu." });
         this.isGeneratingResponse = false;
 
         // If audio finished playing while LLM was streaming last chunk, check if queue is now empty
@@ -4646,19 +4663,13 @@
               this.updateUI("listening", "");
               this.startListening();
             }
-          }, 300);
+          }, 400);
         }
 
       } catch (err) {
         this.isGeneratingResponse = false;
         if (err.name === "AbortError") return;
-        this.updateUI("speaking", "Ek second...");
-        setTimeout(() => {
-          if (this.isOpen) {
-            this.updateUI("listening", "");
-            this.startListening();
-          }
-        }, 1000);
+        this.speakCallChunk("Haan ji, kahiye, mai sun rahi hu.");
       }
     },
 
@@ -4681,7 +4692,7 @@
               this.updateUI("listening", "");
               this.startListening();
             }
-          }, 300);
+          }, 400);
         }
         return;
       }
@@ -4693,13 +4704,13 @@
       const hasHindi = /[\u0900-\u097F]/.test(text);
       const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
 
-      // Watchdog timer: prevents ANY UI freeze if network or player hangs
+      // Safety watchdog: generous 15-second window prevents ANY freeze while allowing full TTS playback
       let watchdog = setTimeout(() => {
         if (this.isOpen && this.isPlayingSpeech) {
           console.warn("Speech watchdog triggered, advancing queue");
           this.playNextQueuedSpeech();
         }
-      }, Math.max(3000, text.length * 150));
+      }, Math.max(15000, text.length * 500));
 
       const clearWatchdog = () => {
         if (watchdog) {
@@ -4708,37 +4719,46 @@
         }
       };
 
+      const ttsEndpoints = [
+        "http://127.0.0.1:3456/api/tts",
+        "http://10.188.22.242:3456/api/tts"
+      ];
+
       let audioBlob = null;
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 1200);
-        const r = await fetch("http://127.0.0.1:3456/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ input: text, voice: activeVoice }),
-          signal: ctrl.signal
-        });
-        clearTimeout(timer);
-        if (r.ok) {
-          const b = await r.blob();
-          if (b && b.size > 200) {
-            audioBlob = b;
+      for (const ep of ttsEndpoints) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 6000);
+          const r = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input: text, voice: activeVoice }),
+            signal: ctrl.signal
+          });
+          clearTimeout(timer);
+          if (r.ok) {
+            const b = await r.blob();
+            if (b && b.size > 200) {
+              audioBlob = b;
+              break;
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
 
       if (!this.isOpen) {
         clearWatchdog();
         return;
       }
 
-      // Synchronize subtitle display with audio playback starting NOW
-      this.updateUI("speaking", text);
-
       if (audioBlob) {
         const audioSrc = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioSrc);
         this.activeAudioEl = audio;
+        audio.onplay = () => {
+          // Synchronize subtitle display with audio playback starting NOW (exactly when voice is heard)
+          this.updateUI("speaking", text);
+        };
         audio.onended = () => {
           clearWatchdog();
           URL.revokeObjectURL(audioSrc);
@@ -4751,12 +4771,16 @@
           this.activeAudioEl = null;
           this.fallbackSpeak(text, hasHindi, activeVoice);
         };
-        audio.play().catch((err) => {
-          clearWatchdog();
-          URL.revokeObjectURL(audioSrc);
-          this.activeAudioEl = null;
-          this.fallbackSpeak(text, hasHindi, activeVoice);
-        });
+        const playPromise = audio.play();
+        if (playPromise && playPromise.catch) {
+          playPromise.catch((err) => {
+            console.warn("audio.play() error:", err);
+            clearWatchdog();
+            URL.revokeObjectURL(audioSrc);
+            this.activeAudioEl = null;
+            this.fallbackSpeak(text, hasHindi, activeVoice);
+          });
+        }
       } else {
         clearWatchdog();
         this.fallbackSpeak(text, hasHindi, activeVoice);
