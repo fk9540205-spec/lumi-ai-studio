@@ -1275,6 +1275,9 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         })
 
     def _handle_tts(self):
+        global _TTS_CACHE
+        if "_TTS_CACHE" not in globals():
+            _TTS_CACHE = {}
         try:
             body = self._read_body()
             if body is None:
@@ -1294,42 +1297,51 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             clean_text = re.sub(r'[*_`#~]', '', text).strip()
             has_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
 
-            # Voice mapping compatible with OpenAI, IndicF5, and ElevenLabs styles
+            # Voice mapping: each voice has its own authentic neural model
             voice_map = {
-                "nova": "hi-IN-SwaraNeural" if has_hindi else "en-US-AvaMultilingualNeural",
-                "alloy": "hi-IN-MadhurNeural" if has_hindi else "en-US-AndrewMultilingualNeural",
-                "shimmer": "hi-IN-SwaraNeural" if has_hindi else "en-US-EmmaMultilingualNeural",
-                "onyx": "hi-IN-MadhurNeural" if has_hindi else "en-US-BrianMultilingualNeural",
+                "nova": "en-US-AvaMultilingualNeural",
+                "alloy": "en-US-AndrewMultilingualNeural",
+                "shimmer": "en-US-EmmaMultilingualNeural",
+                "onyx": "en-US-BrianMultilingualNeural",
                 "echo": "en-US-AndrewMultilingualNeural",
                 "fable": "en-GB-SoniaNeural",
                 "swara": "hi-IN-SwaraNeural",
                 "madhur": "hi-IN-MadhurNeural",
-                "rachel": "en-US-JennyNeural",
-                "adam": "en-US-ChristopherNeural",
+                "rachel": "en-US-JennyNeural" if not has_hindi else "en-US-AvaMultilingualNeural",
+                "adam": "en-US-ChristopherNeural" if not has_hindi else "en-US-BrianMultilingualNeural",
                 "neerja": "en-IN-NeerjaExpressiveNeural"
             }
 
             voice = voice_map.get(raw_voice.lower(), raw_voice)
             if not voice:
-                voice = "hi-IN-SwaraNeural" if has_hindi else "en-US-JennyNeural"
+                voice = "en-US-AvaMultilingualNeural"
 
-            import asyncio
-            import edge_tts
+            cache_key = (voice, clean_text)
+            if cache_key in _TTS_CACHE:
+                audio_bytes = _TTS_CACHE[cache_key]
+            else:
+                import asyncio
+                import edge_tts
 
-            async def _synth():
-                comm = edge_tts.Communicate(clean_text, voice)
-                mp3 = bytearray()
-                async for chunk in comm.stream():
-                    if chunk["type"] == "audio":
-                        mp3.extend(chunk["data"])
-                return bytes(mp3)
+                async def _synth():
+                    comm = edge_tts.Communicate(clean_text, voice)
+                    mp3 = bytearray()
+                    async for chunk in comm.stream():
+                        if chunk["type"] == "audio":
+                            mp3.extend(chunk["data"])
+                    return bytes(mp3)
 
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                audio_bytes = loop.run_until_complete(_synth())
-            finally:
-                loop.close()
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    audio_bytes = loop.run_until_complete(_synth())
+                finally:
+                    loop.close()
+
+                if len(audio_bytes) > 200:
+                    if len(_TTS_CACHE) > 200:
+                        _TTS_CACHE.clear()
+                    _TTS_CACHE[cache_key] = audio_bytes
 
             self.send_response(200)
             self.send_header("Content-Type", "audio/mpeg")

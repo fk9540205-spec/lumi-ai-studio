@@ -3994,6 +3994,7 @@
     speechQueue: [],
     isPlayingSpeech: false,
     isGeneratingResponse: false,
+    pendingTranscript: "",
     streamAbortCtrl: null,
     silenceTimer: null,
     activeAudioEl: null,
@@ -4289,6 +4290,7 @@
         if (text) {
           if (userEl) userEl.textContent = text;
         } else {
+          if (userEl) userEl.textContent = "";
           if (textEl) textEl.textContent = "Bolna shuru kijiye, mai sun rahi hu...";
         }
       } else if (state === "thinking") {
@@ -4381,9 +4383,18 @@
       }
     },
 
+    submitUserSpeech() {
+      clearTimeout(this.silenceTimer);
+      clearTimeout(this.restartTimer);
+      const text = (this.pendingTranscript || "").trim();
+      this.pendingTranscript = "";
+      if (!text) return;
+      this.handleUserSpeech(text);
+    },
+
     startListening() {
       if (!this.isOpen || this.isMuted) return;
-      if (this.state === "speaking" || this.isPlayingSpeech) return;
+      if (this.state === "speaking" || this.isPlayingSpeech || this.isGeneratingResponse) return;
 
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
@@ -4406,7 +4417,7 @@
 
         rec.onresult = (event) => {
           // If AI is currently speaking, disregard mic to prevent acoustic feedback loop
-          if (this.state === "speaking" || this.isPlayingSpeech) return;
+          if (this.state === "speaking" || this.isPlayingSpeech || this.isGeneratingResponse) return;
 
           let interim = "";
           let final = "";
@@ -4418,35 +4429,51 @@
 
           const currentText = (final || interim).trim();
           if (currentText) {
+            this.pendingTranscript = currentText;
             this.updateAuroraState("listening");
             this.updateUI("listening", currentText);
 
             clearTimeout(this.silenceTimer);
-            this.silenceTimer = setTimeout(() => {
-              this.handleUserSpeech(currentText);
-            }, 1200);
+            if (final.trim()) {
+              this.silenceTimer = setTimeout(() => {
+                this.submitUserSpeech();
+              }, 400);
+            } else {
+              this.silenceTimer = setTimeout(() => {
+                this.submitUserSpeech();
+              }, 900);
+            }
           }
         };
 
         rec.onerror = (e) => {
-          if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+          if (this.pendingTranscript && this.pendingTranscript.trim()) {
+            this.submitUserSpeech();
+            return;
+          }
+          if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech && !this.isGeneratingResponse) {
             clearTimeout(this.restartTimer);
             this.restartTimer = setTimeout(() => {
-              if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+              if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech && !this.isGeneratingResponse) {
                 this.startListening();
               }
-            }, 800);
+            }, 300);
           }
         };
 
         rec.onend = () => {
-          if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+          // CRITICAL: If speech was recognized, submit immediately! Never cancel with restart!
+          if (this.pendingTranscript && this.pendingTranscript.trim()) {
+            this.submitUserSpeech();
+            return;
+          }
+          if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech && !this.isGeneratingResponse) {
             clearTimeout(this.restartTimer);
             this.restartTimer = setTimeout(() => {
-              if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+              if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech && !this.isGeneratingResponse) {
                 this.startListening();
               }
-            }, 500);
+            }, 250);
           }
         };
 
@@ -4471,6 +4498,7 @@
     },
 
     interrupt() {
+      this.pendingTranscript = "";
       this.speechQueue = [];
       this.isPlayingSpeech = false;
       this.isGeneratingResponse = false;
@@ -4491,7 +4519,7 @@
       if (typeof window.stopSpeechSynthesis === "function") {
         window.stopSpeechSynthesis();
       }
-      this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+      this.updateUI("listening", "");
       this.startListening();
     },
 
@@ -4531,25 +4559,39 @@
       let sentenceBuffer = "";
 
       try {
-        const apiBase = (window.location.origin && window.location.origin.startsWith("http"))
-          ? window.location.origin
-          : "https://lumi-backend-v4-production.up.railway.app";
+        const chatEndpoints = [
+          "http://127.0.0.1:3456/api/free/chat",
+          "https://lumi-backend-v4-production.up.railway.app/api/free/chat"
+        ];
 
-        const resp = await fetch(`${apiBase}/api/free/chat`, {
-          method: "POST",
-          signal: this.streamAbortCtrl.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "llama-3.3-70b",
-            messages: messages,
-            stream: true,
-            max_tokens: 300
-          })
-        });
+        let resp = null;
+        for (const ep of chatEndpoints) {
+          try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 3500);
+            const r = await fetch(ep, {
+              method: "POST",
+              signal: ctrl.signal,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "llama-3.3-70b",
+                messages: messages,
+                stream: true,
+                max_tokens: 200
+              })
+            });
+            clearTimeout(timer);
+            if (r.ok) {
+              resp = r;
+              break;
+            }
+          } catch (e) {
+            if (this.streamAbortCtrl && this.streamAbortCtrl.signal.aborted) throw e;
+          }
+        }
 
-        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        if (!resp || !resp.ok) throw new Error("All chat backends failed");
 
-        this.updateUI("speaking", "...");
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -4576,9 +4618,6 @@
                 fullAssistantReply += cleanDelta;
                 sentenceBuffer += cleanDelta;
 
-                const cleanSub = fullAssistantReply.replace(/\*\*/g, "").trim();
-                this.updateUI("speaking", cleanSub);
-
                 const sentenceEndMatch = sentenceBuffer.match(/^([\s\S]+?[.?!।\n])\s*([\s\S]*)$/);
                 if (sentenceEndMatch) {
                   const toSpeak = sentenceEndMatch[1].trim();
@@ -4604,10 +4643,10 @@
         if (!this.isPlayingSpeech && this.speechQueue.length === 0) {
           setTimeout(() => {
             if (this.isOpen && !this.isPlayingSpeech && !this.isGeneratingResponse && this.speechQueue.length === 0) {
-              this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+              this.updateUI("listening", "");
               this.startListening();
             }
-          }, 400);
+          }, 300);
         }
 
       } catch (err) {
@@ -4616,10 +4655,10 @@
         this.updateUI("speaking", "Ek second...");
         setTimeout(() => {
           if (this.isOpen) {
-            this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+            this.updateUI("listening", "");
             this.startListening();
           }
-        }, 1200);
+        }, 1000);
       }
     },
 
@@ -4636,104 +4675,132 @@
     async playNextQueuedSpeech() {
       if (!this.isOpen || this.speechQueue.length === 0) {
         this.isPlayingSpeech = false;
-        // Only return to listening once LLM has completely finished generating AND speech queue is drained!
-        if (this.isOpen && !this.isGeneratingResponse && this.state === "speaking") {
+        if (this.isOpen && !this.isGeneratingResponse) {
           setTimeout(() => {
             if (this.isOpen && !this.isGeneratingResponse && !this.isPlayingSpeech && this.speechQueue.length === 0) {
-              this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+              this.updateUI("listening", "");
               this.startListening();
             }
-          }, 400);
+          }, 300);
         }
         return;
       }
 
       this.isPlayingSpeech = true;
-      // ALWAYS keep microphone OFF while AI speaks to prevent acoustic self-interruption
       this.stopListening();
 
       const text = this.speechQueue.shift();
       const hasHindi = /[\u0900-\u097F]/.test(text);
       const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
 
-      this.updateAuroraState("speaking");
+      // Watchdog timer: prevents ANY UI freeze if network or player hangs
+      let watchdog = setTimeout(() => {
+        if (this.isOpen && this.isPlayingSpeech) {
+          console.warn("Speech watchdog triggered, advancing queue");
+          this.playNextQueuedSpeech();
+        }
+      }, Math.max(3000, text.length * 150));
 
-      const endpoints = [
-        "http://127.0.0.1:3456/api/tts",
-        "http://10.188.22.242:3456/api/tts",
-        "http://localhost:3456/api/tts"
-      ];
+      const clearWatchdog = () => {
+        if (watchdog) {
+          clearTimeout(watchdog);
+          watchdog = null;
+        }
+      };
 
       let audioBlob = null;
-      for (const ep of endpoints) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 2500);
-          const r = await fetch(ep, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: text, voice: activeVoice }),
-            signal: ctrl.signal
-          });
-          clearTimeout(timer);
-          if (r.ok) {
-            const b = await r.blob();
-            if (b && b.size > 200) {
-              audioBlob = b;
-              break;
-            }
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 1200);
+        const r = await fetch("http://127.0.0.1:3456/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: text, voice: activeVoice }),
+          signal: ctrl.signal
+        });
+        clearTimeout(timer);
+        if (r.ok) {
+          const b = await r.blob();
+          if (b && b.size > 200) {
+            audioBlob = b;
           }
-        } catch {}
+        }
+      } catch {}
+
+      if (!this.isOpen) {
+        clearWatchdog();
+        return;
       }
 
-      if (!this.isOpen || this.state !== "speaking") return;
+      // Synchronize subtitle display with audio playback starting NOW
+      this.updateUI("speaking", text);
 
       if (audioBlob) {
         const audioSrc = URL.createObjectURL(audioBlob);
         const audio = new Audio(audioSrc);
         this.activeAudioEl = audio;
         audio.onended = () => {
+          clearWatchdog();
           URL.revokeObjectURL(audioSrc);
           this.activeAudioEl = null;
           this.playNextQueuedSpeech();
         };
         audio.onerror = () => {
+          clearWatchdog();
           URL.revokeObjectURL(audioSrc);
           this.activeAudioEl = null;
-          this.fallbackSpeak(text, hasHindi);
+          this.fallbackSpeak(text, hasHindi, activeVoice);
         };
         audio.play().catch((err) => {
-          console.warn("Audio play error, falling back to TTS:", err);
+          clearWatchdog();
           URL.revokeObjectURL(audioSrc);
           this.activeAudioEl = null;
-          this.fallbackSpeak(text, hasHindi);
+          this.fallbackSpeak(text, hasHindi, activeVoice);
         });
       } else {
-        // Fallback: If network / server is unavailable, use Android native TTS or Web Speech API
-        this.fallbackSpeak(text, hasHindi);
+        clearWatchdog();
+        this.fallbackSpeak(text, hasHindi, activeVoice);
       }
     },
 
-    fallbackSpeak(text, hasHindi) {
-      if (!this.isOpen || this.state !== "speaking") return;
+    fallbackSpeak(text, hasHindi, activeVoice) {
+      if (!this.isOpen) return;
       const lang = hasHindi ? "hi-IN" : "en-US";
+      const voiceId = activeVoice || this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
+
+      // Synchronize subtitle display with speech
+      this.updateUI("speaking", text);
+
+      let watchdog = setTimeout(() => {
+        if (this.isOpen && this.isPlayingSpeech) {
+          this.playNextQueuedSpeech();
+        }
+      }, Math.max(2500, text.length * 140));
+
+      const onDone = () => {
+        if (watchdog) {
+          clearTimeout(watchdog);
+          watchdog = null;
+        }
+        this.playNextQueuedSpeech();
+      };
 
       if (window.AndroidTTS && typeof window.AndroidTTS.speak === "function") {
         const msgId = "live_tts_" + Date.now();
         window.__lumiOnTTSDone = (doneId) => {
           if (doneId === msgId) {
-            this.playNextQueuedSpeech();
+            onDone();
           }
         };
-        window.AndroidTTS.speak(msgId, text, lang);
+        window.AndroidTTS.speak(msgId, text, lang, voiceId);
       } else if ("speechSynthesis" in window) {
         const utt = new SpeechSynthesisUtterance(text);
         utt.lang = lang;
-        utt.onend = () => this.playNextQueuedSpeech();
-        utt.onerror = () => this.playNextQueuedSpeech();
+        utt.onend = onDone;
+        utt.onerror = onDone;
         window.speechSynthesis.speak(utt);
       } else {
-        setTimeout(() => this.playNextQueuedSpeech(), 1000);
+        setTimeout(onDone, 800);
       }
     }
   };
