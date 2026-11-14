@@ -1294,17 +1294,19 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             clean_text = re.sub(r'[*_`#~]', '', text).strip()
             has_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
 
-            # Voice mapping compatible with travisvn/openai-edge-tts
+            # Voice mapping compatible with OpenAI, IndicF5, and ElevenLabs styles
             voice_map = {
-                "alloy": "hi-IN-MadhurNeural" if has_hindi else "en-US-GuyNeural",
-                "echo": "en-US-AndrewNeural",
+                "nova": "hi-IN-SwaraNeural" if has_hindi else "en-US-AvaMultilingualNeural",
+                "alloy": "hi-IN-MadhurNeural" if has_hindi else "en-US-AndrewMultilingualNeural",
+                "shimmer": "hi-IN-SwaraNeural" if has_hindi else "en-US-EmmaMultilingualNeural",
+                "onyx": "hi-IN-MadhurNeural" if has_hindi else "en-US-BrianMultilingualNeural",
+                "echo": "en-US-AndrewMultilingualNeural",
                 "fable": "en-GB-SoniaNeural",
-                "onyx": "en-US-ChristopherNeural",
-                "nova": "hi-IN-SwaraNeural" if has_hindi else "en-US-JennyNeural",
-                "shimmer": "hi-IN-SwaraNeural" if has_hindi else "en-US-AriaNeural",
                 "swara": "hi-IN-SwaraNeural",
                 "madhur": "hi-IN-MadhurNeural",
-                "neerja": "en-IN-NeerjaNeural"
+                "rachel": "en-US-JennyNeural",
+                "adam": "en-US-ChristopherNeural",
+                "neerja": "en-IN-NeerjaExpressiveNeural"
             }
 
             voice = voice_map.get(raw_voice.lower(), raw_voice)

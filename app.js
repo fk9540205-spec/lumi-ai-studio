@@ -3636,10 +3636,16 @@
     if (isListening && recognitionInstance) {
       recognitionInstance.stop();
       isListening = false;
+      if (window.AndroidAudio && typeof window.AndroidAudio.restoreSystemSounds === "function") {
+        try { window.AndroidAudio.restoreSystemSounds(); } catch {}
+      }
       render();
       return;
     }
     try {
+      if (window.AndroidAudio && typeof window.AndroidAudio.silenceSystemSounds === "function") {
+        try { window.AndroidAudio.silenceSystemSounds(); } catch {}
+      }
       recognitionInstance = new SpeechRec();
       recognitionInstance.continuous = false;
       recognitionInstance.interimResults = true;
@@ -3647,7 +3653,6 @@
       
       recognitionInstance.onstart = () => {
         isListening = true;
-        AudioEffects.play("click");
         showToast("🎙️ Listening... Speak now in Hindi or English!");
         render();
       };
@@ -3665,15 +3670,24 @@
       };
       recognitionInstance.onerror = () => {
         isListening = false;
+        if (window.AndroidAudio && typeof window.AndroidAudio.restoreSystemSounds === "function") {
+          try { window.AndroidAudio.restoreSystemSounds(); } catch {}
+        }
         render();
       };
       recognitionInstance.onend = () => {
         isListening = false;
+        if (window.AndroidAudio && typeof window.AndroidAudio.restoreSystemSounds === "function") {
+          try { window.AndroidAudio.restoreSystemSounds(); } catch {}
+        }
         render();
       };
       recognitionInstance.start();
     } catch (e) {
       isListening = false;
+      if (window.AndroidAudio && typeof window.AndroidAudio.restoreSystemSounds === "function") {
+        try { window.AndroidAudio.restoreSystemSounds(); } catch {}
+      }
       render();
     }
   }
@@ -3953,13 +3967,29 @@
 
   // ==========================================================================
   // AUTHENTIC GEMINI LIVE MODE (PITCH-BLACK FULLSCREEN VIEW)
-  // Exact match to frame_339.png from official user video
+  // Exact match to frame_339.png from official user video + AI Voice Selector
   // ==========================================================================
+  const LIVE_VOICES = [
+    { id: "nova", name: "Nova", tag: "Warm & Natural", desc: "Conversational, soothing tone (OpenAI style)", icon: "🌸" },
+    { id: "alloy", name: "Alloy", tag: "Dynamic & Friendly", desc: "Balanced, expressive companion (OpenAI style)", icon: "⚡" },
+    { id: "shimmer", name: "Shimmer", tag: "Bright & Clear", desc: "Cheerful, melodious female tone (OpenAI style)", icon: "✨" },
+    { id: "onyx", name: "Onyx", tag: "Deep & Grounded", desc: "Warm, resonant male tone (OpenAI style)", icon: "🎙️" },
+    { id: "swara", name: "Swara", tag: "Natural Hindi", desc: "Fluent, authentic Hindi female (IndicF5)", icon: "🇮🇳" },
+    { id: "madhur", name: "Madhur", tag: "Natural Hindi", desc: "Fluent, warm Hindi male (IndicF5)", icon: "🇮🇳" },
+    { id: "rachel", name: "Rachel", tag: "Calm & Realistic", desc: "Gentle, authentic voice (ElevenLabs style)", icon: "🌿" },
+    { id: "adam", name: "Adam", tag: "Narrative & Deep", desc: "Articulate storytelling voice (ElevenLabs style)", icon: "📖" },
+    { id: "neerja", name: "Neerja", tag: "Indian Accent", desc: "Natural Indian English female", icon: "💫" }
+  ];
+
   const LumiVoiceCall = {
     isOpen: false,
     state: "idle", // "idle" | "listening" | "thinking" | "speaking"
     isMuted: false,
     currentLang: "hi-IN",
+    selectedVoice: localStorage.getItem("lumi_live_voice") || "nova",
+    previewAudio: null,
+    currentlyPlayingSampleId: null,
+    restartTimer: null,
     sessionTurns: [],
     speechQueue: [],
     isPlayingSpeech: false,
@@ -3988,7 +4018,7 @@
                   <line x1="1" y1="1" x2="23" y2="23"/>
                 </svg>
               </button>
-              <button type="button" class="gemini-live-icon-btn" id="live-more-options-btn" title="Options">
+              <button type="button" class="gemini-live-icon-btn" id="live-more-options-btn" title="Select AI Voice & Options">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <circle cx="12" cy="5" r="2"/>
                   <circle cx="12" cy="12" r="2"/>
@@ -4039,6 +4069,22 @@
               </svg>
             </button>
           </div>
+
+          <!-- Voice Selector Bottom Sheet Modal -->
+          <div id="live-voice-sheet" class="gemini-live-voice-sheet hidden">
+            <div class="voice-sheet-backdrop" id="voice-sheet-backdrop"></div>
+            <div class="voice-sheet-panel">
+              <div class="voice-sheet-handle"></div>
+              <div class="voice-sheet-title-row">
+                <h3>Choose AI Voice</h3>
+                <button type="button" class="voice-sheet-close-btn" id="voice-sheet-close-btn" title="Close">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <p class="voice-sheet-subtitle">Select a voice for Lumi. Tap ▶ to hear a sample.</p>
+              <div class="voice-sheet-list" id="voice-sheet-list"></div>
+            </div>
+          </div>
         </div>
       `;
 
@@ -4067,13 +4113,157 @@
       document.querySelector("#live-cam-toggle-btn")?.addEventListener("click", () => {
         showToast("Audio call active");
       });
-      document.querySelector("#live-more-options-btn")?.addEventListener("click", () => {
-        this.currentLang = this.currentLang === "hi-IN" ? "en-IN" : "hi-IN";
-        showToast("Language: " + (this.currentLang === "hi-IN" ? "Hindi" : "English"));
-        if (this.isOpen && !this.isMuted) {
-          this.startListening();
-        }
+
+      // 3-dots: Open Voice Selector Modal
+      document.querySelector("#live-more-options-btn")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.openVoiceSheet();
       });
+
+      document.querySelector("#voice-sheet-close-btn")?.addEventListener("click", () => {
+        this.closeVoiceSheet();
+      });
+      document.querySelector("#voice-sheet-backdrop")?.addEventListener("click", () => {
+        this.closeVoiceSheet();
+      });
+    },
+
+    openVoiceSheet() {
+      const sheet = document.querySelector("#live-voice-sheet");
+      const list = document.querySelector("#voice-sheet-list");
+      if (!sheet || !list) return;
+
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
+
+      list.innerHTML = LIVE_VOICES.map((v) => {
+        const isSelected = v.id === activeVoice;
+        const isPlaying = this.currentlyPlayingSampleId === v.id;
+        return `
+          <div class="voice-sheet-item ${isSelected ? "selected" : ""}" data-voice-id="${v.id}">
+            <div class="voice-item-avatar">${v.icon}</div>
+            <div class="voice-item-info">
+              <div class="voice-item-name-row">
+                <span class="voice-item-name">${v.name}</span>
+                <span class="voice-item-tag">${v.tag}</span>
+              </div>
+              <div class="voice-item-desc">${v.desc}</div>
+            </div>
+            <div class="voice-item-actions">
+              <button type="button" class="voice-sample-btn ${isPlaying ? "playing" : ""}" data-sample-btn="${v.id}" title="Play preview">
+                ${isPlaying ? `
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16" rx="1"/>
+                    <rect x="14" y="4" width="4" height="16" rx="1"/>
+                  </svg>
+                ` : `
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                `}
+              </button>
+              <div class="voice-item-radio">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // Wire item selection
+      list.querySelectorAll(".voice-sheet-item").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          if (e.target.closest(".voice-sample-btn")) return;
+          const vid = el.getAttribute("data-voice-id");
+          if (vid) this.selectVoice(vid);
+        });
+      });
+
+      // Wire sample preview play button
+      list.querySelectorAll(".voice-sample-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const vid = btn.getAttribute("data-sample-btn");
+          if (vid) this.toggleSamplePlayback(vid);
+        });
+      });
+
+      sheet.classList.remove("hidden");
+    },
+
+    closeVoiceSheet() {
+      const sheet = document.querySelector("#live-voice-sheet");
+      if (sheet) sheet.classList.add("hidden");
+      this.stopSamplePlayback();
+    },
+
+    selectVoice(voiceId) {
+      this.selectedVoice = voiceId;
+      localStorage.setItem("lumi_live_voice", voiceId);
+      const voice = LIVE_VOICES.find((v) => v.id === voiceId);
+      showToast(`Voice set to: ${voice ? voice.name : voiceId}`);
+      this.openVoiceSheet();
+    },
+
+    stopSamplePlayback() {
+      if (this.previewAudio) {
+        try {
+          this.previewAudio.pause();
+          this.previewAudio.currentTime = 0;
+        } catch {}
+        this.previewAudio = null;
+      }
+      if (window.AndroidAudio && typeof window.AndroidAudio.stop === "function") {
+        try { window.AndroidAudio.stop(); } catch {}
+      }
+      this.currentlyPlayingSampleId = null;
+      document.querySelectorAll(".voice-sample-btn").forEach((btn) => {
+        btn.classList.remove("playing");
+        btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+      });
+    },
+
+    toggleSamplePlayback(voiceId) {
+      if (this.currentlyPlayingSampleId === voiceId) {
+        this.stopSamplePlayback();
+        return;
+      }
+      this.stopSamplePlayback();
+      this.currentlyPlayingSampleId = voiceId;
+
+      const btn = document.querySelector(`[data-sample-btn="${voiceId}"]`);
+      if (btn) {
+        btn.classList.add("playing");
+        btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`;
+      }
+
+      const sampleUrl = `assets/voices/${voiceId}.mp3`;
+      try {
+        const audio = new Audio(sampleUrl);
+        this.previewAudio = audio;
+        audio.onended = () => this.stopSamplePlayback();
+        audio.onerror = () => {
+          if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
+            window.AndroidAudio.playUrl(sampleUrl);
+          } else {
+            this.stopSamplePlayback();
+          }
+        };
+        audio.play().catch(() => {
+          if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
+            window.AndroidAudio.playUrl(sampleUrl);
+          } else {
+            this.stopSamplePlayback();
+          }
+        });
+      } catch (err) {
+        if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
+          window.AndroidAudio.playUrl(sampleUrl);
+        } else {
+          this.stopSamplePlayback();
+        }
+      }
     },
 
     updateAuroraState(state) {
@@ -4110,6 +4300,12 @@
       this.speechQueue = [];
       this.isPlayingSpeech = false;
       this.state = "listening";
+      this.selectedVoice = localStorage.getItem("lumi_live_voice") || "nova";
+
+      // Silence Android OS SpeechRecognizer chimes completely!
+      if (window.AndroidAudio && typeof window.AndroidAudio.silenceSystemSounds === "function") {
+        try { window.AndroidAudio.silenceSystemSounds(); } catch {}
+      }
 
       const modal = document.querySelector("#lumi-live-modal");
       if (modal) {
@@ -4125,6 +4321,12 @@
       this.isOpen = false;
       this.stopListening();
       this.interrupt();
+      this.closeVoiceSheet();
+
+      // Restore Android OS system sounds
+      if (window.AndroidAudio && typeof window.AndroidAudio.restoreSystemSounds === "function") {
+        try { window.AndroidAudio.restoreSystemSounds(); } catch {}
+      }
 
       const modal = document.querySelector("#lumi-live-modal");
       if (modal) modal.classList.add("hidden");
@@ -4184,6 +4386,11 @@
 
       this.stopListening();
 
+      // Ensure Android OS system chimes are silenced
+      if (window.AndroidAudio && typeof window.AndroidAudio.silenceSystemSounds === "function") {
+        try { window.AndroidAudio.silenceSystemSounds(); } catch {}
+      }
+
       try {
         const rec = new SpeechRec();
         rec.continuous = true;
@@ -4212,27 +4419,29 @@
             clearTimeout(this.silenceTimer);
             this.silenceTimer = setTimeout(() => {
               this.handleUserSpeech(currentText);
-            }, 1100);
+            }, 1200);
           }
         };
 
-        rec.onerror = () => {
-          if (this.isOpen && !this.isMuted && this.state === "listening") {
-            setTimeout(() => {
-              if (this.isOpen && !this.isMuted && this.state === "listening") {
+        rec.onerror = (e) => {
+          if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+            clearTimeout(this.restartTimer);
+            this.restartTimer = setTimeout(() => {
+              if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
                 this.startListening();
               }
-            }, 500);
+            }, 800);
           }
         };
 
         rec.onend = () => {
           if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
-            setTimeout(() => {
+            clearTimeout(this.restartTimer);
+            this.restartTimer = setTimeout(() => {
               if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
                 this.startListening();
               }
-            }, 300);
+            }, 500);
           }
         };
 
@@ -4245,8 +4454,13 @@
 
     stopListening() {
       clearTimeout(this.silenceTimer);
+      clearTimeout(this.restartTimer);
       if (this.recInstance) {
-        try { this.recInstance.stop(); } catch {}
+        try {
+          this.recInstance.onend = null;
+          this.recInstance.onerror = null;
+          this.recInstance.stop();
+        } catch {}
         this.recInstance = null;
       }
     },
@@ -4415,7 +4629,7 @@
       this.isPlayingSpeech = true;
       const text = this.speechQueue.shift();
       const hasHindi = /[\u0900-\u097F]/.test(text);
-      const voice = hasHindi ? "hi-IN-SwaraNeural" : "en-US-JennyNeural";
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
 
       this.updateAuroraState("speaking");
 
@@ -4433,7 +4647,7 @@
           const r = await fetch(ep, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: text, voice: voice }),
+            body: JSON.stringify({ input: text, voice: activeVoice }),
             signal: ctrl.signal
           });
           clearTimeout(timer);
