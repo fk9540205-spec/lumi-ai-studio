@@ -4327,9 +4327,9 @@
     close() {
       if (!this.isOpen) return;
       this.isOpen = false;
-      this.stopListening();
-      this.interrupt();
-      this.closeVoiceSheet();
+      try { this.stopListening(); } catch {}
+      try { this.interrupt(); } catch {}
+      try { this.closeVoiceMenu(); } catch {}
 
       // Restore Android OS system sounds
       if (window.AndroidAudio && typeof window.AndroidAudio.restoreSystemSounds === "function") {
@@ -4340,30 +4340,34 @@
       if (modal) modal.classList.add("hidden");
 
       if (this.sessionTurns.length > 0) {
-        let conv = getActiveConversation();
-        if (!conv) {
-          const threadId = "thread_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-          const firstTurn = this.sessionTurns.find((t) => t.role === "user") || this.sessionTurns[0];
-          const title = (firstTurn?.content || "Voice conversation").slice(0, 32);
-          conv = {
-            id: threadId,
-            title: title,
-            createdAt: new Date().toISOString(),
-            model: { ...selectedModel },
-            messages: []
-          };
-          conversations.unshift(conv);
+        try {
+          let conv = getActiveConversation();
+          if (!conv) {
+            const threadId = "thread_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+            const firstTurn = this.sessionTurns.find((t) => t.role === "user") || this.sessionTurns[0];
+            const title = (firstTurn?.content || "Voice conversation").slice(0, 32);
+            conv = {
+              id: threadId,
+              title: title,
+              createdAt: new Date().toISOString(),
+              model: { ...selectedModel },
+              messages: []
+            };
+            conversations.unshift(conv);
+          }
+          for (const turn of this.sessionTurns) {
+            conv.messages.push({
+              id: "msg_" + Math.random().toString(36).substring(2, 10),
+              role: turn.role,
+              content: turn.content,
+              timestamp: Date.now()
+            });
+          }
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+        } catch (e) {
+          console.warn("Error saving voice conversation turns:", e);
         }
-        for (const turn of this.sessionTurns) {
-          conv.messages.push({
-            id: "msg_" + Math.random().toString(36).substring(2, 10),
-            role: turn.role,
-            content: turn.content,
-            timestamp: Date.now()
-          });
-        }
-        saveJson(STORAGE.CHATS, conversations);
-        render();
       }
     },
 
@@ -4830,6 +4834,50 @@
   };
 
   window.LumiVoiceCall = LumiVoiceCall;
+
+  window.handleAndroidBack = function() {
+    // 1. If Live Voice Call is open
+    if (window.LumiVoiceCall && window.LumiVoiceCall.isOpen) {
+      const voiceMenu = document.querySelector("#live-voice-menu");
+      if (voiceMenu && !voiceMenu.classList.contains("hidden")) {
+        window.LumiVoiceCall.closeVoiceMenu();
+        return true;
+      }
+      window.LumiVoiceCall.close();
+      return true;
+    }
+
+    // 2. If any modal is open
+    const modals = [
+      "#model-selector-modal",
+      "#settings-modal",
+      "#api-keys-modal",
+      "#image-lightbox-modal",
+      "#file-viewer-modal"
+    ];
+    for (const sel of modals) {
+      const el = document.querySelector(sel);
+      if (el && !el.classList.contains("hidden")) {
+        el.classList.add("hidden");
+        return true;
+      }
+    }
+
+    // 3. If sidebar is open on mobile
+    const sidebar = document.querySelector("#sidebar");
+    if (sidebar && sidebar.classList.contains("mobile-open")) {
+      sidebar.classList.remove("mobile-open");
+      return true;
+    }
+
+    return false;
+  };
+
+  window.addEventListener("popstate", () => {
+    if (window.LumiVoiceCall && window.LumiVoiceCall.isOpen) {
+      window.handleAndroidBack();
+    }
+  });
 
   async function runPythonCode(code) {
     activeWorkspaceTab = "terminal";
