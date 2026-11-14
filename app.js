@@ -177,6 +177,16 @@
   }
 
   let conversations = loadJson(STORAGE.CHATS, []);
+
+  function getActiveConversation() {
+    const hash = window.location.hash || "";
+    const activeThreadId = hash.startsWith("#/chat/") ? hash.slice(7) : null;
+    if (activeThreadId) {
+      const found = conversations.find((c) => c.id === activeThreadId);
+      if (found) return found;
+    }
+    return conversations.length > 0 ? conversations[0] : null;
+  }
   let providers = loadJson(STORAGE.PROVIDERS, []);
   let selectedModel = loadJson(STORAGE.MODEL, {
     provider_id: null,
@@ -369,6 +379,31 @@
             osc.start(now + idx * 0.05);
             osc.stop(now + idx * 0.05 + 0.18);
           });
+        } else if (type === "phoneConnect") {
+          [440, 480].forEach((freq) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.22);
+          });
+        } else if (type === "phoneDisconnect") {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(300, now + 0.16);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.16);
         } else if (type === "click") {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
@@ -2260,15 +2295,6 @@
 
               <button
                 type="button"
-                id="voice-mic-btn"
-                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs ${isListening ? "mic-listening-pulse" : "text-muted-foreground hover:text-foreground"} transition-all backdrop-blur shadow-xs cursor-pointer"
-                title="${isListening ? "Listening... click to stop" : "Voice input (Hindi & English)"}"
-              >
-                ${ICONS.mic}
-              </button>
-
-              <button
-                type="button"
                 id="toggle-web-search-btn"
                 class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs ${webSearchEnabled ? "text-primary border-primary/60 bg-primary/10 shadow-xs ring-1 ring-primary/40" : "text-muted-foreground hover:text-foreground"} transition-all backdrop-blur shadow-xs cursor-pointer"
                 title="${webSearchEnabled ? "Live Web Search: Active (Click to disable)" : "Live Web Search: Off (Click to enable)"}"
@@ -2288,9 +2314,17 @@
 
             <div class="flex items-center gap-1.5" id="composer-submit-wrapper">
               <button
+                type="button"
+                id="voice-call-trigger-btn"
+                class="${isStreaming ? "hidden" : "inline-flex"} size-8 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/25 hover:bg-primary hover:text-primary-foreground transition-all active:scale-95 cursor-pointer"
+                title="Voice Call"
+              >
+                ${ICONS.mic}
+              </button>
+              <button
                 type="submit"
                 id="submit-prompt-btn"
-                class="${isStreaming ? "hidden" : "inline-flex"} size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                class="hidden size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 title="Send message"
               >
                 ${ICONS.cornerDownLeft}
@@ -3168,10 +3202,15 @@
 
       // In-place switch send button to stop button
       const submitBtn = document.querySelector("#submit-prompt-btn");
+      const voiceBtn = document.querySelector("#voice-call-trigger-btn");
       const stopBtn = document.querySelector("#stop-generation-btn");
       if (submitBtn) {
         submitBtn.classList.add("hidden");
         submitBtn.classList.remove("inline-flex");
+      }
+      if (voiceBtn) {
+        voiceBtn.classList.add("hidden");
+        voiceBtn.classList.remove("inline-flex");
       }
       if (stopBtn) {
         stopBtn.classList.remove("hidden");
@@ -3579,13 +3618,31 @@
 
       const stopBtn = document.querySelector("#stop-generation-btn");
       const submitBtn = document.querySelector("#submit-prompt-btn");
+      const voiceBtn = document.querySelector("#voice-call-trigger-btn");
+      const ta = document.querySelector("#composer-textarea");
       if (stopBtn) {
         stopBtn.classList.add("hidden");
         stopBtn.classList.remove("inline-flex");
       }
-      if (submitBtn) {
-        submitBtn.classList.remove("hidden");
-        submitBtn.classList.add("inline-flex");
+      const hasText = ta && ta.value.trim().length > 0;
+      if (hasText) {
+        if (submitBtn) {
+          submitBtn.classList.remove("hidden");
+          submitBtn.classList.add("inline-flex");
+        }
+        if (voiceBtn) {
+          voiceBtn.classList.add("hidden");
+          voiceBtn.classList.remove("inline-flex");
+        }
+      } else {
+        if (voiceBtn) {
+          voiceBtn.classList.remove("hidden");
+          voiceBtn.classList.add("inline-flex");
+        }
+        if (submitBtn) {
+          submitBtn.classList.add("hidden");
+          submitBtn.classList.remove("inline-flex");
+        }
       }
 
       scrollToBottom(true);
@@ -3919,6 +3976,513 @@
   window.stopSpeechSynthesis = stopSpeechSynthesis;
   window.renderMarkdown = renderMarkdown;
 
+  // ==========================================================================
+  // AUTHENTIC GEMINI LIVE MODE (PITCH-BLACK FULLSCREEN VIEW)
+  // Exact match to frame_339.png from official user video
+  // ==========================================================================
+  const LumiVoiceCall = {
+    isOpen: false,
+    state: "idle", // "idle" | "listening" | "thinking" | "speaking"
+    isMuted: false,
+    currentLang: "hi-IN",
+    sessionTurns: [],
+    speechQueue: [],
+    isPlayingSpeech: false,
+    streamAbortCtrl: null,
+    silenceTimer: null,
+    activeAudioEl: null,
+    recInstance: null,
+
+    init() {
+      if (document.querySelector("#lumi-live-modal")) return;
+
+      const liveHtml = `
+        <div id="lumi-live-modal" class="hidden">
+          <!-- Top Navigation Bar: = on left, camera slash & 3 dots on right -->
+          <div class="gemini-live-top-bar">
+            <button type="button" class="gemini-live-icon-btn" id="live-menu-btn" title="Menu">
+              <svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="1" y1="2" x2="21" y2="2"></line>
+                <line x1="1" y1="12" x2="21" y2="12"></line>
+              </svg>
+            </button>
+            <div class="gemini-live-top-right">
+              <button type="button" class="gemini-live-icon-btn" id="live-cam-toggle-btn" title="Toggle Camera">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              </button>
+              <button type="button" class="gemini-live-icon-btn" id="live-more-options-btn" title="Options">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2"/>
+                  <circle cx="12" cy="12" r="2"/>
+                  <circle cx="12" cy="19" r="2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Spoken Dialogue / Subtitle Area -->
+          <div class="gemini-live-transcript-area" id="live-transcript-area">
+            <div class="gemini-live-user-speech" id="live-user-speech"></div>
+            <div class="gemini-live-subtitle" id="live-subtitle-text">Bolna shuru kijiye, mai sun rahi hu...</div>
+          </div>
+
+          <!-- Bottom Action Bar: (+) (📹) [GEMINI AURORA CAPSULE] (🎤) (✕) -->
+          <div class="gemini-live-bottom-bar">
+            <button type="button" class="gemini-live-circle-btn" id="live-add-btn" title="Add">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <button type="button" class="gemini-live-circle-btn" id="live-video-btn" title="Video">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m22 8-6 4 6 4V8Z"/>
+                <rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>
+              </svg>
+            </button>
+            
+            <!-- Center Liquid Aurora Pill -->
+            <div class="gemini-live-aurora-pill" id="live-aurora-stage" title="Tap to interrupt">
+              <div class="gemini-aurora-glow-blob" id="live-aurora-blob"></div>
+              <div class="gemini-aurora-shimmer"></div>
+            </div>
+
+            <button type="button" class="gemini-live-circle-btn" id="live-mic-mute-btn" title="Mute Microphone">
+              <svg id="live-mic-icon-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+              </svg>
+            </button>
+            <button type="button" class="gemini-live-circle-btn live-btn-hangup" id="live-end-btn" title="Hang up">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+
+      const div = document.createElement("div");
+      div.innerHTML = liveHtml;
+      document.body.appendChild(div.firstElementChild);
+      this.bindEvents();
+    },
+
+    bindEvents() {
+      // Hang up button
+      document.querySelector("#live-end-btn")?.addEventListener("click", () => this.close());
+
+      // Mic mute toggle
+      document.querySelector("#live-mic-mute-btn")?.addEventListener("click", () => this.toggleMute());
+
+      // Aurora stage tap to interrupt
+      document.querySelector("#live-aurora-stage")?.addEventListener("click", () => {
+        if (this.state === "speaking" || this.isPlayingSpeech) {
+          this.interrupt();
+        }
+      });
+
+      // Top menu and close
+      document.querySelector("#live-menu-btn")?.addEventListener("click", () => this.close());
+      document.querySelector("#live-cam-toggle-btn")?.addEventListener("click", () => {
+        showToast("Audio call active");
+      });
+      document.querySelector("#live-more-options-btn")?.addEventListener("click", () => {
+        this.currentLang = this.currentLang === "hi-IN" ? "en-IN" : "hi-IN";
+        showToast("Language: " + (this.currentLang === "hi-IN" ? "Hindi" : "English"));
+        if (this.isOpen && !this.isMuted) {
+          this.startListening();
+        }
+      });
+    },
+
+    updateAuroraState(state) {
+      this.state = state;
+      const blob = document.querySelector("#live-aurora-blob");
+      if (blob) {
+        blob.className = "gemini-aurora-glow-blob " + state;
+      }
+    },
+
+    updateUI(state, text) {
+      this.updateAuroraState(state);
+      const textEl = document.querySelector("#live-subtitle-text");
+      const userEl = document.querySelector("#live-user-speech");
+
+      if (state === "listening") {
+        if (text) {
+          if (userEl) userEl.textContent = text;
+        } else {
+          if (textEl) textEl.textContent = "Bolna shuru kijiye, mai sun rahi hu...";
+        }
+      } else if (state === "thinking") {
+        if (userEl) userEl.textContent = text || "";
+        if (textEl) textEl.textContent = "Thinking...";
+      } else if (state === "speaking") {
+        if (textEl) textEl.textContent = text || "";
+      }
+    },
+
+    open() {
+      this.init();
+      this.isOpen = true;
+      this.sessionTurns = [];
+      this.speechQueue = [];
+      this.isPlayingSpeech = false;
+      this.state = "listening";
+
+      const modal = document.querySelector("#lumi-live-modal");
+      if (modal) {
+        modal.classList.remove("hidden");
+      }
+
+      // Single pleasant phone connect chime
+      AudioEffects.play("phoneConnect");
+      this.updateUI("listening");
+      this.startListening();
+    },
+
+    close() {
+      if (!this.isOpen) return;
+      this.isOpen = false;
+      this.stopListening();
+      this.interrupt();
+
+      // Gentle phone disconnect tone
+      AudioEffects.play("phoneDisconnect");
+
+      const modal = document.querySelector("#lumi-live-modal");
+      if (modal) modal.classList.add("hidden");
+
+      if (this.sessionTurns.length > 0) {
+        let conv = getActiveConversation();
+        if (!conv) {
+          const threadId = "thread_" + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+          const firstTurn = this.sessionTurns.find((t) => t.role === "user") || this.sessionTurns[0];
+          const title = (firstTurn?.content || "Voice conversation").slice(0, 32);
+          conv = {
+            id: threadId,
+            title: title,
+            createdAt: new Date().toISOString(),
+            model: { ...selectedModel },
+            messages: []
+          };
+          conversations.unshift(conv);
+        }
+        for (const turn of this.sessionTurns) {
+          conv.messages.push({
+            id: "msg_" + Math.random().toString(36).substring(2, 10),
+            role: turn.role,
+            content: turn.content,
+            timestamp: Date.now()
+          });
+        }
+        saveJson(STORAGE.CHATS, conversations);
+        render();
+      }
+    },
+
+    toggleMute() {
+      this.isMuted = !this.isMuted;
+      const btn = document.querySelector("#live-mic-mute-btn");
+      if (btn) {
+        if (this.isMuted) {
+          btn.classList.add("muted");
+          this.stopListening();
+          this.updateUI("idle", "Mic muted. Tap mic to resume.");
+        } else {
+          btn.classList.remove("muted");
+          this.startListening();
+          this.updateUI("listening", "");
+        }
+      }
+    },
+
+    startListening() {
+      if (this.isMuted) return;
+
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        this.updateUI("listening", "Speech recognition not supported in this browser.");
+        return;
+      }
+
+      this.stopListening();
+
+      try {
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = this.currentLang;
+
+        rec.onresult = (event) => {
+          let interim = "";
+          let final = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) final += transcript;
+            else interim += transcript;
+          }
+
+          const currentText = (final || interim).trim();
+          if (currentText) {
+            this.updateAuroraState("listening");
+            this.updateUI("listening", currentText);
+
+            // Instant Duplex Interruption: user speaks while AI speaks -> stop immediately
+            if (this.state === "speaking" || this.isPlayingSpeech) {
+              this.interrupt();
+            }
+
+            clearTimeout(this.silenceTimer);
+            this.silenceTimer = setTimeout(() => {
+              this.handleUserSpeech(currentText);
+            }, 1100);
+          }
+        };
+
+        rec.onerror = () => {
+          if (this.isOpen && !this.isMuted && this.state === "listening") {
+            setTimeout(() => {
+              if (this.isOpen && !this.isMuted && this.state === "listening") {
+                this.startListening();
+              }
+            }, 500);
+          }
+        };
+
+        rec.onend = () => {
+          if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+            setTimeout(() => {
+              if (this.isOpen && !this.isMuted && this.state === "listening" && !this.isPlayingSpeech) {
+                this.startListening();
+              }
+            }, 300);
+          }
+        };
+
+        this.recInstance = rec;
+        rec.start();
+      } catch (e) {
+        console.warn("SpeechRec start error:", e);
+      }
+    },
+
+    stopListening() {
+      clearTimeout(this.silenceTimer);
+      if (this.recInstance) {
+        try { this.recInstance.stop(); } catch {}
+        this.recInstance = null;
+      }
+    },
+
+    interrupt() {
+      this.speechQueue = [];
+      this.isPlayingSpeech = false;
+      if (this.streamAbortCtrl) {
+        this.streamAbortCtrl.abort();
+        this.streamAbortCtrl = null;
+      }
+      if (this.activeAudioEl) {
+        try { this.activeAudioEl.pause(); } catch {}
+        this.activeAudioEl = null;
+      }
+      if (window.AndroidAudio && typeof window.AndroidAudio.stop === "function") {
+        try { window.AndroidAudio.stop(); } catch {}
+      }
+      if (typeof window.stopSpeechSynthesis === "function") {
+        window.stopSpeechSynthesis();
+      }
+      if (this.state === "speaking") {
+        this.updateUI("listening", "");
+        this.startListening();
+      }
+    },
+
+    async handleUserSpeech(transcript) {
+      if (!transcript || !transcript.trim()) return;
+      const cleanPrompt = transcript.trim();
+
+      this.stopListening();
+      this.updateUI("thinking", cleanPrompt);
+
+      this.sessionTurns.push({ role: "user", content: cleanPrompt });
+
+      const messages = [
+        {
+          role: "system",
+          content: "You are Lumi in a real-time phone call. Speak in warm, natural, human conversational tone (1-2 short sentences per turn). Answer directly as if talking on a phone call. Never use markdown symbols, asterisks (**), bullet points, numbered lists, or headers."
+        }
+      ];
+
+      const conv = getActiveConversation();
+      if (conv && conv.messages) {
+        for (const m of conv.messages.slice(-4)) {
+          if (m.role === "user" || m.role === "assistant") {
+            messages.push({ role: m.role, content: m.content });
+          }
+        }
+      }
+
+      for (const t of this.sessionTurns.slice(-4)) {
+        messages.push({ role: t.role, content: t.content });
+      }
+
+      this.streamAbortCtrl = new AbortController();
+      let fullAssistantReply = "";
+      let sentenceBuffer = "";
+
+      try {
+        const apiBase = (window.location.origin && window.location.origin.startsWith("http"))
+          ? window.location.origin
+          : "https://lumi-backend-v4-production.up.railway.app";
+
+        const resp = await fetch(`${apiBase}/api/free/chat`, {
+          method: "POST",
+          signal: this.streamAbortCtrl.signal,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "llama-3.3-70b",
+            messages: messages,
+            stream: true,
+            max_tokens: 300
+          })
+        });
+
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+        this.updateUI("speaking", "...");
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === "[DONE]") continue;
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              const delta = parsed.choices?.[0]?.delta?.content || "";
+              if (delta) {
+                const cleanDelta = delta.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<\/?think>/g, "");
+                fullAssistantReply += cleanDelta;
+                sentenceBuffer += cleanDelta;
+
+                const cleanSub = fullAssistantReply.replace(/\*\*/g, "").trim();
+                this.updateUI("speaking", cleanSub);
+
+                const sentenceEndMatch = sentenceBuffer.match(/^([\s\S]+?[.?!।\n])\s*([\s\S]*)$/);
+                if (sentenceEndMatch) {
+                  const toSpeak = sentenceEndMatch[1].trim();
+                  sentenceBuffer = sentenceEndMatch[2];
+                  if (toSpeak) {
+                    this.speakCallChunk(toSpeak);
+                  }
+                }
+              }
+            } catch {}
+          }
+        }
+
+        if (sentenceBuffer.trim()) {
+          this.speakCallChunk(sentenceBuffer.trim());
+        }
+
+        const finalClean = fullAssistantReply.replace(/\*\*/g, "").trim();
+        this.sessionTurns.push({ role: "assistant", content: finalClean });
+
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        this.updateUI("speaking", "Ek second...");
+        setTimeout(() => {
+          if (this.isOpen) {
+            this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+            this.startListening();
+          }
+        }, 1200);
+      }
+    },
+
+    speakCallChunk(sentence) {
+      const clean = sentence.replace(/\*\*/g, "").replace(/[`#_*~]/g, "").trim();
+      if (!clean) return;
+
+      this.speechQueue.push(clean);
+      if (!this.isPlayingSpeech) {
+        this.playNextQueuedSpeech();
+      }
+    },
+
+    playNextQueuedSpeech() {
+      if (!this.isOpen || this.speechQueue.length === 0) {
+        this.isPlayingSpeech = false;
+        if (this.isOpen && this.state === "speaking") {
+          setTimeout(() => {
+            if (this.isOpen && this.state === "speaking" && !this.isPlayingSpeech) {
+              this.updateUI("listening", "Bolna shuru kijiye, mai sun rahi hu...");
+              this.startListening();
+            }
+          }, 350);
+        }
+        return;
+      }
+
+      this.isPlayingSpeech = true;
+      const text = this.speechQueue.shift();
+      const hasHindi = /[\u0900-\u097F]/.test(text);
+      const lang = hasHindi ? "hi" : "en";
+
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang}&client=tw-ob`;
+
+      this.updateAuroraState("speaking");
+
+      // Play via AndroidAudio (hardware MediaPlayer) if present, or HTML5 Audio
+      if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
+        window.__lumiOnAudioDone = () => {
+          this.playNextQueuedSpeech();
+        };
+        try {
+          window.AndroidAudio.playUrl(ttsUrl);
+          return;
+        } catch (e) {
+          console.warn("AndroidAudio error:", e);
+        }
+      }
+
+      const audio = new Audio(ttsUrl);
+      this.activeAudioEl = audio;
+      audio.onended = () => {
+        this.activeAudioEl = null;
+        this.playNextQueuedSpeech();
+      };
+      audio.onerror = () => {
+        this.activeAudioEl = null;
+        this.playNextQueuedSpeech();
+      };
+      audio.play().catch((err) => {
+        console.warn("Audio play error, skipping chunk:", err);
+        this.playNextQueuedSpeech();
+      });
+    }
+  };
+
+  window.LumiVoiceCall = LumiVoiceCall;
+
   async function runPythonCode(code) {
     activeWorkspaceTab = "terminal";
     workspaceOpen = true;
@@ -4059,6 +4623,23 @@
       textarea.addEventListener("input", () => {
         textarea.style.height = "auto";
         textarea.style.height = Math.min(textarea.scrollHeight, 192) + "px";
+
+        const hasText = textarea.value.trim().length > 0;
+        const voiceBtn = document.querySelector("#voice-call-trigger-btn");
+        const submitBtn = document.querySelector("#submit-prompt-btn");
+        if (voiceBtn && submitBtn && !isStreaming) {
+          if (hasText) {
+            voiceBtn.classList.add("hidden");
+            voiceBtn.classList.remove("inline-flex");
+            submitBtn.classList.remove("hidden");
+            submitBtn.classList.add("inline-flex");
+          } else {
+            submitBtn.classList.add("hidden");
+            submitBtn.classList.remove("inline-flex");
+            voiceBtn.classList.remove("hidden");
+            voiceBtn.classList.add("inline-flex");
+          }
+        }
       });
 
       textarea.addEventListener("keydown", (e) => {
@@ -4067,6 +4648,15 @@
           const val = textarea.value.trim();
           if (val) sendMessage(val);
         }
+      });
+    }
+
+    const voiceCallTrigger = document.querySelector("#voice-call-trigger-btn");
+    if (voiceCallTrigger) {
+      voiceCallTrigger.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        LumiVoiceCall.open();
       });
     }
 

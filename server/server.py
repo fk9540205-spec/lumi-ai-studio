@@ -325,6 +325,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_extract_pdf()
         elif path == "/api/export/zip":
             self._handle_export_zip()
+        elif path in ("/api/tts", "/api/voice/tts"):
+            self._handle_tts()
         else:
             self._error(404, f"API endpoint {path} not found")
 
@@ -1267,8 +1269,48 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 "duck_ai": "/api/duck/chat",
                 "gemini_web": "/api/gemini/chat",
                 "proxy_hub": "/api/proxy/chat",
+                "tts": "/api/tts",
             },
         })
+
+    def _handle_tts(self):
+        try:
+            body = self._read_json_body()
+            text = (body.get("text") or "").strip()
+            voice = body.get("voice") or "hi-IN-SwaraNeural"
+            if not text:
+                self._error(400, "Missing text parameter")
+                return
+
+            clean_text = re.sub(r'[*_`#~]', '', text).strip()
+
+            import asyncio
+            import edge_tts
+
+            async def _synth():
+                comm = edge_tts.Communicate(clean_text, voice)
+                mp3 = bytearray()
+                async for chunk in comm.stream():
+                    if chunk["type"] == "audio":
+                        mp3.extend(chunk["data"])
+                return bytes(mp3)
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                audio_bytes = loop.run_until_complete(_synth())
+            finally:
+                loop.close()
+
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/mpeg")
+            self.send_header("Content-Length", str(len(audio_bytes)))
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(audio_bytes)
+        except Exception as e:
+            self._error(500, f"TTS synthesis failed: {str(e)}")
 
 # ---------------------------------------------------------------------------
 # Threaded Server
