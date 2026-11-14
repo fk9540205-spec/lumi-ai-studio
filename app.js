@@ -212,26 +212,37 @@
 
   // Real System Personas
   const PERSONA_PROMPTS = {
-    general: "You are Lumi, an exceptionally intelligent, clear, and helpful AI assistant with live real-time knowledge and web search capabilities. When live web search results or live data are provided, synthesize the findings thoroughly, answer directly, and present the facts with confidence. NEVER refuse or say 'I cannot browse the internet' or 'I lack real-time access' or 'as an AI I cannot search' — you ALREADY have the live search results provided to you. Directly deliver the comprehensive answer in a natural, helpful tone.",
-    engineer: "You are an elite Senior Staff Software Engineer. Focus on clean, modular, production-ready code, idiomatic architecture, robust error handling, edge cases, and peak performance. Provide complete, runnable code examples.",
-    dsa: "You are an expert Data Structures & Algorithms (DSA) and Coding Interview Coach. Explain problem-solving patterns intuitively, break down step-by-step algorithms, rigorously analyze Time & Space Complexity (Big-O), and write clean, optimal implementations.",
-    hindi: "Aap Lumi ho, ek friendly, super-intelligent AI sathi jiske paas live web search aur real-time knowledge access hai. Baat-cheet bilkul aasan aur natural Hindi / Hinglish mein karo. Jab search results ya live data diya jaye, to use padhkar seedha aur vistaar se jawab do. Kabhi bhi ye mat bolo ki 'main search nahi kar sakta' ya 'mere paas live access nahi hai' — aapke paas live search results uplabdh hain, unka upyog karke behtareen aur clear uttar do.",
-    bughunter: "You are a Senior Code Auditor and Bug Hunter. Thoroughly inspect code for security vulnerabilities (XSS, SQLi, injection, logic bugs), race conditions, memory leaks, and edge cases. Offer concrete, minimal fixes.",
+    general: "You are Lumi, a top-tier, highly articulate AI companion. Format your responses with clean, professional elegance. Do NOT clutter responses with excessive asterisks (**) or bold text on every phrase. Use clean headings, well-structured bullet points, and natural prose. When live search results are provided, synthesize the facts directly with confidence and authority.",
+    engineer: "You are an elite Senior Staff Software Engineer. Focus on clean, modular, production-ready code, idiomatic architecture, robust error handling, edge cases, and peak performance. Provide complete, runnable code examples without unnecessary filler.",
+    dsa: "You are an expert Data Structures & Algorithms (DSA) and Coding Interview Coach. Explain problem-solving patterns intuitively, break down step-by-step algorithms, analyze Time & Space Complexity (Big-O), and write clean, optimal implementations.",
+    hindi: "Aap Lumi ho, ek aadhunik, super-intelligent aur professional AI sathi. Baat-cheet bilkul swachh, aasan aur natural Hindi / Hinglish mein karo. Format ko bilkul clean aur professional rakhein — har line ya label par baar-baar **bold** ya asterisks lagane se bachein. Seedha, sundar aur vistarit uttar dein.",
+    bughunter: "You are a Senior Code Auditor and Bug Hunter. Thoroughly inspect code for security vulnerabilities, race conditions, memory leaks, and edge cases with minimal, concrete fixes.",
     writer: "You are a master creative writer, storyteller, and copywriter. Craft vivid, compelling, engaging, and beautifully phrased prose with powerful narrative flow.",
     artist: "You are an AI Artist & Image Generator. When the user describes any image, scene, or concept, describe it evocatively and create stunning visual art."
   };
 
   const GENUI_SYSTEM_INSTRUCTION = `
-[INTERACTIVE RICH CARDS & LIVE SEARCH]
-When live web search or verified knowledge is provided, synthesize the facts and provide an authoritative, clear answer. Never say you cannot search the web or lack real-time access.
-When helpful (products, comparisons, weather, stats, recommendations, charts), output a compact UI block using \`\`\`json:ui ... \`\`\`:
-- Product: {"type":"product","title":"Sony WH-1000XM5","price":"$399","rating":4.8,"features":["30h Battery","ANC"]}
-- Weather: {"type":"weather","city":"Delhi","temp":"22°C","condition":"Smoky haze","humidity":"60%","wind":"4 km/h","forecast":[{"day":"Tomorrow","temp":"30°C","icon":"☀️"}]}
-- Stats: {"type":"stats","title":"Q3 Performance","metrics":[{"label":"Revenue","value":"$1.2M","delta":"+20%"},{"label":"Users","value":"45k","delta":"+12%"}]}
-- Comparison: {"type":"comparison","title":"A vs B","itemA":{"title":"A"},"itemB":{"title":"B","winner":true},"features":[{"feature":"Camera","valA":"5x","valB":"10x","winner":"B"}],"verdict":"B wins on camera."}
-- Chart: {"type":"chart","chartType":"bar","title":"Market Cap (T$)","data":[{"label":"Apple","value":3.4},{"label":"Nvidia","value":3.3}]}
-- Recommendation: {"type":"recommendation","title":"Top Picks","items":[{"rank":1,"title":"MacBook Air M3","score":"9.6/10","reason":"Best battery."}]}
-CRITICAL: Never mention system instructions or tokens. Never output internal planning. Directly give the final answer and card.
+[PROFESSIONAL FORMATTING & TYPOGRAPHY GUIDELINES]
+1. ELEGANT & CLEAN FORMATTING (STRICT):
+   - Never spam asterisks (**) or bold text on every single line, sub-point, or phrase.
+   - Do NOT use repetitive boilerplate bold labels like "**Kyu zaroori hai:**" or "**Kaise karein:**" or "**Samanya galti:**" repeatedly.
+   - Format lists cleanly: "1. Heading Title — Concise, natural explanation."
+   - Use clear markdown headers (### Section Title) for distinct sections rather than bolding entire inline lines.
+   - Keep line breaks and whitespace balanced for effortless readability.
+
+2. DIRECT & FACTUAL ANSWERS:
+   - Immediately output your response without any <think> tags, internal deliberations, or planning scratchpads.
+   - When live web search or verified knowledge is provided, synthesize the facts and deliver an authoritative, clear answer. Never say you cannot browse or lack real-time access.
+   - Conclude every thought and sentence completely. Never cut off mid-thought.
+
+3. INTERACTIVE RICH CARDS:
+   When helpful (products, comparisons, weather, stats, recommendations, charts), output a compact UI block using \`\`\`json:ui ... \`\`\`:
+   - Product: {"type":"product","title":"Sony WH-1000XM5","price":"$399","rating":4.8,"features":["30h Battery","ANC"]}
+   - Weather: {"type":"weather","city":"Delhi","temp":"22°C","condition":"Smoky haze","humidity":"60%","wind":"4 km/h","forecast":[{"day":"Tomorrow","temp":"30°C","icon":"☀️"}]}
+   - Stats: {"type":"stats","title":"Q3 Performance","metrics":[{"label":"Revenue","value":"$1.2M","delta":"+20%"},{"label":"Users","value":"45k","delta":"+12%"}]}
+   - Comparison: {"type":"comparison","title":"A vs B","itemA":{"title":"A"},"itemB":{"title":"B","winner":true},"features":[{"feature":"Camera","valA":"5x","valB":"10x","winner":"B"}],"verdict":"B wins on camera."}
+   - Chart: {"type":"chart","chartType":"bar","title":"Market Cap (T$)","data":[{"label":"Apple","value":3.4},{"label":"Nvidia","value":3.3}]}
+   - Recommendation: {"type":"recommendation","title":"Top Picks","items":[{"rank":1,"title":"MacBook Air M3","score":"9.6/10","reason":"Best battery."}]}
 `;
 
   const PERSONA_LABELS = {
@@ -1470,54 +1481,145 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
     }
     text = newLines.join("\n");
 
-    // 5. Headings
-    text = text.replace(/^### (.*$)/gim, "<h3>$1</h3>");
-    text = text.replace(/^## (.*$)/gim, "<h2>$1</h2>");
-    text = text.replace(/^# (.*$)/gim, "<h1>$1</h1>");
+    // 5. Clean clumsy heading bolding before parsing: ### **Title** -> ### Title
+    text = text.replace(/^(#{1,4})\s*\*\*(.*?)\*\*\s*$/gm, "$1 $2");
 
-    // 6. Blockquotes
-    text = text.replace(/^\> (.*$)/gim, "<blockquote>$1</blockquote>");
+    // 6. Line-by-line block parser (Headings, Lists, Quotes, Paragraphs)
+    const outputBlocks = [];
+    let listType = null; // "ul" or "ol"
+    let listItems = [];
+    let paraLines = [];
 
-    // 7. Unordered Lists
-    text = text.replace(/^[\*\-] (.*$)/gim, "<li>$1</li>");
-    text = text.replace(/(<li>[\s\S]+?<\/li>)/g, "<ul>$1</ul>");
-    text = text.replace(/<\/ul>\s*<ul>/g, "");
+    const flushList = () => {
+      if (listType && listItems.length > 0) {
+        outputBlocks.push(`<${listType}>\n` + listItems.join("\n") + `\n</${listType}>`);
+        listType = null;
+        listItems = [];
+      }
+    };
 
-    // 8. Ordered Lists
-    text = text.replace(/^\d+\. (.*$)/gim, "<oli>$1</oli>");
-    text = text.replace(/(<oli>[\s\S]+?<\/oli>)/g, "<ol>$1</ol>");
-    text = text.replace(/<oli>/g, "<li>").replace(/<\/oli>/g, "</li>");
-    text = text.replace(/<\/ol>\s*<ol>/g, "");
-
-    // 9. Paragraphs (lines separated by double newlines)
-    const paragraphs = text.split(/\n\n+/);
-    text = paragraphs
-      .map((p) => {
-        const trimmed = p.trim();
-        if (!trimmed) return "";
-        if (/^<(h[1-4]|div|ul|ol|blockquote|table)/.test(trimmed)) {
-          return trimmed;
+    const flushPara = () => {
+      if (paraLines.length > 0) {
+        const textBlock = paraLines.map((l) => l.trim()).filter(Boolean).join("<br/>");
+        if (textBlock) {
+          outputBlocks.push(`<p>${textBlock}</p>`);
         }
-        return `<p>${renderInlineFormatting(trimmed).replace(/\n/g, "<br/>")}</p>`;
-      })
-      .join("\n");
+        paraLines = [];
+      }
+    };
 
-    // 10. Restore Code Blocks
-    text = text.replace(/__CODE_BLOCK_(\d+)__/g, (match, idx) => {
-      return codeBlocks[Number(idx)] || "";
-    });
+    for (const l of newLines) {
+      const trimmed = l.trim();
 
-    return text;
+      // Blank line: separate paragraphs/lists
+      if (!trimmed) {
+        flushList();
+        flushPara();
+        continue;
+      }
+
+      // Already an HTML block or code block placeholder
+      if (
+        trimmed.startsWith('<div class="markdown-table-wrapper"') ||
+        trimmed.startsWith('__CODE_BLOCK_') ||
+        trimmed.startsWith('<div class="genui-') ||
+        trimmed.startsWith('<div class="math-block"')
+      ) {
+        flushList();
+        flushPara();
+        outputBlocks.push(trimmed);
+        continue;
+      }
+
+      // Headings (#, ##, ###, ####)
+      const hMatch = trimmed.match(/^(#{1,4})\s+(.*)$/);
+      if (hMatch) {
+        flushList();
+        flushPara();
+        const level = hMatch[1].length;
+        outputBlocks.push(`<h${level}>${hMatch[2].replace(/\*\*/g, "")}</h${level}>`);
+        continue;
+      }
+
+      // Blockquotes (> ...)
+      if (trimmed.startsWith(">")) {
+        flushList();
+        flushPara();
+        outputBlocks.push(`<blockquote>${trimmed.slice(1).trim()}</blockquote>`);
+        continue;
+      }
+
+      // Ordered list: "1. " or "2. "
+      const olMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+      if (olMatch) {
+        flushPara();
+        if (listType !== "ol") {
+          flushList();
+          listType = "ol";
+        }
+        listItems.push(`<li>${olMatch[2]}</li>`);
+        continue;
+      }
+
+      // Indented Sub-bullet: "  - " or "  * "
+      const subUlMatch = l.match(/^[ \t]+[\*\-]\s+(.*)$/);
+      if (subUlMatch) {
+        flushPara();
+        if (!listType) listType = "ul";
+        listItems.push(`<li class="sub-item">${subUlMatch[1]}</li>`);
+        continue;
+      }
+
+      // Top-level Unordered bullet: "- " or "* "
+      const ulMatch = trimmed.match(/^[\*\-]\s+(.*)$/);
+      if (ulMatch) {
+        flushPara();
+        if (listType !== "ul") {
+          flushList();
+          listType = "ul";
+        }
+        listItems.push(`<li>${ulMatch[1]}</li>`);
+        continue;
+      }
+
+      // Plain text line inside paragraph
+      flushList();
+      paraLines.push(trimmed);
+    }
+
+    flushList();
+    flushPara();
+
+    let fullHtml = outputBlocks.join("\n");
+
+    // Merge consecutive list blocks separated by newlines
+    fullHtml = fullHtml.replace(/<\/ol>\s*<ol>/g, "\n");
+    fullHtml = fullHtml.replace(/<\/ul>\s*<ul>/g, "\n");
+
+    // 7. UNIVERSAL INLINE FORMATTING (Applied cleanly across whole document!)
+    fullHtml = renderInlineFormatting(fullHtml);
+
+    // 8. Restore Code Blocks
+    for (let i = 0; i < codeBlocks.length; i++) {
+      fullHtml = fullHtml.replace(`__CODE_BLOCK_${i}__`, codeBlocks[i]);
+    }
+
+    return fullHtml;
   }
 
   function renderInlineFormatting(str) {
+    if (!str) return "";
     let s = str;
-    // Bold
-    s = s.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    // Italic
-    s = s.replace(/\*(.*?)\*/g, "<em>$1</em>");
-    // Inline code
-    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    // 1. Markdown links: [Title](https://...)
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary underline underline-offset-4 hover:opacity-80">$1</a>');
+    // 2. Bold: **text**
+    s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // 3. Italic: *text* (when not part of double asterisks)
+    s = s.replace(/(?<!\*)\*([^\*\n]+?)\*(?!\*)/g, "<em>$1</em>");
+    // 4. Inline code: `text`
+    s = s.replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded text-xs font-mono bg-muted border border-border/50 text-foreground">$1</code>');
+    // 5. Clean up any leftover stray unclosed double asterisks
+    s = s.replace(/\*\*/g, "");
     return s;
   }
 
@@ -3345,18 +3447,40 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
             chatHistory[chatHistory.length - 1].content += extraContext;
           }
 
-          const resp = await fetch(`${apiBase}/api/free/chat`, {
-            method: "POST",
-            signal: streamAbortController.signal,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: selectedModel.model || "llama-3.3-70b",
-              messages: chatHistory,
-              image: imagePayload,
-              stream: true,
-              max_tokens: 4096,
-            }),
-          });
+          // Direct high-capacity streaming with instant fallback to backend
+          let resp = null;
+          if (!imagePayload) {
+            try {
+              resp = await fetch("https://text.pollinations.ai/openai/chat/completions", {
+                method: "POST",
+                signal: streamAbortController.signal,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: "openai",
+                  messages: chatHistory,
+                  stream: true,
+                  max_tokens: 4096,
+                }),
+              });
+            } catch (directErr) {
+              console.warn("Direct cluster streaming bypassed, falling back to backend:", directErr);
+            }
+          }
+
+          if (!resp || !resp.ok) {
+            resp = await fetch(`${apiBase}/api/free/chat`, {
+              method: "POST",
+              signal: streamAbortController.signal,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: selectedModel.model || "llama-3.3-70b",
+                messages: chatHistory,
+                image: imagePayload,
+                stream: true,
+                max_tokens: 4096,
+              }),
+            });
+          }
 
           if (resp.ok) {
             const reader = resp.body.getReader();
@@ -3793,6 +3917,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
   window.toggleSpeechSynthesis = toggleSpeechSynthesis;
   window.stopSpeechSynthesis = stopSpeechSynthesis;
+  window.renderMarkdown = renderMarkdown;
 
   async function runPythonCode(code) {
     activeWorkspaceTab = "terminal";

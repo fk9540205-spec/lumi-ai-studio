@@ -291,9 +291,28 @@ body {
   list-style-type: decimal;
 }
 
+.markdown-body strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.markdown-body em {
+  font-style: italic;
+  color: var(--foreground);
+}
+
 .markdown-body li {
   margin-top: 0.25em;
   margin-bottom: 0.25em;
+}
+
+.markdown-body li.sub-item {
+  list-style-type: circle;
+  margin-left: 1.25rem;
+  margin-top: 0.15rem;
+  margin-bottom: 0.15rem;
+  color: var(--muted-foreground);
+  font-size: 0.94em;
 }
 
 .markdown-body blockquote {
