@@ -379,31 +379,6 @@
             osc.start(now + idx * 0.05);
             osc.stop(now + idx * 0.05 + 0.18);
           });
-        } else if (type === "phoneConnect") {
-          [440, 480].forEach((freq) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(freq, now);
-            gain.gain.setValueAtTime(0.08, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.22);
-          });
-        } else if (type === "phoneDisconnect") {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(440, now);
-          osc.frequency.exponentialRampToValueAtTime(300, now + 0.16);
-          gain.gain.setValueAtTime(0.08, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(now);
-          osc.stop(now + 0.16);
         } else if (type === "click") {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
@@ -4141,8 +4116,6 @@
         modal.classList.remove("hidden");
       }
 
-      // Single pleasant phone connect chime
-      AudioEffects.play("phoneConnect");
       this.updateUI("listening");
       this.startListening();
     },
@@ -4152,9 +4125,6 @@
       this.isOpen = false;
       this.stopListening();
       this.interrupt();
-
-      // Gentle phone disconnect tone
-      AudioEffects.play("phoneDisconnect");
 
       const modal = document.querySelector("#lumi-live-modal");
       if (modal) modal.classList.add("hidden");
@@ -4428,7 +4398,7 @@
       }
     },
 
-    playNextQueuedSpeech() {
+    async playNextQueuedSpeech() {
       if (!this.isOpen || this.speechQueue.length === 0) {
         this.isPlayingSpeech = false;
         if (this.isOpen && this.state === "speaking") {
@@ -4445,37 +4415,72 @@
       this.isPlayingSpeech = true;
       const text = this.speechQueue.shift();
       const hasHindi = /[\u0900-\u097F]/.test(text);
-      const lang = hasHindi ? "hi" : "en";
-
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang}&client=tw-ob`;
+      const voice = hasHindi ? "hi-IN-SwaraNeural" : "en-US-JennyNeural";
 
       this.updateAuroraState("speaking");
 
-      // Play via AndroidAudio (hardware MediaPlayer) if present, or HTML5 Audio
-      if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
+      const endpoints = [
+        "http://127.0.0.1:3456/api/tts",
+        "http://localhost:3456/api/tts",
+        "https://lumi-backend-v4-production.up.railway.app/api/tts"
+      ];
+
+      let audioBlob = null;
+      for (const ep of endpoints) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 4000);
+          const r = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input: text, voice: voice }),
+            signal: ctrl.signal
+          });
+          clearTimeout(timer);
+          if (r.ok) {
+            const b = await r.blob();
+            if (b && b.size > 200) {
+              audioBlob = b;
+              break;
+            }
+          }
+        } catch {}
+      }
+
+      if (!this.isOpen || this.state !== "speaking") return;
+
+      const audioSrc = audioBlob
+        ? URL.createObjectURL(audioBlob)
+        : `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${hasHindi ? "hi" : "en"}&client=tw-ob`;
+
+      // Play via AndroidAudio (hardware MediaPlayer) if available, or HTML5 Audio
+      if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function" && !audioBlob) {
         window.__lumiOnAudioDone = () => {
           this.playNextQueuedSpeech();
         };
         try {
-          window.AndroidAudio.playUrl(ttsUrl);
+          window.AndroidAudio.playUrl(audioSrc);
           return;
         } catch (e) {
           console.warn("AndroidAudio error:", e);
         }
       }
 
-      const audio = new Audio(ttsUrl);
+      const audio = new Audio(audioSrc);
       this.activeAudioEl = audio;
       audio.onended = () => {
+        if (audioBlob) URL.revokeObjectURL(audioSrc);
         this.activeAudioEl = null;
         this.playNextQueuedSpeech();
       };
       audio.onerror = () => {
+        if (audioBlob) URL.revokeObjectURL(audioSrc);
         this.activeAudioEl = null;
         this.playNextQueuedSpeech();
       };
       audio.play().catch((err) => {
-        console.warn("Audio play error, skipping chunk:", err);
+        console.warn("Audio play error:", err);
+        if (audioBlob) URL.revokeObjectURL(audioSrc);
         this.playNextQueuedSpeech();
       });
     }

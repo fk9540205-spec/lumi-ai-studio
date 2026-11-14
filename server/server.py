@@ -18,6 +18,7 @@ import io
 import json
 import mimetypes
 import os
+import re
 import ssl
 import subprocess
 import sys
@@ -325,7 +326,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_extract_pdf()
         elif path == "/api/export/zip":
             self._handle_export_zip()
-        elif path in ("/api/tts", "/api/voice/tts"):
+        elif path in ("/api/tts", "/api/voice/tts", "/v1/audio/speech"):
             self._handle_tts()
         else:
             self._error(404, f"API endpoint {path} not found")
@@ -1275,14 +1276,40 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
     def _handle_tts(self):
         try:
-            body = self._read_json_body()
-            text = (body.get("text") or "").strip()
-            voice = body.get("voice") or "hi-IN-SwaraNeural"
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                self._error(400, "Invalid JSON")
+                return
+
+            text = (data.get("text") or data.get("input") or "").strip()
+            raw_voice = (data.get("voice") or "").strip()
             if not text:
-                self._error(400, "Missing text parameter")
+                self._error(400, "Missing text or input parameter")
                 return
 
             clean_text = re.sub(r'[*_`#~]', '', text).strip()
+            has_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
+
+            # Voice mapping compatible with travisvn/openai-edge-tts
+            voice_map = {
+                "alloy": "hi-IN-MadhurNeural" if has_hindi else "en-US-GuyNeural",
+                "echo": "en-US-AndrewNeural",
+                "fable": "en-GB-SoniaNeural",
+                "onyx": "en-US-ChristopherNeural",
+                "nova": "hi-IN-SwaraNeural" if has_hindi else "en-US-JennyNeural",
+                "shimmer": "hi-IN-SwaraNeural" if has_hindi else "en-US-AriaNeural",
+                "swara": "hi-IN-SwaraNeural",
+                "madhur": "hi-IN-MadhurNeural",
+                "neerja": "en-IN-NeerjaNeural"
+            }
+
+            voice = voice_map.get(raw_voice.lower(), raw_voice)
+            if not voice:
+                voice = "hi-IN-SwaraNeural" if has_hindi else "en-US-JennyNeural"
 
             import asyncio
             import edge_tts
