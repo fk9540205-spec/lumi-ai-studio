@@ -377,6 +377,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         messages = data.get("messages", [])
         stream = data.get("stream", True)
         image = data.get("image")
+        max_tokens = int(data.get("max_tokens", 4096))
 
         # 0. Multimodal Vision: If user uploaded an image, route to Gemini Vision
         if image and G4F_AVAILABLE and _g4f_client:
@@ -420,7 +421,47 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             except Exception as vision_err:
                 sys.stderr.write(f"Vision streaming attempt failed: {vision_err}\n")
 
-        # 1. Primary: In-process Cloudflare G4F Engine (Zero rate-limit, super fast)
+        # 1. Primary: High-Capacity Free AI Hub (Full 4,096 tokens, no truncation, zero cutoffs)
+        try:
+            req = urllib.request.Request(
+                FREE_HUB_URL,
+                data=json.dumps({"model": "openai", "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
+                headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
+                method="POST",
+            )
+            resp = urllib.request.urlopen(req, timeout=120, context=_get_ssl_context())
+            if stream:
+                self._start_sse()
+                for raw_line in resp:
+                    line = raw_line.decode(errors="replace").strip()
+                    if line.startswith("data: "):
+                        data_part = line[6:].strip()
+                        if data_part == "[DONE]":
+                            break
+                        try:
+                            parsed = json.loads(data_part)
+                            delta = parsed.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content") or ""
+                            if content:
+                                chunk_payload = {
+                                    "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
+                                    "provider": "free-ai-hub",
+                                    "model": target_model,
+                                }
+                                self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                        except Exception:
+                            pass
+                self._send_chunk(b"data: [DONE]\n\n")
+                self._end_chunks()
+                return
+            else:
+                data_resp = json.loads(resp.read().decode())
+                self._json_response(data_resp)
+                return
+        except Exception as e:
+            sys.stderr.write(f"Primary Free AI Hub attempt failed, falling back to in-process engine: {e}\n")
+
+        # 2. Secondary fallback: In-process Cloudflare G4F Engine
         if G4F_AVAILABLE and _g4f_client:
             try:
                 import g4f.Provider
@@ -431,9 +472,9 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         provider=provider,
                         messages=messages,
                         stream=True,
+                        max_tokens=max_tokens,
                     )
                     first_content = None
-                    # Verify first chunk before sending SSE headers
                     for chunk in gen:
                         c = ""
                         if hasattr(chunk, "choices") and chunk.choices:
@@ -470,6 +511,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         provider=provider,
                         messages=messages,
                         stream=False,
+                        max_tokens=max_tokens,
                     )
                     content = response.choices[0].message.content or ""
                     if content and "moved to a new app" not in content:
@@ -480,47 +522,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         })
                         return
             except Exception as e:
-                sys.stderr.write(f"In-process Cloudflare G4F attempt failed, trying fallback: {e}\n")
-
-        # 2. Secondary fallback: Pollinations Free Hub
-        try:
-            req = urllib.request.Request(
-                FREE_HUB_URL,
-                data=json.dumps({"model": "openai", "messages": messages, "stream": stream}).encode("utf-8"),
-                headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
-                method="POST",
-            )
-            resp = urllib.request.urlopen(req, timeout=30, context=_get_ssl_context())
-            if stream:
-                self._start_sse()
-                for raw_line in resp:
-                    line = raw_line.decode(errors="replace").strip()
-                    if line.startswith("data: "):
-                        data_part = line[6:].strip()
-                        if data_part == "[DONE]":
-                            break
-                        try:
-                            parsed = json.loads(data_part)
-                            delta = parsed.get("choices", [{}])[0].get("delta", {})
-                            content = delta.get("content") or ""
-                            if content:
-                                chunk_payload = {
-                                    "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
-                                    "provider": "pollinations-hub",
-                                    "model": target_model,
-                                }
-                                self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                        except Exception:
-                            pass
-                self._send_chunk(b"data: [DONE]\n\n")
-                self._end_chunks()
-                return
-            else:
-                data_resp = json.loads(resp.read().decode())
-                self._json_response(data_resp)
-                return
-        except Exception as e:
-            sys.stderr.write(f"Pollinations hub attempt failed: {e}\n")
+                sys.stderr.write(f"In-process Cloudflare G4F fallback failed: {e}\n")
 
         # 3. Third fallback: Direct text endpoint with prompt
         try:
@@ -933,6 +935,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         api_key = data.get("apiKey", "")
         stream = data.get("stream", True)
         api_type = data.get("apiType", "OpenAI-compatible")
+        max_tokens = int(data.get("max_tokens", 4096))
 
         if not backend_url:
             self._error(400, "backendUrl is required")
@@ -949,7 +952,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         if stream:
             headers["Accept"] = "text/event-stream"
 
-        proxy_body = json.dumps({"model": model, "messages": messages, "stream": stream}).encode()
+        proxy_body = json.dumps({"model": model, "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode()
         url = f"{backend_url}/chat/completions"
         req = urllib.request.Request(url, data=proxy_body, headers=headers, method="POST")
 
@@ -994,11 +997,18 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         results = []
         import html, re
 
+        # Clean conversational search filler
+        q_clean = q.strip()
+        q_clean = re.sub(r"^/search\s+", "", q_clean, flags=re.I)
+        q_clean = re.sub(r"^(?:please\s+|can\s+you\s+)?(?:search(?:\s+the\s+web|\s+online|\s+on\s+google)?|google|find|dhoondo|khojo)(?:\s+(?:for|about|me))?\s+", "", q_clean, flags=re.I)
+        q_clean = re.sub(r"[\s,]+(?:search\s*(?:karke|karo)?|google\s*(?:karke|karo)?|dhoond\s*(?:kar|ke)?|khoj\s*(?:kar|ke)?)\s*(?:batao|dikhau|bataiye|please)?[\s\?!.]*$", "", q_clean, flags=re.I)
+        q_clean = re.sub(r"[\?!.]+$", "", q_clean).strip() or q.strip()
+
         # 0. Live Real-Time Weather Check (Instant wttr.in Integration)
-        weather_match = re.search(r"\b(?:weather|mausam|temperature|forecast|temp)\b", q, re.I)
+        weather_match = re.search(r"\b(?:weather|mausam|temperature|forecast|temp)\b", q_clean, re.I)
         if weather_match:
-            city_match = re.search(r"(?:in|of|at|for|ka|ki)\s+([A-Za-z\s]+)", q, re.I) or re.search(r"([A-Za-z]+)\s+(?:weather|mausam|temp)", q, re.I)
-            city = city_match.group(1).strip() if city_match else q.replace("weather", "").replace("mausam", "").strip()
+            city_match = re.search(r"(?:in|of|at|for|ka|ki)\s+([A-Za-z\s]+)", q_clean, re.I) or re.search(r"([A-Za-z]+)\s+(?:weather|mausam|temp)", q_clean, re.I)
+            city = city_match.group(1).strip() if city_match else q_clean.replace("weather", "").replace("mausam", "").strip()
             city = re.sub(r"\b(today|now|tomorrow|report|kaisa|hai|batao|the|current)\b", "", city, flags=re.I).strip()
             if city:
                 try:
@@ -1023,51 +1033,76 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 except Exception:
                     pass
 
-        # 1. DuckDuckGo Instant Answer API
+        # 1. Real Full Web Search via DuckDuckGo HTML
         try:
-            ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(q)}&format=json&no_html=1&skip_disambig=1"
-            req = urllib.request.Request(ddg_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-            with urllib.request.urlopen(req, timeout=4, context=_get_ssl_context()) as resp:
-                d = json.loads(resp.read().decode())
-                abstract = d.get("AbstractText", "") or d.get("Abstract", "")
-                heading = d.get("Heading", "")
-                source_url = d.get("AbstractURL", "")
-                if abstract:
-                    results.append({
-                        "title": heading or q,
-                        "snippet": abstract[:350],
-                        "url": source_url or "https://duckduckgo.com/?q=" + urllib.parse.quote(q)
-                    })
-                for rel in d.get("RelatedTopics", [])[:3]:
-                    if isinstance(rel, dict) and "Text" in rel:
-                        results.append({
-                            "title": rel.get("Text", "").split(" - ")[0][:60],
-                            "snippet": rel.get("Text", "")[:250],
-                            "url": rel.get("FirstURL", "")
-                        })
+            ddg_html_url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(q_clean)
+            req = urllib.request.Request(ddg_html_url, headers={
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            })
+            with urllib.request.urlopen(req, timeout=5, context=_get_ssl_context()) as resp:
+                c = resp.read().decode("utf-8", errors="replace")
+                bodies = re.findall(r"<div class=\"[^\"]*result__body[^\"]*\">([\s\S]*?)(?:<div class=\"[^\"]*result__body|\Z)", c)
+                for b in bodies[:5]:
+                    tm = re.search(r"<a[^>]*class=\"[^\"]*result__a[^\"]*\"[^>]*href=\"([^\"]+)\"[^>]*>([\s\S]*?)</a>", b)
+                    sm = re.search(r"<a[^>]*class=\"[^\"]*result__snippet[^\"]*\"[^>]*>([\s\S]*?)</a>", b)
+                    if tm:
+                        raw_url = tm.group(1)
+                        if "uddg=" in raw_url:
+                            raw_url = urllib.parse.unquote(raw_url.split("uddg=")[1].split("&")[0])
+                        title = html.unescape(re.sub(r"<[^>]+>", "", tm.group(2))).strip()
+                        snippet = html.unescape(re.sub(r"<[^>]+>", "", sm.group(1))).strip() if sm else ""
+                        if title and (snippet or raw_url):
+                            results.append({"title": title, "url": raw_url, "snippet": snippet})
         except Exception:
             pass
 
-        # 2. Wikipedia Search API
-        try:
-            url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(q)}&format=json&utf8="
-            req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0 (Linux; en)"})
-            with urllib.request.urlopen(req, timeout=5, context=_get_ssl_context()) as resp:
-                data = json.loads(resp.read().decode())
-                items = data.get("query", {}).get("search", [])
-                for it in items[:4]:
-                    snippet = html.unescape(re.sub(r"<[^>]+>", "", it.get("snippet", ""))).strip()
-                    title = it.get("title", "")
-                    results.append({
-                        "title": title,
-                        "snippet": snippet,
-                        "url": f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
-                    })
-        except Exception as e:
-            if not results:
-                results.append({"title": f"Search: {q}", "snippet": f"Web search could not reach external engines: {str(e)}", "url": ""})
+        # 2. DuckDuckGo Instant Answer API Fallback
+        if len(results) < 2:
+            try:
+                ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(q_clean)}&format=json&no_html=1&skip_disambig=1"
+                req = urllib.request.Request(ddg_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+                with urllib.request.urlopen(req, timeout=4, context=_get_ssl_context()) as resp:
+                    d = json.loads(resp.read().decode())
+                    abstract = d.get("AbstractText", "") or d.get("Abstract", "")
+                    heading = d.get("Heading", "")
+                    source_url = d.get("AbstractURL", "")
+                    if abstract:
+                        results.append({
+                            "title": heading or q_clean,
+                            "snippet": abstract[:350],
+                            "url": source_url or "https://duckduckgo.com/?q=" + urllib.parse.quote(q_clean)
+                        })
+                    for rel in d.get("RelatedTopics", [])[:3]:
+                        if isinstance(rel, dict) and "Text" in rel:
+                            results.append({
+                                "title": rel.get("Text", "").split(" - ")[0][:60],
+                                "snippet": rel.get("Text", "")[:250],
+                                "url": rel.get("FirstURL", "")
+                            })
+            except Exception:
+                pass
 
-        self._json_response({"query": q, "results": results[:6]})
+        # 3. Wikipedia Search API Fallback
+        if len(results) < 2:
+            try:
+                url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(q_clean)}&format=json&utf8="
+                req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0 (Linux; en)"})
+                with urllib.request.urlopen(req, timeout=5, context=_get_ssl_context()) as resp:
+                    data = json.loads(resp.read().decode())
+                    items = data.get("query", {}).get("search", [])
+                    for it in items[:4]:
+                        snippet = html.unescape(re.sub(r"<[^>]+>", "", it.get("snippet", ""))).strip()
+                        title = it.get("title", "")
+                        results.append({
+                            "title": title,
+                            "snippet": snippet,
+                            "url": f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}"
+                        })
+            except Exception as e:
+                if not results:
+                    results.append({"title": f"Search: {q_clean}", "snippet": f"Web search could not reach external engines: {str(e)}", "url": ""})
+
+        self._json_response({"query": q_clean, "results": results[:6]})
 
     # -----------------------------------------------------------------------
     # Web URL Reader & Scraper

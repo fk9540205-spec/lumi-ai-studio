@@ -212,20 +212,22 @@
 
   // Real System Personas
   const PERSONA_PROMPTS = {
-    general: "You are Lumi, an exceptionally intelligent, clear, and helpful AI assistant. Always provide accurate, well-structured, and thoughtful responses.",
+    general: "You are Lumi, an exceptionally intelligent, clear, and helpful AI assistant with live real-time knowledge and web search capabilities. When live web search results or live data are provided, synthesize the findings thoroughly, answer directly, and present the facts with confidence. NEVER refuse or say 'I cannot browse the internet' or 'I lack real-time access' or 'as an AI I cannot search' — you ALREADY have the live search results provided to you. Directly deliver the comprehensive answer in a natural, helpful tone.",
     engineer: "You are an elite Senior Staff Software Engineer. Focus on clean, modular, production-ready code, idiomatic architecture, robust error handling, edge cases, and peak performance. Provide complete, runnable code examples.",
     dsa: "You are an expert Data Structures & Algorithms (DSA) and Coding Interview Coach. Explain problem-solving patterns intuitively, break down step-by-step algorithms, rigorously analyze Time & Space Complexity (Big-O), and write clean, optimal implementations.",
-    hindi: "Aap ek friendly aur bohot helpful AI sathi ho. Baat-cheet bilkul aasan aur natural Hindi / Hinglish mein karo. Har technical ya normal cheez ko saral shabdon mein samjhao jaise ek sacha dost samjhata hai.",
+    hindi: "Aap Lumi ho, ek friendly, super-intelligent AI sathi jiske paas live web search aur real-time knowledge access hai. Baat-cheet bilkul aasan aur natural Hindi / Hinglish mein karo. Jab search results ya live data diya jaye, to use padhkar seedha aur vistaar se jawab do. Kabhi bhi ye mat bolo ki 'main search nahi kar sakta' ya 'mere paas live access nahi hai' — aapke paas live search results uplabdh hain, unka upyog karke behtareen aur clear uttar do.",
     bughunter: "You are a Senior Code Auditor and Bug Hunter. Thoroughly inspect code for security vulnerabilities (XSS, SQLi, injection, logic bugs), race conditions, memory leaks, and edge cases. Offer concrete, minimal fixes.",
     writer: "You are a master creative writer, storyteller, and copywriter. Craft vivid, compelling, engaging, and beautifully phrased prose with powerful narrative flow.",
     artist: "You are an AI Artist & Image Generator. When the user describes any image, scene, or concept, describe it evocatively and create stunning visual art."
   };
 
   const GENUI_SYSTEM_INSTRUCTION = `
-[INTERACTIVE RICH CARDS]
+[INTERACTIVE RICH CARDS & LIVE SEARCH]
+When live web search or verified knowledge is provided, synthesize the facts and provide an authoritative, clear answer. Never say you cannot search the web or lack real-time access.
 When helpful (products, comparisons, weather, stats, recommendations, charts), output a compact UI block using \`\`\`json:ui ... \`\`\`:
 - Product: {"type":"product","title":"Sony WH-1000XM5","price":"$399","rating":4.8,"features":["30h Battery","ANC"]}
 - Weather: {"type":"weather","city":"Delhi","temp":"22°C","condition":"Smoky haze","humidity":"60%","wind":"4 km/h","forecast":[{"day":"Tomorrow","temp":"30°C","icon":"☀️"}]}
+- Stats: {"type":"stats","title":"Q3 Performance","metrics":[{"label":"Revenue","value":"$1.2M","delta":"+20%"},{"label":"Users","value":"45k","delta":"+12%"}]}
 - Comparison: {"type":"comparison","title":"A vs B","itemA":{"title":"A"},"itemB":{"title":"B","winner":true},"features":[{"feature":"Camera","valA":"5x","valB":"10x","winner":"B"}],"verdict":"B wins on camera."}
 - Chart: {"type":"chart","chartType":"bar","title":"Market Cap (T$)","data":[{"label":"Apple","value":3.4},{"label":"Nvidia","value":3.3}]}
 - Recommendation: {"type":"recommendation","title":"Top Picks","items":[{"rank":1,"title":"MacBook Air M3","score":"9.6/10","reason":"Best battery."}]}
@@ -630,9 +632,12 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
         </div>` : "";
 
       let featuresHtml = "";
-      if (Array.isArray(b.features) && b.features.length) {
+      const featuresList = Array.isArray(b.features)
+        ? b.features
+        : (typeof b.features === "string" ? b.features.split(",").map(s => s.trim()).filter(Boolean) : []);
+      if (featuresList.length) {
         featuresHtml = `<div class="genui-product-features">` +
-          b.features.map(f => `
+          featuresList.map(f => `
             <div class="genui-feature-item">
               <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 fill-none stroke-current" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
               <span>${escapeHtml(f)}</span>
@@ -758,7 +763,15 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
     renderStatsCard(b) {
       const title = escapeHtml(b.title || "Key Metrics");
-      const metrics = Array.isArray(b.metrics) ? b.metrics : [b];
+      const metrics = Array.isArray(b.metrics)
+        ? b.metrics
+        : Array.isArray(b.data)
+        ? b.data
+        : Array.isArray(b.items)
+        ? b.items
+        : Array.isArray(b.stats)
+        ? b.stats
+        : [b];
 
       const itemsHtml = metrics.map(m => {
         const val = escapeHtml(String(m.value || m.val || "--"));
@@ -804,18 +817,25 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
       let rowsHtml = "";
       if (Array.isArray(b.features)) {
-        rowsHtml = b.features.map(f => `
-          <div class="genui-compare-row">
-            <div>
-              <div class="text-xs text-muted-foreground">${escapeHtml(f.feature || "")}</div>
-              <div class="font-medium text-foreground ${f.winner === 'A' ? 'text-indigo-400 font-bold' : ''}">${escapeHtml(String(f.valA !== undefined ? f.valA : f.valueA || ""))}</div>
+        rowsHtml = b.features.map(f => {
+          const fName = escapeHtml(f.feature || f.name || f.label || f.aspect || "Feature");
+          const vA = escapeHtml(String(f.valA !== undefined ? f.valA : (f.valueA !== undefined ? f.valueA : (f.a !== undefined ? f.a : (f.itemA || "--")))));
+          const vB = escapeHtml(String(f.valB !== undefined ? f.valB : (f.valueB !== undefined ? f.valueB : (f.b !== undefined ? f.b : (f.itemB || "--")))));
+          const isWinA = f.winner === 'A' || f.winner === 'itemA' || f.winner === true;
+          const isWinB = f.winner === 'B' || f.winner === 'itemB';
+          return `
+            <div class="genui-compare-row">
+              <div>
+                <div class="text-xs text-muted-foreground">${fName}</div>
+                <div class="font-medium text-foreground ${isWinA ? 'text-indigo-400 font-bold' : ''}">${vA}</div>
+              </div>
+              <div>
+                <div class="text-xs text-muted-foreground">${fName}</div>
+                <div class="font-medium text-foreground ${isWinB ? 'text-indigo-400 font-bold' : ''}">${vB}</div>
+              </div>
             </div>
-            <div>
-              <div class="text-xs text-muted-foreground">${escapeHtml(f.feature || "")}</div>
-              <div class="font-medium text-foreground ${f.winner === 'B' ? 'text-indigo-400 font-bold' : ''}">${escapeHtml(String(f.valB !== undefined ? f.valB : f.valueB || ""))}</div>
-            </div>
-          </div>
-        `).join("");
+          `;
+        }).join("");
       }
 
       const verdictHtml = b.verdict ? `
@@ -886,7 +906,15 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
     renderRecommendationCard(b) {
       const title = escapeHtml(b.title || "Top Recommendations");
-      const items = Array.isArray(b.items) ? b.items : [];
+      const items = Array.isArray(b.items)
+        ? b.items
+        : Array.isArray(b.recommendations)
+        ? b.recommendations
+        : Array.isArray(b.picks)
+        ? b.picks
+        : Array.isArray(b.data)
+        ? b.data
+        : [];
 
       const itemsHtml = items.map((it, idx) => {
         const rank = it.rank || (idx + 1);
@@ -969,7 +997,8 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
       const padding = { top: 20, right: 15, bottom: 35, left: 35 };
       const chartW = width - padding.left - padding.right;
       const chartH = height - padding.top - padding.bottom;
-      const maxVal = Math.max(...data.map(d => this.parseNum(d.value) || 0), 10);
+      const computedMax = Math.max(...data.map(d => this.parseNum(d.value) || 0), 0);
+      const maxVal = computedMax > 0 ? computedMax * 1.15 : 10;
       const barW = Math.max(14, Math.min(38, Math.floor(chartW / data.length) - 8));
 
       let bars = "";
@@ -977,7 +1006,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
       data.forEach((d, i) => {
         const val = this.parseNum(d.value);
         const displayVal = d.value !== undefined ? escapeHtml(String(d.value)) : String(val);
-        const barH = Math.round((val / maxVal) * chartH);
+        const barH = Math.max(4, Math.round((val / maxVal) * chartH));
         const x = padding.left + i * (chartW / data.length) + (chartW / data.length - barW) / 2;
         const y = padding.top + (chartH - barH);
         const color = d.color || (i % 2 === 0 ? "#6366f1" : "#8b5cf6");
@@ -989,7 +1018,9 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
             </rect>
             <text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="10" font-weight="600" fill="currentColor" opacity="0.9">${displayVal}</text>
           </g>`;
-        labels += `<text x="${x + barW / 2}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml((d.label || "").slice(0, 8))}</text>`;
+        const rawLabel = d.label || "";
+        const labelText = rawLabel.length > 11 ? rawLabel.slice(0, 9) + "…" : rawLabel;
+        labels += `<text x="${x + barW / 2}" y="${height - 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity="0.65">${escapeHtml(labelText)}</text>`;
       });
 
       return `
@@ -1183,6 +1214,20 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
     }
     s = s.slice(idx);
 
+    // Clean garbage/duplicate tokens before quoted values like :B "B" or :+15% "+15%" -> : "$1"
+    s = s.replace(/:\s*[^"\{\}\[\]\n,:]+\s*"([^"]*)"/g, ': "$1"');
+
+    // Clean unquoted tokens like : B, -> : "B", or : +15%, -> : "+15%",
+    s = s.replace(/:\s*([A-Za-z0-9_+%-]+)\s*([,\}\]])/g, (m, val, post) => {
+      if (["true", "false", "null"].includes(val.toLowerCase())) {
+        return `: ${val}${post}`;
+      }
+      if (/^-?\d+(?:\.\d+)?$/.test(val)) {
+        return `: ${val}${post}`;
+      }
+      return `: "${val}"${post}`;
+    });
+
     let inStr = false;
     let esc = false;
     const stack = [];
@@ -1204,10 +1249,11 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
     let fixed = s;
     if (inStr) fixed += '"';
-    fixed = fixed.replace(/,\s*$/, "");
     while (stack.length) {
       fixed += stack.pop();
     }
+    // Remove trailing commas before closing braces/brackets
+    fixed = fixed.replace(/,\s*([\]\}])/g, "$1");
 
     try {
       return JSON.parse(fixed);
@@ -1226,8 +1272,12 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
     try {
       let fixed = s
-        .replace(/:\s*([A-Za-z][A-Za-z0-9_-]*)\s*([,\}\]])/g, (m, val, post) => {
+        .replace(/:\s*[^"\{\}\[\]\n,:]+\s*"([^"]*)"/g, ': "$1"')
+        .replace(/:\s*([A-Za-z0-9_+%-]+)\s*([,\}\]])/g, (m, val, post) => {
           if (["true", "false", "null"].includes(val.toLowerCase())) {
+            return `: ${val}${post}`;
+          }
+          if (/^-?\d+(?:\.\d+)?$/.test(val)) {
             return `: ${val}${post}`;
           }
           return `: "${val}"${post}`;
@@ -1251,7 +1301,12 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
     text = text.replace(/<think>[\s\S]*$/gi, "");
 
     // Strip accidental internal deliberation / scratchpad leaks from models
+    text = text.replace(/^(?:User says\s+"[^"]*"\.?\s*|User:\s*"[^"]*"\.?\s*|Possibly just [^\.]*\.?\s*|Should respond [^\.]*\.?\s*|We have sources\.?\s*|Let's check\.?\s*|first source [^\.]*\.?\s*|It says [^\?]*\?\s*|We need to [^\.]*\.?\s*|However we [^\.]*\.?\s*|Given the [^\.]*\.?\s*)+/gi, "");
     text = text.replace(/^(?:We need to|Given the|The spec|Use max|Provide quick|I think better|Given TOS|We have no)[\s\S]*?(?=(?:```|The |Here|It |Today|\n\n))/i, "");
+
+    // Strip AI refusal disclaimers ("I cannot search the web / I don't have internet / Main search nahi kar sakta")
+    text = text.replace(/^(?:As an AI[^\.\n]*[\.\n]\s*|I do not have (?:direct )?access to the internet[^\.\n]*[\.\n]\s*|I cannot browse the internet[^\.\n]*[\.\n]\s*|I cannot search the web[^\.\n]*[\.\n]\s*|Main internet par search nahi kar sakta[^\.\n]*[\.\n]\s*|Main live web search nahi kar sakta[^\.\n]*[\.\n]\s*|Mere paas real-time access nahi hai[^\.\n]*[\.\n]\s*|Mere paas live data access nahi hai[^\.\n]*[\.\n]\s*|Kripya dhyan de ki ye jaankari live nahi hai[^\.\n]*[\.\n]\s*)+/gi, "");
+    text = text.replace(/^(?:Lekin|However,|But)\s+/i, "");
 
     // 1. Math block: $$ ... $$
     text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, math) => {
@@ -1310,7 +1365,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
     });
 
     // 0.2 Universal Resilient GenUI Block Parser (Handles missing leading backticks, 2-backtick closures ``, or unquoted card JSONs)
-    text = text.replace(/(?:^|\n)(?:```+)?(?:json:ui|genui|ui)\s*\n?(\{[\s\S]*?\})(?:```*|``|\n|$)/gi, (match, innerJson) => {
+    text = text.replace(/(?:^|\n)(?:```+)?(?:json:ui|genui|ui)\s*\n?(\{[\s\S]*?\})\s*(?:```+|``|\n\n|$)/gi, (match, innerJson) => {
       try {
         const parsed = tryParseJson(innerJson.trim());
         if (parsed && (parsed.type || parsed.blocks || GenUIRenderer.isRecognizedType(parsed.type))) {
@@ -2778,7 +2833,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
         },
         body: JSON.stringify({
           model: modelName || provider.default_model || "claude-3-5-sonnet-20241022",
-          max_tokens: 2048,
+          max_tokens: 4096,
           messages: [{ role: "user", content: promptText }],
           stream: true,
         }),
@@ -2794,10 +2849,11 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+        }
         const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
+        buffer = done ? "" : (lines.pop() || "");
 
         for (const line of lines) {
           if (line.startsWith("data: ")) {
@@ -2811,6 +2867,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
             } catch {}
           }
         }
+        if (done) break;
       }
       return;
     }
@@ -2845,6 +2902,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
         model: modelName || provider.default_model || "gpt-4o",
         messages: [{ role: "user", content: promptText }],
         stream: true,
+        max_tokens: 4096,
       }),
     });
 
@@ -2858,10 +2916,11 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      if (value) {
+        buffer += decoder.decode(value, { stream: !done });
+      }
       const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      buffer = done ? "" : (lines.pop() || "");
 
       for (const line of lines) {
         if (line.startsWith("data: ")) {
@@ -2871,7 +2930,6 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
             const parsed = JSON.parse(dataStr);
             const delta =
               parsed.choices?.[0]?.delta?.content ||
-              parsed.choices?.[0]?.delta?.reasoning ||
               parsed.choices?.[0]?.delta?.text ||
               parsed.message ||
               "";
@@ -2879,6 +2937,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
           } catch {}
         }
       }
+      if (done) break;
     }
   }
 
@@ -2886,6 +2945,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
   async function sendMessage(text) {
     const prompt = text.trim();
     if (!prompt || isStreaming) return;
+    stopSpeechSynthesis();
 
     let { path } = parseLocation();
     let threadId = path.startsWith("/chat/") ? path.slice(6) : null;
@@ -3110,7 +3170,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
               url: `https://wttr.in/${encodeURIComponent(city)}`,
             },
           ];
-          webContext = `\n\n[Live Real-time Verified Weather for ${city}]:\n- Current: ${tempC}°C, ${desc}, Humidity: ${hum}%, Wind: ${wind} km/h\n- 3-Day Forecast: ${forecastList.join("; ")}\n`;
+          webContext = `\n\n[OFFICIAL REAL-TIME LIVE WEATHER FOR ${city.toUpperCase()} RETRIEVED JUST NOW]:\n- Current Temperature: ${tempC}°C, Weather: ${desc}, Humidity: ${hum}%, Wind: ${wind} km/h\n- Forecast: ${forecastList.join("; ")}\n(CRITICAL: You HAVE real-time live data provided above. Present it directly as current verified weather. NEVER output disclaimers claiming you lack real-time access.)\n`;
           render();
           scrollToBottom();
         }
@@ -3122,23 +3182,33 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
         webSearchEnabled ||
         isSearchExplicit ||
         /^(search|google|dhoondo|khojo|find|who is|what is|when is|where is|latest|current|today'?s|news about|live score)\b/i.test(prompt.trim()) ||
-        /\b(search karo|search karke|latest news|aaj ki|today|ipl score)\b/i.test(prompt);
+        /\b(search\s*(?:karo|karke|kar)|google\s*(?:karo|karke|pe)?|dhoond\s*(?:kar|ke|karo)?|khoj\s*(?:kar|ke|karo)?|latest news|aaj ki|today|ipl score|score|news|who is|kaun hai|kya hai)\b/i.test(prompt);
 
       if (hasSearchIntent) {
-        const cleanSearchQuery = prompt
+        let cleanQuery = prompt
           .replace(/^\/search\s+/i, "")
-          .replace(/^(search\s+for|search|google|dhoondo|khojo|find)\s+/i, "")
-          .replace(/\s+(search karo|search karke|dhoondo)$/i, "")
+          .replace(/^(?:please\s+|can\s+you\s+)?(?:search(?:\s+the\s+web|\s+online|\s+on\s+google)?|google\s*(?:karke|karo|pe|par)|dhoondo|khojo)(?:\s+(?:for|about|me))?\s+/i, "")
+          .replace(/[\s,]+(?:search\s*(?:karke|karo)|google\s*(?:karke|karo|pe|par)|dhoond\s*(?:kar|ke|karo)|khoj\s*(?:kar|ke|karo))\s*(?:batao|dikhau|bataiye|please)?[\s\?!.]*$/i, "")
+          .replace(/[\?!.]+$/, "")
           .trim();
-        const searchQuery = cleanSearchQuery || prompt;
 
+        let keywordQuery = cleanQuery
+          .replace(/\b(who is|what is|when is|where is|tell me|explain|give me|the|ke|ki|ka|ko|mein|se|par|hain|hai|kaun|kya|kab|kahan|kise|kiske|batao|bataiye|dikhaye|chahiye)\b/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+
+        const searchQuery = keywordQuery || cleanQuery || prompt;
+
+        let searchResults = [];
+
+        // 1. Try Backend Multi-Source Web Search
         try {
           const apiBase =
             window.location.origin && window.location.origin.startsWith("http")
               ? ""
               : "https://lumi-backend-v4-production.up.railway.app";
           const searchController = new AbortController();
-          const searchTimeout = setTimeout(() => searchController.abort(), 2500);
+          const searchTimeout = setTimeout(() => searchController.abort(), 3500);
           const searchResp = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(searchQuery)}`, {
             signal: searchController.signal,
           });
@@ -3146,15 +3216,49 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
           if (searchResp.ok) {
             const searchData = await searchResp.json();
-            if (searchData.results && searchData.results.length > 0) {
-              assistantMsg.searchResults = searchData.results;
-              webContext = "\n\n[Live Real-time Web Knowledge Sources]:\n" + searchData.results.map(r => `- ${r.title}: ${r.snippet} (${r.url})`).join("\n");
-              render();
-              scrollToBottom();
+            if (Array.isArray(searchData.results) && searchData.results.length > 0) {
+              searchResults = searchData.results;
             }
           }
         } catch (err) {
-          console.warn("Live web search failed:", err);
+          console.warn("Backend web search failed:", err);
+        }
+
+        // 2. Direct Wikipedia Client Fallback if backend returned 0 or poor results
+        if (!searchResults.length) {
+          try {
+            const keywordQuery = searchQuery
+              .replace(/\b(who is|what is|when is|where is|the|current|ke|ki|ka|ko|mein|se|par|hain|hai|kaun|kya|kab|kahan|kise|kiske|batao|bataiye)\b/gi, "")
+              .replace(/\s+/g, " ")
+              .trim();
+            const targetWikiQuery = keywordQuery || searchQuery;
+            const wikiResp = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(targetWikiQuery)}&format=json&origin=*`);
+            if (wikiResp.ok) {
+              const wikiData = await wikiResp.json();
+              const items = wikiData.query?.search || [];
+              searchResults = items.slice(0, 5).map(it => {
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = it.snippet || "";
+                const cleanSnippet = tempDiv.textContent || tempDiv.innerText || "";
+                return {
+                  title: it.title,
+                  snippet: cleanSnippet,
+                  url: `https://en.wikipedia.org/wiki/${encodeURIComponent(it.title.replace(/\s+/g, "_"))}`
+                };
+              });
+            }
+          } catch (wikiErr) {
+            console.warn("Direct Wikipedia search fallback failed:", wikiErr);
+          }
+        }
+
+        if (searchResults.length > 0) {
+          assistantMsg.searchResults = searchResults;
+          webContext = `\n\n[OFFICIAL VERIFIED LIVE WEB KNOWLEDGE FOR: "${searchQuery}"]:\n` +
+            searchResults.map((r, i) => `[Source ${i + 1}: ${r.title}]\nSnippet: ${r.snippet}\nSource URL: ${r.url}`).join("\n\n") +
+            `\n\n(CRITICAL INSTRUCTION: You HAVE just executed a live web search and retrieved the live verified facts above. Synthesize this information and answer the user's question completely, accurately, and naturally. NEVER output disclaimers saying "I cannot search the web", "I don't have internet access", or "I cannot browse live links". Present the verified facts directly in your response.)\n`;
+          render();
+          scrollToBottom();
         }
       }
     }
@@ -3246,10 +3350,11 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
             signal: streamAbortController.signal,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              model: selectedModel.model || "qwen-2.5-coder-32b",
+              model: selectedModel.model || "llama-3.3-70b",
               messages: chatHistory,
               image: imagePayload,
               stream: true,
+              max_tokens: 4096,
             }),
           });
 
@@ -3267,10 +3372,11 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
                 throw readErr;
               }
               const { done, value } = chunkObj;
-              if (done) break;
-              buffer += decoder.decode(value, { stream: true });
+              if (value) {
+                buffer += decoder.decode(value, { stream: !done });
+              }
               const lines = buffer.split("\n");
-              buffer = lines.pop() || "";
+              buffer = done ? "" : (lines.pop() || "");
 
               for (const line of lines) {
                 if (line.startsWith("data: ")) {
@@ -3280,7 +3386,6 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
                     const parsed = JSON.parse(dataStr);
                     const delta =
                       parsed.choices?.[0]?.delta?.content ||
-                      parsed.choices?.[0]?.delta?.reasoning ||
                       parsed.choices?.[0]?.delta?.text ||
                       parsed.message ||
                       "";
@@ -3291,6 +3396,7 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
                   } catch {}
                 }
               }
+              if (done) break;
             }
           }
         } catch (backendErr) {
@@ -3362,6 +3468,8 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
     }
   }
 
+  window.sendMessage = sendMessage;
+
   // --- Voice, Code Runner & Project Helpers ---
   function toggleSpeechRecognition() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3414,35 +3522,277 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
     }
   }
 
-  function toggleSpeechSynthesis(msgId, text) {
-    if (!("speechSynthesis" in window)) {
-      showToast("Text-to-speech not supported in this browser.");
-      return;
-    }
-    if (currentlySpeakingId === msgId) {
-      window.speechSynthesis.cancel();
-      currentlySpeakingId = null;
-      render();
-      return;
-    }
-    window.speechSynthesis.cancel();
-    currentlySpeakingId = msgId;
-    render();
+  // --- Persistent Global TTS Manager (Queue-based, chunked, GC-proof) ---
+  window.__lumiTTS = window.__lumiTTS || {
+    msgId: null,
+    chunks: [],
+    chunkIndex: 0,
+    keepAliveTimer: null,
+    activeUtterance: null, // Hard reference on window to prevent V8 Garbage Collection mid-sentence!
+    speaking: false,
+  };
 
-    const cleanText = text.replace(/```[\s\S]*?```/g, "Code block omitted.").replace(/[#*`_]/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
-    utterance.onend = () => {
+  window.__lumiOnTTSDone = function (msgId) {
+    if (currentlySpeakingId === msgId) {
       currentlySpeakingId = null;
-      render();
-    };
-    utterance.onerror = () => {
-      currentlySpeakingId = null;
-      render();
-    };
-    window.speechSynthesis.speak(utterance);
+      updateSpeechUI();
+    }
+  };
+
+  let cachedVoices = [];
+  function refreshVoices() {
+    if ("speechSynthesis" in window) {
+      try {
+        cachedVoices = window.speechSynthesis.getVoices() || [];
+      } catch (e) {
+        cachedVoices = [];
+      }
+    }
   }
+  if ("speechSynthesis" in window) {
+    refreshVoices();
+    try {
+      window.speechSynthesis.onvoiceschanged = refreshVoices;
+    } catch (e) {}
+  }
+
+  function updateSpeechUI() {
+    document.querySelectorAll("[data-action='speak-message']").forEach((btn) => {
+      const id = btn.getAttribute("data-id");
+      const isSpeaking = currentlySpeakingId && (currentlySpeakingId === id);
+      btn.className = `inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs ${
+        isSpeaking ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+      } transition-colors cursor-pointer`;
+      btn.title = isSpeaking ? "Stop voice" : "Read aloud";
+      btn.innerHTML = `${isSpeaking ? ICONS.volumeMute : ICONS.volume} <span>${isSpeaking ? "Speaking..." : "Listen"}</span>`;
+    });
+  }
+
+  function stopSpeechSynthesis() {
+    if (window.AndroidTTS && typeof window.AndroidTTS.stop === "function") {
+      try {
+        window.AndroidTTS.stop();
+      } catch (e) {}
+    }
+    const tts = window.__lumiTTS;
+    if (tts && tts.keepAliveTimer) {
+      clearInterval(tts.keepAliveTimer);
+      tts.keepAliveTimer = null;
+    }
+    if (tts) {
+      tts.speaking = false;
+      tts.msgId = null;
+      tts.chunks = [];
+      tts.chunkIndex = 0;
+      tts.activeUtterance = null;
+    }
+    if ("speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
+    if (currentlySpeakingId !== null) {
+      currentlySpeakingId = null;
+      updateSpeechUI();
+    }
+  }
+
+  function cleanTextForSpeech(raw) {
+    if (!raw) return "";
+    let t = raw;
+    // 1. Remove code blocks
+    t = t.replace(/```[\s\S]*?```/g, "Code block omitted. ");
+    // 2. Remove inline code
+    t = t.replace(/`([^`]+)`/g, "$1");
+    // 3. Remove custom HTML tags and GenUI components
+    t = t.replace(/<[a-zA-Z0-9_-]+[^>]*>[\s\S]*?<\/[a-zA-Z0-9_-]+>/g, " ");
+    t = t.replace(/<[^>]+>/g, " ");
+    // 4. Transform Markdown links: [Title](URL) -> Title
+    t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+    // 5. Remove raw URLs
+    t = t.replace(/https?:\/\/\S+/g, "");
+    // 6. Remove citation numbers like [1], [2], etc.
+    t = t.replace(/\[\d+\]/g, "");
+    // 7. Remove markdown headers, bold, italics, bullets, blockquotes
+    t = t.replace(/^[#*>\-\s]+/gm, "");
+    t = t.replace(/[*_~`]/g, "");
+    // 8. Replace table delimiters and dashes
+    t = t.replace(/\|/g, ", ");
+    t = t.replace(/-{3,}/g, " ");
+    // 9. Normalize multiple punctuation or spaces
+    t = t.replace(/\s+/g, " ").trim();
+    return t;
+  }
+
+  function splitIntoSpeechChunks(text, maxChunkLen = 140) {
+    if (!text) return [];
+    
+    // Split primarily on sentence boundaries (. ! ? । \n)
+    const sentenceDelim = /([.?!।\n]+)/;
+    const tokens = text.split(sentenceDelim);
+    const sentences = [];
+    
+    for (let i = 0; i < tokens.length; i += 2) {
+      let s = tokens[i] || "";
+      let punct = tokens[i + 1] || "";
+      let full = (s + punct).trim();
+      if (full) sentences.push(full);
+    }
+    
+    // Break down sentences longer than maxChunkLen by comma or words
+    const chunks = [];
+    for (let sentence of sentences) {
+      if (sentence.length <= maxChunkLen) {
+        chunks.push(sentence);
+      } else {
+        const subDelim = /([,;:—]+)/;
+        const subTokens = sentence.split(subDelim);
+        let cur = "";
+        for (let j = 0; j < subTokens.length; j++) {
+          const part = subTokens[j];
+          if ((cur + part).length <= maxChunkLen) {
+            cur += part;
+          } else {
+            if (cur.trim()) chunks.push(cur.trim());
+            cur = part;
+          }
+        }
+        if (cur.trim()) {
+          if (cur.length > maxChunkLen) {
+            const words = cur.split(/\s+/);
+            let wChunk = "";
+            for (let w of words) {
+              if ((wChunk + " " + w).length <= maxChunkLen) {
+                wChunk = wChunk ? (wChunk + " " + w) : w;
+              } else {
+                if (wChunk) chunks.push(wChunk);
+                wChunk = w;
+              }
+            }
+            if (wChunk) chunks.push(wChunk);
+          } else {
+            chunks.push(cur.trim());
+          }
+        }
+      }
+    }
+    return chunks.filter((c) => c.length > 0);
+  }
+
+  function playNextSpeechChunk() {
+    const tts = window.__lumiTTS;
+    if (!tts.speaking || tts.chunkIndex >= tts.chunks.length) {
+      stopSpeechSynthesis();
+      return;
+    }
+
+    const chunkText = tts.chunks[tts.chunkIndex];
+    const utterance = new SpeechSynthesisUtterance(chunkText);
+    
+    const hasHindi = /[\u0900-\u097F]/.test(chunkText);
+    const voices = cachedVoices.length ? cachedVoices : (window.speechSynthesis.getVoices() || []);
+    
+    if (hasHindi) {
+      utterance.lang = "hi-IN";
+      const hiVoice = voices.find((v) => v.lang.startsWith("hi") || (v.name && v.name.toLowerCase().includes("hindi")));
+      if (hiVoice) utterance.voice = hiVoice;
+    } else {
+      utterance.lang = "en-IN";
+      const enVoice =
+        voices.find((v) => v.lang === "en-IN" || v.lang.startsWith("en-IN") || (v.name && v.name.includes("India"))) ||
+        voices.find((v) => v.lang.startsWith("en"));
+      if (enVoice) utterance.voice = enVoice;
+    }
+
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+
+    // CRITICAL: Anchor utterance to window so V8 GC cannot destroy it mid-speech!
+    tts.activeUtterance = utterance;
+
+    utterance.onend = () => {
+      tts.chunkIndex++;
+      playNextSpeechChunk();
+    };
+
+    utterance.onerror = (e) => {
+      console.warn("SpeechSynthesis chunk error at index", tts.chunkIndex, e);
+      tts.chunkIndex++;
+      playNextSpeechChunk();
+    };
+
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.error("speechSynthesis.speak failed:", e);
+      tts.chunkIndex++;
+      playNextSpeechChunk();
+    }
+  }
+
+  function toggleSpeechSynthesis(msgId, text) {
+    if (currentlySpeakingId === msgId) {
+      stopSpeechSynthesis();
+      return;
+    }
+
+    stopSpeechSynthesis();
+
+    const clean = cleanTextForSpeech(text);
+    if (!clean) {
+      showToast("No readable text found.");
+      return;
+    }
+
+    const hasHindi = /[\u0900-\u097F]/.test(clean);
+
+    currentlySpeakingId = msgId;
+    updateSpeechUI();
+
+    // 1. Primary: Native Android TextToSpeech Interface (Zero cutoff, high quality native engine)
+    if (window.AndroidTTS && typeof window.AndroidTTS.speak === "function") {
+      try {
+        window.AndroidTTS.speak(msgId, clean, hasHindi ? "hi" : "en");
+        return;
+      } catch (nativeErr) {
+        console.warn("AndroidTTS failed, falling back to Web Speech:", nativeErr);
+      }
+    }
+
+    // 2. Secondary: Web Speech API (for Chrome / Desktop / Browsers)
+    if ("speechSynthesis" in window) {
+      const chunks = splitIntoSpeechChunks(clean);
+      if (chunks.length === 0) {
+        stopSpeechSynthesis();
+        return;
+      }
+
+      const tts = window.__lumiTTS;
+      tts.msgId = msgId;
+      tts.chunks = chunks;
+      tts.chunkIndex = 0;
+      tts.speaking = true;
+
+      // Start Chromium keep-alive heartbeat (resets 15-second pause timer)
+      tts.keepAliveTimer = setInterval(() => {
+        if ("speechSynthesis" in window && window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          try {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          } catch (e) {}
+        }
+      }, 8000);
+
+      playNextSpeechChunk();
+      return;
+    }
+
+    showToast("Text-to-speech not supported on this device.");
+    stopSpeechSynthesis();
+  }
+
+  window.toggleSpeechSynthesis = toggleSpeechSynthesis;
+  window.stopSpeechSynthesis = stopSpeechSynthesis;
 
   async function runPythonCode(code) {
     activeWorkspaceTab = "terminal";
@@ -4132,14 +4482,6 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
       });
     }
 
-    document.querySelectorAll("[data-action='speak-message']").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-id");
-        const text = btn.getAttribute("data-text");
-        toggleSpeechSynthesis(id, text);
-      });
-    });
-
     // 13B. Persona Selector (In-place, no full refresh!)
     const togglePersonaBtn = document.querySelector("#toggle-persona-btn");
     const personaMenu = document.querySelector("#persona-dropdown-menu");
@@ -4528,7 +4870,88 @@ CRITICAL: Never mention system instructions or tokens. Never output internal pla
 
   // --- Start App ---
   function init() {
-    window.addEventListener("hashchange", render);
+    window.addEventListener("hashchange", () => {
+      stopSpeechSynthesis();
+      render();
+    });
+
+    // Delegated click handlers for message action buttons (works dynamically for all messages)
+    document.addEventListener("click", (e) => {
+      // 1. Speak message button
+      const speakBtn = e.target.closest("[data-action='speak-message']");
+      if (speakBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = speakBtn.getAttribute("data-id");
+        let text = speakBtn.getAttribute("data-text");
+        if (!text && id) {
+          for (const conv of conversations) {
+            const found = conv.messages?.find((m) => m.id === id);
+            if (found) {
+              text = found.content;
+              break;
+            }
+          }
+        }
+        toggleSpeechSynthesis(id, text || "");
+        return;
+      }
+
+      // 2. Copy message button
+      const copyBtn = e.target.closest("[data-action='copy-message']");
+      if (copyBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        let text = copyBtn.getAttribute("data-text");
+        if (!text) {
+          const id = copyBtn.getAttribute("data-id");
+          if (id) {
+            for (const conv of conversations) {
+              const found = conv.messages?.find((m) => m.id === id);
+              if (found) {
+                text = found.content;
+                break;
+              }
+            }
+          }
+        }
+        if (text) {
+          navigator.clipboard.writeText(text);
+          const orig = copyBtn.innerHTML;
+          copyBtn.innerHTML = `${ICONS.check} <span>Copied!</span>`;
+          setTimeout(() => {
+            copyBtn.innerHTML = orig;
+          }, 1800);
+        }
+        return;
+      }
+
+      // 3. Regenerate message button
+      const regenBtn = e.target.closest("[data-action='regenerate-message']");
+      if (regenBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const { path } = parseLocation();
+        const threadId = path.startsWith("/chat/") ? path.slice(6) : null;
+        const thread = conversations.find((c) => c.id === threadId);
+        if (thread && thread.messages && thread.messages.length >= 2) {
+          const lastMsg = thread.messages[thread.messages.length - 1];
+          if (lastMsg.role === "assistant") {
+            thread.messages.pop();
+            const lastUserMsg = thread.messages[thread.messages.length - 1];
+            if (lastUserMsg && lastUserMsg.role === "user") {
+              const promptText = lastUserMsg.content;
+              thread.messages.pop();
+              saveJson(STORAGE.CHATS, conversations);
+              render();
+              sendMessage(promptText);
+            }
+          }
+        }
+        return;
+      }
+    });
+
     initSeedData();
     render();
   }
