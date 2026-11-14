@@ -1314,6 +1314,22 @@ CRITICAL OUTPUT RULES:
       </div>\n`;
     });
 
+    // 0.2 Universal Resilient GenUI Block Parser (Handles missing leading backticks, 2-backtick closures ``, or unquoted card JSONs)
+    text = text.replace(/(?:^|\n)(?:```+)?(?:json:ui|genui|ui)\s*\n?(\{[\s\S]*?\})(?:```*|``|\n|$)/gi, (match, innerJson) => {
+      try {
+        const parsed = tryParseJson(innerJson.trim());
+        if (parsed && (parsed.type || parsed.blocks || GenUIRenderer.isRecognizedType(parsed.type))) {
+          const id = "genui-" + Math.random().toString(36).slice(2, 9);
+          codeBlocks.push(`<div id="${id}" class="genui-wrapper animate-fade-in">${GenUIRenderer.render(parsed)}</div>`);
+          return `\n__CODE_BLOCK_${codeBlocks.length - 1}__\n`;
+        }
+      } catch (e) {}
+      return match;
+    });
+
+    // 0.3 Filter out model scratchpad / internal deliberation code blocks
+    text = text.replace(/```(?:code)?\s*\n*(?:We need to decide|Let'?s output|Given the instructions|I think better)[\s\S]*?```/gi, "");
+
     // 3. Fenced Code Blocks with IDE Syntax Highlighting, GenUI Interception, Sandbox Run & Copy
     text = text.replace(/```([a-zA-Z0-9_\-\.:]*)\n([\s\S]*?)```/g, (match, lang, code) => {
       const cleanLang = (lang || "").trim().toLowerCase();
