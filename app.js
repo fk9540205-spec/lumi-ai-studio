@@ -2246,14 +2246,14 @@
             class="w-full resize-none rounded-3xl border-0 bg-transparent px-5 pt-4 pb-2 text-[15px] outline-none placeholder:text-muted-foreground min-h-[56px] max-h-48"
           ></textarea>
 
-          <div class="flex items-center justify-between gap-2 px-3 pb-3">
-            <div class="flex min-w-0 items-center gap-2">
+          <div class="composer-toolbar flex items-center justify-between gap-2 px-3 pb-3">
+            <div class="composer-toolbar-left flex min-w-0 items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar py-0.5">
               ${renderModelPicker("composer")}
 
               <button
                 type="button"
                 id="attach-file-btn"
-                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
+                class="composer-toolbar-btn inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer shrink-0"
                 title="Attach files or documents (.pdf, .txt, .py, .js, .csv, .md, .json)"
               >
                 ${ICONS.paperclip}
@@ -2262,7 +2262,7 @@
               <button
                 type="button"
                 id="toggle-sound-btn"
-                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer"
+                class="composer-toolbar-btn inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer shrink-0"
                 title="${soundEnabled ? "Mute UI sounds" : "Enable UI sounds"}"
               >
                 ${soundEnabled ? ICONS.volume : ICONS.volumeMute}
@@ -2271,7 +2271,7 @@
               <button
                 type="button"
                 id="toggle-web-search-btn"
-                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs ${webSearchEnabled ? "text-primary border-primary/60 bg-primary/10 shadow-xs ring-1 ring-primary/40" : "text-muted-foreground hover:text-foreground"} transition-all backdrop-blur shadow-xs cursor-pointer"
+                class="composer-toolbar-btn inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs ${webSearchEnabled ? "text-primary border-primary/60 bg-primary/10 shadow-xs ring-1 ring-primary/40" : "text-muted-foreground hover:text-foreground"} transition-all backdrop-blur shadow-xs cursor-pointer shrink-0"
                 title="${webSearchEnabled ? "Live Web Search: Active (Click to disable)" : "Live Web Search: Off (Click to enable)"}"
               >
                 ${ICONS.globe}
@@ -2280,18 +2280,18 @@
               <button
                 type="button"
                 id="image-gen-btn"
-                class="inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors backdrop-blur shadow-xs cursor-pointer"
+                class="composer-toolbar-btn inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors backdrop-blur shadow-xs cursor-pointer shrink-0"
                 title="Generate AI Image (/image)"
               >
                 ${ICONS.image}
               </button>
             </div>
 
-            <div class="flex items-center gap-1.5" id="composer-submit-wrapper">
+            <div class="flex items-center gap-1.5 shrink-0 ml-auto" id="composer-submit-wrapper">
               <button
                 type="button"
                 id="voice-call-trigger-btn"
-                class="${isStreaming ? "hidden" : "inline-flex"} size-8 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/25 hover:bg-primary hover:text-primary-foreground transition-all active:scale-95 cursor-pointer"
+                class="${isStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/25 hover:bg-primary hover:text-primary-foreground transition-all active:scale-95 cursor-pointer shrink-0"
                 title="Voice Call"
               >
                 ${ICONS.mic}
@@ -2299,7 +2299,7 @@
               <button
                 type="submit"
                 id="submit-prompt-btn"
-                class="hidden size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                class="hidden composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
                 title="Send message"
               >
                 ${ICONS.cornerDownLeft}
@@ -2307,7 +2307,7 @@
               <button
                 type="button"
                 id="stop-generation-btn"
-                class="${isStreaming ? "inline-flex" : "hidden"} size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer"
+                class="${isStreaming ? "inline-flex" : "hidden"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shrink-0"
                 title="Stop generation"
               >
                 ${ICONS.square}
