@@ -251,9 +251,7 @@ body {
   gap: 0.4rem !important;
   min-width: 0 !important;
   flex: 1 1 auto !important;
-  overflow-x: auto !important;
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
+  overflow: visible !important;
 }
 
 .composer-toolbar-left::-webkit-scrollbar {
@@ -1258,9 +1256,34 @@ body {
     width: min(290px, 92vw) !important;
   }
   .model-dropdown-menu.placement-topbar {
-    right: -75px !important;
-    left: auto !important;
-    max-width: calc(100vw - 24px) !important;
+    position: fixed !important;
+    top: 52px !important;
+    left: 14px !important;
+    right: 14px !important;
+    bottom: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 60vh !important;
+    z-index: 999999 !important;
+    border-radius: 1.25rem !important;
+    background: #1c1c22 !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85) !important;
+  }
+  .model-dropdown-menu.placement-composer {
+    position: fixed !important;
+    bottom: 84px !important;
+    top: auto !important;
+    left: 14px !important;
+    right: 14px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 55vh !important;
+    z-index: 999999 !important;
+    border-radius: 1.25rem !important;
+    background: #1c1c22 !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85) !important;
   }
   .topbar-dropdown-menu {
     max-width: calc(100vw - 24px) !important;

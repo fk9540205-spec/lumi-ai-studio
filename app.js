@@ -2247,7 +2247,7 @@
           ></textarea>
 
           <div class="composer-toolbar flex items-center justify-between gap-2 px-3 pb-3">
-            <div class="composer-toolbar-left flex min-w-0 items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar py-0.5">
+            <div class="composer-toolbar-left flex min-w-0 items-center gap-1.5 flex-1 py-0.5">
               ${renderModelPicker("composer")}
 
               <button
