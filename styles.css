@@ -1077,9 +1077,11 @@ body {
 
 .ai-image-card img {
   width: 100%;
+  min-height: 240px;
   height: auto;
   display: block;
   object-fit: cover;
+  background: rgba(255, 255, 255, 0.03);
   transition: transform 0.3s ease;
 }
 

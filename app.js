@@ -3739,12 +3739,19 @@
         render();
       }, 1000);
 
-      const candidateEndpoints = [
-        "http://127.0.0.1:3456/api/generate/image",
-        "http://localhost:3456/api/generate/image",
-        "https://lumi-backend-v4-production.up.railway.app/api/generate/image"
-      ];
-      if (window.location.origin && window.location.origin.startsWith("http")) {
+      const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const candidateEndpoints = isLocalHost
+        ? [
+            "http://127.0.0.1:3456/api/generate/image",
+            "http://localhost:3456/api/generate/image",
+            "https://lumi-backend-v4-production.up.railway.app/api/generate/image"
+          ]
+        : [
+            "https://lumi-backend-v4-production.up.railway.app/api/generate/image",
+            "http://127.0.0.1:3456/api/generate/image",
+            "http://localhost:3456/api/generate/image"
+          ];
+      if (window.location.origin && window.location.origin.startsWith("http") && !candidateEndpoints.includes(`${window.location.origin}/api/generate/image`)) {
         candidateEndpoints.unshift(`${window.location.origin}/api/generate/image`);
       }
 
@@ -3817,12 +3824,19 @@
       render();
       scrollToBottom();
 
-      const candidateEndpoints = [
-        "http://127.0.0.1:3456/api/music/generate",
-        "http://localhost:3456/api/music/generate",
-        "https://lumi-backend-v4-production.up.railway.app/api/music/generate"
-      ];
-      if (window.location.origin && window.location.origin.startsWith("http")) {
+      const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const candidateEndpoints = isLocalHost
+        ? [
+            "http://127.0.0.1:3456/api/music/generate",
+            "http://localhost:3456/api/music/generate",
+            "https://lumi-backend-v4-production.up.railway.app/api/music/generate"
+          ]
+        : [
+            "https://lumi-backend-v4-production.up.railway.app/api/music/generate",
+            "http://127.0.0.1:3456/api/music/generate",
+            "http://localhost:3456/api/music/generate"
+          ];
+      if (window.location.origin && window.location.origin.startsWith("http") && !candidateEndpoints.includes(`${window.location.origin}/api/music/generate`)) {
         candidateEndpoints.unshift(`${window.location.origin}/api/music/generate`);
       }
 
