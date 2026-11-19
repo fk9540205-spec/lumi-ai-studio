@@ -352,7 +352,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_run_python()
         elif path == "/api/extract/pdf":
             self._handle_extract_pdf()
-        elif path == "/api/generate/image":
+        elif path in ("/api/generate/image", "/api/image/generate", "/v1/images/generations"):
             self._handle_generate_image()
         elif path in ("/api/music/generate", "/api/music/create", "/api/suno/generate"):
             self._handle_music_generate()
@@ -376,7 +376,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             return
         prompt = data.get("prompt", "a beautiful digital art")
 
-        # High-definition Gemini 3.1 Flash Image via local Google Antigravity proxy
+        # 1. High-definition Gemini 3.1 Flash Image via local Google Antigravity proxy
         try:
             cpa_req = urllib.request.Request(
                 "http://127.0.0.1:8317/v1/chat/completions",
@@ -405,20 +405,47 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         except Exception as err:
             sys.stderr.write(f"Gemini image generation attempt failed: {err}\n")
 
-        # 2. Studio-Grade FLUX.1 [dev] via Black Forest Labs
-        try:
-            if G4F_AVAILABLE and _g4f_client:
-                flux_resp = _g4f_client.images.generate(model="flux", prompt=prompt)
-                if flux_resp and flux_resp.data:
-                    raw_url = flux_resp.data[0].url
-                    if "?url=" in raw_url:
-                        direct_url = urllib.parse.unquote(raw_url.split("?url=")[1])
-                    else:
-                        direct_url = raw_url
-                    self._json_response({"url": direct_url, "provider": "black-forest-flux-1-dev"})
-                    return
-        except Exception as e:
-            sys.stderr.write(f"FLUX.1 Dev generation error: {e}\n")
+        # 2. Studio-Grade Black Forest Labs FLUX.1 directly via Gradio API (Zero third-party proxy, 100% Real 1024x1024 WebP)
+        for space in ["black-forest-labs-flux-1-schnell", "black-forest-labs-flux-1-dev"]:
+            try:
+                call_url = f"https://{space}.hf.space/gradio_api/call/infer"
+                payload = {
+                    "data": [
+                        prompt,
+                        0,
+                        True,
+                        1024,
+                        1024,
+                        4 if "schnell" in space else 28
+                    ]
+                }
+                req = urllib.request.Request(
+                    call_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+                )
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    res = json.loads(r.read().decode())
+                    event_id = res.get("event_id")
+                    if event_id:
+                        res_url = f"https://{space}.hf.space/gradio_api/call/infer/{event_id}"
+                        req2 = urllib.request.Request(res_url, headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req2, timeout=45) as r2:
+                            lines = r2.read().decode().splitlines()
+                            for line in lines:
+                                if line.startswith("data:"):
+                                    data_part = line[5:].strip()
+                                    parsed = json.loads(data_part)
+                                    if isinstance(parsed, list) and len(parsed) > 0:
+                                        img_obj = parsed[0]
+                                        if isinstance(img_obj, dict) and img_obj.get("url"):
+                                            self._json_response({
+                                                "url": img_obj.get("url"),
+                                                "provider": space
+                                            })
+                                            return
+            except Exception as e:
+                sys.stderr.write(f"Direct FLUX generation error on {space}: {e}\n")
 
         self._error(500, "Image generation error")
 
