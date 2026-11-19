@@ -2436,6 +2436,24 @@
             </div>
           </div>
 
+          <!-- Suno AI Real Music Audio Configuration -->
+          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] font-semibold uppercase tracking-wider text-pink-400">🎵 Suno Audio (Real MP3 Songs)</label>
+              <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_suno_cookie") ? "Connected" : "Optional"}</span>
+            </div>
+            <input
+              type="password"
+              id="settings-suno-cookie-input"
+              class="w-full text-xs px-3 py-2 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-pink-500 font-mono"
+              placeholder="Paste Suno.com session cookie for real MP3"
+              value="${escapeHtml(localStorage.getItem('lumi_suno_cookie') || '')}"
+            />
+            <p class="text-[10px] text-muted-foreground leading-relaxed">
+              Login to Suno.com ➔ DevTools (F12) ➔ Copy cookie to generate and stream real MP3 songs directly into your player.
+            </p>
+          </div>
+
           <!-- Chat Data Management -->
           <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
             <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Chat History</label>
@@ -3817,7 +3835,11 @@
             const mResp = await fetch(ep, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt: songPrompt, style: style }),
+              body: JSON.stringify({
+                prompt: songPrompt,
+                style: style,
+                cookie: localStorage.getItem("lumi_suno_cookie") || ""
+              }),
               signal: mCtrl.signal
             });
             clearTimeout(mTid);
@@ -3833,9 +3855,10 @@
           targetMsg.musicTrack = {
             title: resData.title || songPrompt,
             style: resData.style || style,
+            audioUrl: resData.audioUrl || "",
             composition: resData.composition || (resData.data ? JSON.stringify(resData.data, null, 2) : "")
           };
-          targetMsg.content = `✨ **AI Song Track Composed Successfully!**`;
+          targetMsg.content = resData.audioUrl ? `🎵 **Audio Track Generated!** Tap play to listen.` : `✨ **AI Song Track Composed!** (Connect Suno Cookie to stream direct MP3)`;
           AudioEffects.play("success");
         } else {
           targetMsg.content = `❌ Song generation error. Please check your network and try again.`;
@@ -4198,26 +4221,7 @@
 
         let streamedSuccessfully = false;
         try {
-          // Direct high-capacity streaming with instant fallback to backend
           let resp = null;
-          const isGeminiModel = selectedModel && selectedModel.model && selectedModel.model.includes("gemini");
-          if (!imagePayload && !isGeminiModel) {
-            try {
-              resp = await fetch("https://text.pollinations.ai/openai/chat/completions", {
-                method: "POST",
-                signal: streamAbortController.signal,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model: "openai",
-                  messages: chatHistory,
-                  stream: true,
-                  max_tokens: 4096,
-                }),
-              });
-            } catch (directErr) {
-              console.warn("Direct cluster streaming bypassed, falling back to backend:", directErr);
-            }
-          }
 
           if (!resp || !resp.ok) {
             const candidateEndpoints = [
@@ -5333,8 +5337,7 @@
         const chatEndpoints = [
           "http://127.0.0.1:3456/api/free/chat",
           "https://lumi-backend-v4-production.up.railway.app/api/free/chat",
-          "http://10.188.22.242:3456/api/free/chat",
-          "https://text.pollinations.ai/openai/chat/completions"
+          "http://10.188.22.242:3456/api/free/chat"
         ];
 
         let resp = null;
@@ -6746,6 +6749,20 @@
         showToast(`Theme changed to ${theme.toUpperCase()}`);
       });
     });
+
+    const sunoCookieInput = document.querySelector("#settings-suno-cookie-input");
+    if (sunoCookieInput) {
+      sunoCookieInput.addEventListener("change", (e) => {
+        const val = e.target.value.trim();
+        if (val) {
+          localStorage.setItem("lumi_suno_cookie", val);
+          showToast("🎵 Suno account cookie saved! Real MP3 streaming active.");
+        } else {
+          localStorage.removeItem("lumi_suno_cookie");
+          showToast("Suno cookie cleared.");
+        }
+      });
+    }
 
     const exportChatsBtn = document.querySelector("#settings-export-chats-btn");
     if (exportChatsBtn) {

@@ -3,7 +3,7 @@
 Lumi AI Studio — Unified Free & Reverse-Engineered AI Backend Server
 
 Combines top open-source AI projects into one backend:
-  1. Zero-Setup Free AI Hub (Pollinations & Reverse-Engineered OpenAI-compatible)
+  1. Antigravity OAuth Hub (Google Gemini 3 Flash & Claude 3.7)
   2. GPT4Free (xtekky/gpt4free) — 70+ models without API keys
   3. Duck.ai API (enter-a-new-username3/duck-ai-api) — DuckDuckGo free AI
   4. Gemini Web to API (ntthanh2603/gemini-web-to-api & XD06/gemini-free-api)
@@ -62,16 +62,15 @@ MAX_BODY = 25 * 1024 * 1024  # 25MB for PDFs, images & multi-doc attachments
 WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # ---------------------------------------------------------------------------
-# Free AI Hub (Zero Setup / 100% Free)
+# Antigravity Core Proxy Engine (Google Auth & Claude 4.6)
 # ---------------------------------------------------------------------------
-FREE_HUB_URL = "https://text.pollinations.ai/openai/chat/completions"
-_pollinations_blocked_until = 0
+ANTIGRAVITY_PROXY_URL = "http://127.0.0.1:8317/v1/chat/completions"
 FREE_MODELS = [
-    {"id": "openai-fast", "name": "GPT-OSS 20B Fast (Pollinations)", "provider": "free-hub", "description": "Fast reasoning and coding model with tool calling"},
-    {"id": "qwen-2.5-coder-32b", "name": "Qwen 2.5 Coder 32B (Free Coding)", "provider": "free-hub", "description": "Top-tier AI coding model (Fast & Free)"},
-    {"id": "llama-3.3-70b", "name": "Llama 3.3 70B (Free Fast)", "provider": "free-hub", "description": "Flagship Meta Llama 3.3 70B (Fluent Hindi/English)"},
-    {"id": "deepseek-distill-qwen-32b", "name": "DeepSeek R1 Distill (Free)", "provider": "free-hub", "description": "DeepSeek reasoning & math model"},
-    {"id": "mistral-small-3.1-24b", "name": "Mistral Small (Free)", "provider": "free-hub", "description": "Fast European reasoning model"},
+    {"id": "gemini-3-flash", "name": "Gemini 3 Flash (Google Auth)", "provider": "antigravity", "description": "Google Gemini 3 Flash via Antigravity OAuth"},
+    {"id": "claude-sonnet-4-6", "name": "Claude 3.7 Sonnet (Google Auth)", "provider": "antigravity", "description": "Anthropic Claude 3.7 Sonnet with Reasoning"},
+    {"id": "claude-opus-4-6-thinking", "name": "Claude 3.7 Opus Thinking (Google Auth)", "provider": "antigravity", "description": "Anthropic Claude Opus Extended Thinking"},
+    {"id": "gemini-3.8-flash-high", "name": "Gemini 3.8 Flash High (Google Auth)", "provider": "antigravity", "description": "High-compute Gemini Flash"},
+    {"id": "gpt-oss-120b-medium", "name": "GPT-OSS 120B (Google Auth)", "provider": "antigravity", "description": "Open weights 120B reasoning model"}
 ]
 
 def _serialize_g4f_tool_call(tool_call):
@@ -460,9 +459,24 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     headers=suno_headers,
                     method="POST"
                 )
-                with urllib.request.urlopen(s_req, timeout=20) as s_resp:
+                with urllib.request.urlopen(s_req, timeout=30) as s_resp:
                     res = json.loads(s_resp.read().decode())
-                    self._json_response({"status": "success", "provider": "suno", "data": res})
+                    clips = res.get("clips") or []
+                    audio_url = ""
+                    clip_lyrics = ""
+                    if clips and len(clips) > 0:
+                        clip = clips[0]
+                        audio_url = clip.get("audio_url") or f"https://cdn1.suno.ai/{clip.get('id')}.mp3"
+                        clip_lyrics = clip.get("metadata", {}).get("prompt", "") or clip.get("title", "")
+                    self._json_response({
+                        "status": "success",
+                        "provider": "suno",
+                        "title": title,
+                        "style": style,
+                        "audioUrl": audio_url,
+                        "composition": clip_lyrics or prompt,
+                        "data": res
+                    })
                     return
             except Exception as e:
                 sys.stderr.write(f"Suno upstream failed: {e}\n")
@@ -534,7 +548,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._error(500, f"Lyrics generation error: {e}")
 
     # -----------------------------------------------------------------------
-    # 1. Zero-Setup Free AI Hub (Pollinations & Reverse-Engineered OpenAI)
+    # 1. Antigravity OAuth Core Engine (Gemini 3 Flash & Claude)
     # -----------------------------------------------------------------------
     def _handle_free_health(self):
         start = time.time()
@@ -684,185 +698,36 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             except Exception as vision_err:
                 sys.stderr.write(f"Vision streaming attempt failed: {vision_err}\n")
 
-        # 1. Primary: High-Capacity Free AI Hub (Full 4,096 tokens, no truncation, zero cutoffs)
-        global _pollinations_blocked_until
-        if time.time() > _pollinations_blocked_until:
-            try:
-                req = urllib.request.Request(
-                    FREE_HUB_URL,
-                    data=json.dumps({
-                        "model": target_model if target_model == "openai-fast" else "openai",
-                        "messages": messages,
-                        "stream": stream,
-                        "max_tokens": max_tokens,
-                        **({"reasoning_effort": "low"} if target_model == "openai-fast" else {}),
-                        **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
-                    }).encode("utf-8"),
-                    headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
-                    method="POST",
-                )
-                resp = urllib.request.urlopen(req, timeout=4.0, context=_get_ssl_context())
-                if stream:
-                    self._start_sse()
-                    streamed_tool_names = {}
-                    for raw_line in resp:
-                        line = raw_line.decode(errors="replace").strip()
-                        if line.startswith("data: "):
-                            data_part = line[6:].strip()
-                            if data_part == "[DONE]":
-                                break
-                            try:
-                                parsed = json.loads(data_part)
-                                delta = parsed.get("choices", [{}])[0].get("delta", {})
-                                content = delta.get("content") or ""
-                                tool_calls = []
-                                for tool_call in delta.get("tool_calls", []):
-                                    function = tool_call.get("function") or {}
-                                    name = function.get("name")
-                                    index = tool_call.get("index")
-                                    if name and index is not None:
-                                        streamed_tool_names[index] = name
-                                    active_name = name or streamed_tool_names.get(index)
-                                    if active_name in allowed_tool_names:
-                                        tool_calls.append(tool_call)
-                                    else:
-                                        content += function.get("arguments") or ""
-                                if content or tool_calls:
-                                    chunk_payload = {
-                                        "choices": [{"index": 0, "delta": {**({"content": content} if content else {}), **({"tool_calls": tool_calls} if tool_calls else {})}, "finish_reason": None}],
-                                        "provider": "free-ai-hub",
-                                        "model": target_model,
-                                    }
-                                    self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                            except Exception:
-                                pass
-                    self._send_chunk(b"data: [DONE]\n\n")
-                    self._end_chunks()
-                    return
-                else:
-                    data_resp = json.loads(resp.read().decode())
-                    choice = data_resp.get("choices", [{}])[0]
-                    message = choice.get("message", {})
-                    kept_tool_calls = []
-                    for tool_call in message.get("tool_calls", []):
-                        function = tool_call.get("function") or {}
-                        if function.get("name") in allowed_tool_names:
-                            kept_tool_calls.append(tool_call)
-                        else:
-                            message["content"] = (message.get("content") or "") + (function.get("arguments") or "")
-                    if "tool_calls" in message:
-                        message["tool_calls"] = kept_tool_calls
-                    self._json_response(data_resp)
-                    return
-            except Exception as e:
-                _pollinations_blocked_until = time.time() + 120
-                sys.stderr.write(f"Primary Free AI Hub attempt failed (circuit open 120s), falling back to in-process engine: {e}\n")
-
-        # 2. Secondary fallback: In-process Cloudflare G4F Engine
-        if target_model != "openai-fast" and G4F_AVAILABLE and _g4f_client:
-            try:
-                import g4f.Provider
-                provider = g4f.Provider.Cloudflare
-                if stream:
-                    gen = _g4f_client.chat.completions.create(
-                        model=target_model,
-                        provider=provider,
-                        messages=messages,
-                        stream=True,
-                        max_tokens=max_tokens,
-                    )
-                    first_content = None
-                    for chunk in gen:
-                        c = ""
-                        if hasattr(chunk, "choices") and chunk.choices:
-                            c = getattr(chunk.choices[0].delta, "content", "") or ""
-                        if c:
-                            first_content = c
-                            break
-
-                    if first_content is not None:
-                        self._start_sse()
-                        chunk_payload = {
-                            "choices": [{"index": 0, "delta": {"content": first_content}, "finish_reason": None}],
-                            "provider": "g4f-cloudflare",
-                            "model": target_model,
-                        }
-                        self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                        for chunk in gen:
-                            c = ""
-                            if hasattr(chunk, "choices") and chunk.choices:
-                                c = getattr(chunk.choices[0].delta, "content", "") or ""
-                            if c:
-                                chunk_payload = {
-                                    "choices": [{"index": 0, "delta": {"content": c}, "finish_reason": None}],
-                                    "provider": "g4f-cloudflare",
-                                    "model": target_model,
-                                }
-                                self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                        self._send_chunk(b"data: [DONE]\n\n")
-                        self._end_chunks()
-                        return
-                else:
-                    response = _g4f_client.chat.completions.create(
-                        model=target_model,
-                        provider=provider,
-                        messages=messages,
-                        stream=False,
-                        max_tokens=max_tokens,
-                    )
-                    content = response.choices[0].message.content or ""
-                    if content and "moved to a new app" not in content:
-                        self._json_response({
-                            "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
-                            "provider": "g4f-cloudflare",
-                            "model": target_model,
-                        })
-                        return
-            except Exception as e:
-                sys.stderr.write(f"In-process Cloudflare G4F fallback failed: {e}\n")
-
-        # 3. Third fallback: Direct text endpoint with prompt
+        # Fallback straight to Antigravity Gemini 3 Flash / Claude
         try:
-            if target_model == "openai-fast":
-                raise RuntimeError("GPT-OSS Fast is temporarily unavailable; no different model was substituted.")
-            last_prompt = ""
-            for m in reversed(messages):
-                if m.get("role") == "user":
-                    last_prompt = m.get("content", "")
-                    break
-            if not last_prompt:
-                last_prompt = "Hello"
-
-            enc_prompt = urllib.parse.quote(last_prompt[:500])
-            url = f"https://text.pollinations.ai/{enc_prompt}?model=openai&system=You+are+Lumi+AI"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            resp = urllib.request.urlopen(req, timeout=20, context=_get_ssl_context())
-            text = resp.read().decode(errors="replace")
-            if text and "Free limit reached" not in text:
-                if stream:
-                    self._start_sse()
-                    words = text.split(" ")
-                    for i, w in enumerate(words):
-                        space = " " if i > 0 else ""
-                        chunk_payload = {
-                            "choices": [{"index": 0, "delta": {"content": space + w}, "finish_reason": None}],
-                            "provider": "pollinations-direct",
-                            "model": target_model,
-                        }
-                        self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                        time.sleep(0.015)
-                    self._send_chunk(b"data: [DONE]\n\n")
-                    self._end_chunks()
-                    return
-                else:
-                    self._json_response({
-                        "choices": [{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
-                        "provider": "pollinations-direct",
-                        "model": target_model,
-                    })
-                    return
+            cpa_req = urllib.request.Request(
+                ANTIGRAVITY_PROXY_URL,
+                data=json.dumps({"model": "gemini-3-flash", "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer lumi-antigravity-local",
+                    "Accept": "text/event-stream" if stream else "application/json"
+                },
+                method="POST"
+            )
+            cpa_resp = urllib.request.urlopen(cpa_req, timeout=45)
+            if stream:
+                self._start_sse()
+                for raw_line in cpa_resp:
+                    line = raw_line.decode(errors="replace")
+                    if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                        self._send_chunk(line.encode("utf-8"))
+                    elif line.strip() == "data: [DONE]":
+                        break
+                self._send_chunk(b"data: [DONE]\n\n")
+                self._end_chunks()
+                return
+            else:
+                raw_data = json.loads(cpa_resp.read().decode())
+                self._json_response(raw_data)
+                return
         except Exception as e:
-            sys.stderr.write(f"Direct text fallback failed: {e}\n")
+            sys.stderr.write(f"Antigravity fallback failed: {e}\n")
 
         # If all free providers failed, send a clean friendly error without crash
         if stream:
