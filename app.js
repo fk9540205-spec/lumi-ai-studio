@@ -2789,28 +2789,26 @@
                         ${isCurrentlyStreaming && rawText ? `<span class="streaming-cursor"></span>` : ""}
                       </div>
 
-                      <!-- AI Image Generation Result / Real-Time Animated Generative Canvas -->
+                      <!-- Ultra-Clean Studio Image Generator Card -->
                       ${
                         msg.imageLoading
                           ? `
-                        <div class="ai-image-generator-live my-3">
-                          <div class="ai-generator-mesh"></div>
-                          <div class="ai-generator-grid"></div>
-                          <div class="ai-scanner-beam"></div>
-                          <div class="ai-generator-core">
-                            <div class="ai-core-ring-outer"></div>
-                            <div class="ai-core-ring-inner"></div>
-                            <div class="ai-core-glow"></div>
-                            <span class="text-2xl relative z-10">🎨</span>
+                        <div class="pro-gen-card pro-image-gen-card my-3">
+                          <div class="pro-gen-header">
+                            <div class="pro-gen-badge">
+                              <span class="pro-pulse-dot"></span>
+                              <span>FLUX.1 Studio Engine</span>
+                            </div>
+                            <span class="pro-gen-timer">${escapeHtml(msg.generationStage || "Synthesizing")}</span>
                           </div>
-                          <div class="ai-generator-stage-badge">
-                            <span class="size-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-                            <span>${escapeHtml(msg.generationStage || "SYNTHESIZING 8K PIXELS")}</span>
+                          <div class="pro-gen-body">
+                            <div class="pro-shimmer-sweep"></div>
+                            <div class="pro-spinner-ring"></div>
+                            <div class="pro-gen-title">Rendering 8K Masterpiece</div>
+                            <div class="pro-gen-prompt">"${escapeHtml(msg.imagePrompt || "")}"</div>
                           </div>
-                          <div class="ai-generator-title">Generating AI Masterpiece...</div>
-                          <div class="ai-generator-prompt-pill">"${escapeHtml(msg.imagePrompt || "")}"</div>
-                          <div class="ai-generator-progress-wrap">
-                            <div class="ai-generator-progress-bar"></div>
+                          <div class="pro-progress-track">
+                            <div class="pro-progress-fill"></div>
                           </div>
                         </div>`
                           : msg.imageUrl
@@ -2846,19 +2844,31 @@
                           : ""
                       }
 
-                      <!-- Suno & Udio AI Music Track Card -->
+                      <!-- Ultra-Clean Studio Music Generator Card -->
                       ${
                         msg.musicLoading
                           ? `
-                        <div class="music-studio-card p-6 flex flex-col items-center justify-center gap-3 text-center my-3">
-                          <div class="relative size-12 flex items-center justify-center">
-                            <div class="absolute inset-0 rounded-full border-2 border-pink-500/20 border-t-pink-500 animate-spin"></div>
-                            <span class="text-2xl">🎵</span>
+                        <div class="pro-gen-card pro-music-gen-card my-3">
+                          <div class="pro-gen-header">
+                            <div class="pro-gen-badge music">
+                              <span class="pro-pulse-dot pink"></span>
+                              <span>Suno & Udio Neural Studio</span>
+                            </div>
+                            <span class="pro-gen-timer">Arranging score</span>
                           </div>
-                          <div class="text-sm font-semibold text-pink-300">Composing Track with Suno & Udio AI...</div>
-                          <div class="text-xs text-muted-foreground font-mono truncate max-w-xs">"${escapeHtml(msg.musicPrompt || "")}"</div>
-                          <div class="w-48 h-1.5 bg-pink-950/40 rounded-full overflow-hidden mt-1">
-                            <div class="h-full bg-gradient-to-r from-pink-500 to-purple-500 animate-pulse w-3/4"></div>
+                          <div class="pro-gen-body">
+                            <div class="pro-shimmer-sweep"></div>
+                            <div class="pro-equalizer-bars">
+                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                            </div>
+                            <div class="pro-gen-title">Composing Arrangement & Lyrics</div>
+                            <div class="pro-gen-prompt">"${escapeHtml(msg.musicPrompt || "")}"</div>
+                          </div>
+                          <div class="pro-progress-track">
+                            <div class="pro-progress-fill music"></div>
                           </div>
                         </div>`
                           : msg.musicTrack
@@ -3864,18 +3874,28 @@
     // 1B. SUNO & UDIO AI MUSIC & SONG GENERATION (/song, /music, or natural prompt)
     const isMusicCommand =
       /^\/(?:music|song|suno|udio)\s+/i.test(prompt) ||
-      /\b(?:gaana|gana|song|music|track)\s+(?:banao|banado|bana\s+do|create|generate|compose)\b/i.test(prompt) ||
-      /\b(?:banao|banado|bana\s+do|create|generate|compose)\s+.*?\b(?:gaana|gana|song|music|track)\b/i.test(prompt) ||
+      /\b(?:gaana|gana|geet|song|music|track|rap|melody|ghazal)\s+(?:banao|banado|bana\s+do|likho|likh\s+do|create|generate|compose)\b/i.test(prompt) ||
+      /\b(?:banao|banado|bana\s+do|likho|likh\s+do|compose|create)\s+.*?\b(?:gaana|gana|geet|song|music|track|rap|melody|ghazal)\b/i.test(prompt) ||
       /\b(?:suno|udio)\s+(?:song|music|track)?\b/i.test(prompt);
 
     if (isMusicCommand) {
+      let detectedStyle = "Bollywood / Pop";
+      if (/romantic|pyaar|love|ishq/i.test(prompt)) detectedStyle = "Bollywood Romantic";
+      else if (/lo-?fi|chill|relax|peace/i.test(prompt)) detectedStyle = "Lo-fi Chill Beats";
+      else if (/rap|hip-?hop|cypher|trap/i.test(prompt)) detectedStyle = "Hip-Hop / Rap";
+      else if (/punjabi|bhangra|desi/i.test(prompt)) detectedStyle = "Punjabi Beat";
+      else if (/rock|acoustic|guitar/i.test(prompt)) detectedStyle = "Acoustic Rock";
+      else if (/edm|dance|club|party/i.test(prompt)) detectedStyle = "Electronic EDM";
+      else if (/sad|dard|emotional|heartbreak/i.test(prompt)) detectedStyle = "Sad / Soulful Melody";
+
       let songPrompt = prompt
         .replace(/^\/(?:music|song|suno|udio)\s+/i, "")
-        .replace(/\b(?:gaana|gana|song|music|track)\s+(?:banao|banado|bana\s+do|create|generate|compose)\b/gi, "")
-        .replace(/\b(?:banao|banado|bana\s+do|create|generate|compose)\s+(?:ek|koi)?\s*(?:gaana|gana|song|music|track)?\b/gi, "")
+        .replace(/\b(?:gaana|gana|geet|song|music|track|rap|melody|ghazal)\s+(?:banao|banado|bana\s+do|likho|likh\s+do|create|generate|compose)\b/gi, "")
+        .replace(/\b(?:banao|banado|bana\s+do|likho|likh\s+do|compose|create)\s+(?:ek|koi)?\s*(?:gaana|gana|geet|song|music|track|rap|melody)?\b/gi, "")
+        .replace(/\b(?:ki|ka|ke|ek|koi|par|pe)\b/gi, "")
         .trim();
       if (!songPrompt) songPrompt = prompt.trim();
-      triggerSongGeneration(songPrompt, assistantMsg);
+      triggerSongGeneration(songPrompt, assistantMsg, detectedStyle);
       return;
     }
 
