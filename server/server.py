@@ -353,12 +353,178 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_run_python()
         elif path == "/api/extract/pdf":
             self._handle_extract_pdf()
+        elif path == "/api/generate/image":
+            self._handle_generate_image()
+        elif path in ("/api/music/generate", "/api/music/create", "/api/suno/generate"):
+            self._handle_music_generate()
+        elif path in ("/api/music/lyrics", "/api/suno/lyrics"):
+            self._handle_music_lyrics()
         elif path == "/api/export/zip":
             self._handle_export_zip()
         elif path in ("/api/tts", "/api/voice/tts", "/v1/audio/speech"):
             self._handle_tts()
         else:
             self._error(404, f"API endpoint {path} not found")
+
+    def _handle_generate_image(self):
+        body = self._read_body()
+        if body is None:
+            return
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._error(400, "Invalid JSON")
+            return
+        prompt = data.get("prompt", "a beautiful digital art")
+
+        # High-definition Gemini 3.1 Flash Image via local Google Antigravity proxy
+        try:
+            cpa_req = urllib.request.Request(
+                "http://127.0.0.1:8317/v1/chat/completions",
+                data=json.dumps({
+                    "model": "gemini-3.1-flash-image",
+                    "messages": [{"role": "user", "content": f"draw: {prompt}"}],
+                    "stream": False
+                }).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer lumi-antigravity-local"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(cpa_req, timeout=35) as cpa_resp:
+                res_data = json.loads(cpa_resp.read().decode())
+                choices = res_data.get("choices", [])
+                if choices:
+                    msg = choices[0].get("message", {})
+                    imgs = msg.get("images")
+                    if imgs and isinstance(imgs, list) and len(imgs) > 0:
+                        img_url = imgs[0].get("image_url", {}).get("url")
+                        if img_url:
+                            self._json_response({"url": img_url, "provider": "gemini-3.1-flash-image"})
+                            return
+        except Exception as err:
+            sys.stderr.write(f"Gemini image generation attempt failed: {err}\n")
+
+        # Fallback to high-definition FLUX.1
+        try:
+            seed = int(time.time() * 1000) % 999999
+            enc_prompt = urllib.parse.quote(prompt)
+            fallback_url = f"https://image.pollinations.ai/prompt/{enc_prompt}?width=1024&height=1024&nologo=true&model=flux&seed={seed}"
+            self._json_response({"url": fallback_url, "provider": "flux-hd"})
+            return
+        except Exception:
+            self._error(500, "Image generation error")
+
+    def _handle_music_generate(self):
+        body = self._read_body()
+        if body is None:
+            return
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._error(400, "Invalid JSON")
+            return
+
+        prompt = data.get("prompt", "")
+        style = data.get("style", "Bollywood / Pop")
+        title = data.get("title", "Lumi AI Track")
+        instrumental = data.get("instrumental", False)
+        suno_cookie = data.get("cookie") or os.environ.get("SUNO_COOKIE")
+
+        # 1. Reverse-Engineered Suno API (if cookie provided)
+        if suno_cookie:
+            try:
+                suno_headers = {
+                    "Authorization": f"Bearer {suno_cookie}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0"
+                }
+                payload = {
+                    "prompt": prompt,
+                    "tags": style,
+                    "title": title,
+                    "make_instrumental": instrumental,
+                    "wait_audio": False
+                }
+                s_req = urllib.request.Request(
+                    "https://studio-api.suno.ai/api/generate/v2/",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers=suno_headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(s_req, timeout=20) as s_resp:
+                    res = json.loads(s_resp.read().decode())
+                    self._json_response({"status": "success", "provider": "suno", "data": res})
+                    return
+            except Exception as e:
+                sys.stderr.write(f"Suno upstream failed: {e}\n")
+
+        # 2. Intelligent Composition & Lyrics Flow via Claude Opus / Gemini 3
+        try:
+            cpa_req = urllib.request.Request(
+                "http://127.0.0.1:8317/v1/chat/completions",
+                data=json.dumps({
+                    "model": "claude-sonnet-4-6",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a master music producer and composer. Write a complete song composition with: Title, Style/Genre, BPM, Chords Progression, [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Outro] and production notes."
+                        },
+                        {"role": "user", "content": f"Create a full musical composition in {style} style about: {prompt}"}
+                    ],
+                    "stream": False
+                }).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer lumi-antigravity-local"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(cpa_req, timeout=30) as cpa_resp:
+                res_data = json.loads(cpa_resp.read().decode())
+                lyrics = res_data["choices"][0]["message"]["content"]
+                self._json_response({
+                    "status": "success",
+                    "provider": "lumi-suno-composer",
+                    "title": title,
+                    "style": style,
+                    "composition": lyrics
+                })
+                return
+        except Exception as e:
+            self._error(500, f"Music generation error: {e}")
+
+    def _handle_music_lyrics(self):
+        body = self._read_body()
+        if body is None:
+            return
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._error(400, "Invalid JSON")
+            return
+        prompt = data.get("prompt", "")
+        try:
+            cpa_req = urllib.request.Request(
+                "http://127.0.0.1:8317/v1/chat/completions",
+                data=json.dumps({
+                    "model": "gemini-3-flash",
+                    "messages": [
+                        {"role": "system", "content": "Write catchy song lyrics with [Verse], [Chorus], and rhyming rhythm."},
+                        {"role": "user", "content": f"Lyrics for: {prompt}"}
+                    ],
+                    "stream": False
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json", "Authorization": "Bearer lumi-antigravity-local"},
+                method="POST"
+            )
+            with urllib.request.urlopen(cpa_req, timeout=20) as cpa_resp:
+                res = json.loads(cpa_resp.read().decode())
+                self._json_response({"lyrics": res["choices"][0]["message"]["content"]})
+                return
+        except Exception as e:
+            self._error(500, f"Lyrics generation error: {e}")
 
     # -----------------------------------------------------------------------
     # 1. Zero-Setup Free AI Hub (Pollinations & Reverse-Engineered OpenAI)
@@ -407,28 +573,10 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         ]
         if raw_model in antigravity_models or raw_model.startswith("antigravity-"):
             clean_m = raw_model.replace("antigravity-", "")
-            # Inject clean Hindi / Hinglish instruction
-            clean_lang_rule = (
-                "CRITICAL LANGUAGE RULE: When speaking or replying in Hindi or Hinglish, ALWAYS use pure, clean, standard, "
-                "and grammatically correct natural Hindi (in Roman script or Devanagari). "
-                "STRICTLY FORBIDDEN: NEVER use broken slang, bizarre corrupted words (like 'tero', 'bhir se', 'kaafi boss'), "
-                "or strange dialects. Speak smoothly, clearly, respectfully, and naturally like an educated native Hindi speaker."
-            )
-            cpa_messages = []
-            has_sys = False
-            for m in messages:
-                if m.get("role") == "system":
-                    has_sys = True
-                    cpa_messages.append({"role": "system", "content": m.get("content", "") + "\n\n" + clean_lang_rule})
-                else:
-                    cpa_messages.append(m)
-            if not has_sys:
-                cpa_messages.insert(0, {"role": "system", "content": clean_lang_rule})
-
             try:
                 cpa_req = urllib.request.Request(
                     "http://127.0.0.1:8317/v1/chat/completions",
-                    data=json.dumps({"model": clean_m, "messages": cpa_messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
+                    data=json.dumps({"model": clean_m, "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": "Bearer lumi-antigravity-local",
