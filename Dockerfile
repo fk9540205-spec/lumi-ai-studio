@@ -36,6 +36,7 @@ RUN chmod +x /app/entrypoint.sh
 # Set environment
 ENV PORT=3456
 ENV HOST=0.0.0.0
+ENV PYTHONUNBUFFERED=1
 EXPOSE 3456
 
 CMD ["/bin/bash", "/app/entrypoint.sh"]
