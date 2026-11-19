@@ -406,15 +406,22 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         except Exception as err:
             sys.stderr.write(f"Gemini image generation attempt failed: {err}\n")
 
-        # Fallback to high-definition FLUX.1
+        # 2. Studio-Grade FLUX.1 [dev] via Black Forest Labs
         try:
-            seed = int(time.time() * 1000) % 999999
-            enc_prompt = urllib.parse.quote(prompt)
-            fallback_url = f"https://image.pollinations.ai/prompt/{enc_prompt}?width=1024&height=1024&nologo=true&model=flux&seed={seed}"
-            self._json_response({"url": fallback_url, "provider": "flux-hd"})
-            return
-        except Exception:
-            self._error(500, "Image generation error")
+            if G4F_AVAILABLE and _g4f_client:
+                flux_resp = _g4f_client.images.generate(model="flux", prompt=prompt)
+                if flux_resp and flux_resp.data:
+                    raw_url = flux_resp.data[0].url
+                    if "?url=" in raw_url:
+                        direct_url = urllib.parse.unquote(raw_url.split("?url=")[1])
+                    else:
+                        direct_url = raw_url
+                    self._json_response({"url": direct_url, "provider": "black-forest-flux-1-dev"})
+                    return
+        except Exception as e:
+            sys.stderr.write(f"FLUX.1 Dev generation error: {e}\n")
+
+        self._error(500, "Image generation error")
 
     def _handle_music_generate(self):
         body = self._read_body()

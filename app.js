@@ -240,10 +240,10 @@
   let recognitionInstance = null;
   let currentlySpeakingId = null;
 
-  // Real System Personas
+  // Real System Personas - Natural, Direct & Authentic
   const PERSONA_PROMPTS = {
-    general: "You are a helpful, intelligent AI assistant.",
-    hindi: "Aap ek helpful aur intelligent AI assistant hain.",
+    general: "You are a direct, intelligent, and authentic AI assistant. Answer naturally as yourself without forced scripts, artificial cheerfulness, or fake dialect.",
+    hindi: "Aap ek smart aur direct AI assistant hain. Naturally aur seedha baat karein bina kisi banavati formality ke.",
     tutor: "You are an encouraging, expert English & Language Tutor.",
     engineer: "You are an elite Senior Staff Software Engineer.",
     dsa: "You are an expert Data Structures & Algorithms coach.",
@@ -462,9 +462,9 @@
 
     getProfile() {
       return loadJson(this.PROFILE_KEY, {
-        primaryTone: "brotherly_hinglish",
-        pronoun: "tu",
-        toneStyle: "Natural, candid, loyal brotherly Hinglish. Speak like a close, smart friend/brother using words like 'bhai', 'yr', 'tu', 'chal', 'dekh', 'tension mat le'. Be straight to the point, honest, sharp, and helpful.",
+        primaryTone: "natural",
+        pronoun: "natural",
+        toneStyle: "Direct, articulate, and completely natural to the user's language and style without any forced polite scripts or artificial constraints.",
         learnedRules: [
           "100% REAL WORKING IMPLEMENTATIONS: Strictly reject fake demos, fake mockups, or placeholder code. Provide complete, working, production-grade solutions.",
           "ZERO CLUTTER & NO USELESS BUTTONS: Keep things working under the hood in the background. Don't add unnecessary buttons or manual steps when it can be done automatically.",
@@ -2621,6 +2621,15 @@
               >
                 ${ICONS.image}
               </button>
+
+              <button
+                type="button"
+                id="music-studio-btn"
+                class="composer-toolbar-btn inline-flex size-8 items-center justify-center rounded-full border border-pink-500/30 bg-card/80 text-xs text-pink-400 hover:text-pink-300 hover:border-pink-500/60 transition-colors backdrop-blur shadow-xs cursor-pointer shrink-0"
+                title="Suno & Udio Music Studio (/song)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </button>
             </div>
 
             <div class="flex items-center gap-1.5 shrink-0 ml-auto" id="composer-submit-wrapper">
@@ -2780,17 +2789,29 @@
                         ${isCurrentlyStreaming && rawText ? `<span class="streaming-cursor"></span>` : ""}
                       </div>
 
-                      <!-- AI Image Generation Result / Loading Card -->
+                      <!-- AI Image Generation Result / Real-Time Animated Generative Canvas -->
                       ${
                         msg.imageLoading
                           ? `
-                        <div class="ai-image-card p-6 flex flex-col items-center justify-center gap-3 text-center my-3 border border-border bg-card/60 rounded-2xl">
-                          <div class="relative size-12 flex items-center justify-center">
-                            <div class="absolute inset-0 rounded-full border-2 border-primary/20 border-t-primary animate-spin"></div>
-                            <span class="text-xl">🎨</span>
+                        <div class="ai-image-generator-live my-3">
+                          <div class="ai-generator-mesh"></div>
+                          <div class="ai-generator-grid"></div>
+                          <div class="ai-scanner-beam"></div>
+                          <div class="ai-generator-core">
+                            <div class="ai-core-ring-outer"></div>
+                            <div class="ai-core-ring-inner"></div>
+                            <div class="ai-core-glow"></div>
+                            <span class="text-2xl relative z-10">🎨</span>
                           </div>
-                          <div class="text-sm font-medium text-foreground">Generating high-definition AI image...</div>
-                          <div class="text-xs text-muted-foreground truncate max-w-xs font-mono">"${escapeHtml(msg.imagePrompt || "")}"</div>
+                          <div class="ai-generator-stage-badge">
+                            <span class="size-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                            <span>${escapeHtml(msg.generationStage || "SYNTHESIZING 8K PIXELS")}</span>
+                          </div>
+                          <div class="ai-generator-title">Generating AI Masterpiece...</div>
+                          <div class="ai-generator-prompt-pill">"${escapeHtml(msg.imagePrompt || "")}"</div>
+                          <div class="ai-generator-progress-wrap">
+                            <div class="ai-generator-progress-bar"></div>
+                          </div>
                         </div>`
                           : msg.imageUrl
                           ? `
@@ -2820,6 +2841,46 @@
                                 ${ICONS.refreshCw}
                               </button>
                             </div>
+                          </div>
+                        </div>`
+                          : ""
+                      }
+
+                      <!-- Suno & Udio AI Music Track Card -->
+                      ${
+                        msg.musicLoading
+                          ? `
+                        <div class="music-studio-card p-6 flex flex-col items-center justify-center gap-3 text-center my-3">
+                          <div class="relative size-12 flex items-center justify-center">
+                            <div class="absolute inset-0 rounded-full border-2 border-pink-500/20 border-t-pink-500 animate-spin"></div>
+                            <span class="text-2xl">🎵</span>
+                          </div>
+                          <div class="text-sm font-semibold text-pink-300">Composing Track with Suno & Udio AI...</div>
+                          <div class="text-xs text-muted-foreground font-mono truncate max-w-xs">"${escapeHtml(msg.musicPrompt || "")}"</div>
+                          <div class="w-48 h-1.5 bg-pink-950/40 rounded-full overflow-hidden mt-1">
+                            <div class="h-full bg-gradient-to-r from-pink-500 to-purple-500 animate-pulse w-3/4"></div>
+                          </div>
+                        </div>`
+                          : msg.musicTrack
+                          ? `
+                        <div class="music-studio-card my-3">
+                          <div class="music-studio-header">
+                            <div class="music-studio-title">
+                              <span>🎵</span>
+                              <span>${escapeHtml(msg.musicTrack.title || "AI Musical Track")}</span>
+                            </div>
+                            <span class="music-tag-pill">${escapeHtml(msg.musicTrack.style || "Suno / Udio")}</span>
+                          </div>
+                          ${msg.musicTrack.audioUrl ? `
+                            <div class="mb-3">
+                              <audio controls src="${escapeHtml(msg.musicTrack.audioUrl)}" class="w-full rounded-lg"></audio>
+                            </div>
+                          ` : ''}
+                          <div class="music-lyrics-box">${escapeHtml(msg.musicTrack.composition || msg.musicTrack.lyrics || "")}</div>
+                          <div class="music-actions-row">
+                            <button type="button" class="inline-flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 font-medium transition-colors cursor-pointer" data-action="copy-music" data-text="${escapeHtml(msg.musicTrack.composition || msg.musicTrack.lyrics || '')}">
+                              📋 Copy Score & Lyrics
+                            </button>
                           </div>
                         </div>`
                           : ""
@@ -3618,49 +3679,53 @@
       }
     }
 
-    // 1. FREE HIGH-RESOLUTION IMAGE GENERATION (/image, /imagine, or visual prompt)
-    const isImageCommand =
-      /^\/(?:image|img|imagine)\s+/i.test(prompt) ||
-      /^(?:generate image of|generate image|image of|draw a|draw an|paint a|create an image of|create image of)\s*/i.test(prompt) ||
-      /\b(photo banao|image bana do|image banao|tasveer banao|picture bana do|photo generate karo)\b/i.test(prompt) ||
-      activePersona === "artist";
-
-    if (isImageCommand) {
-      let imagePrompt = prompt
-        .replace(/^\/(?:image|img|imagine)\s+/i, "")
-        .replace(/^(?:generate image of|generate image|image of|draw a|draw an|paint a|create an image of|create image of)\s*/i, "")
-        .replace(/\b(photo banao|image bana do|image banao|tasveer banao|picture bana do|photo generate karo)\b/i, "")
-        .trim();
-      if (!imagePrompt) imagePrompt = prompt.trim();
-
-      // Automatically enhance prompt with visual keywords for ultra-high definition
+    // Reusable Real-Time Generative Image Flow
+    const triggerImageGeneration = (imagePrompt, targetMsg) => {
       let enhancedPrompt = imagePrompt;
       if (!/photorealistic|8k|masterpiece|cinematic|detailed/i.test(enhancedPrompt)) {
         enhancedPrompt = `${imagePrompt}, highly detailed, photorealistic, 8k resolution, cinematic lighting, masterpiece`;
       }
 
-      assistantMsg.imagePrompt = imagePrompt;
-      assistantMsg.imageLoading = true;
-      assistantMsg.content = `🎨 **Generating High-Definition FLUX.1 Image** for: *"**${escapeHtml(imagePrompt)}**"*...`;
+      targetMsg.imagePrompt = imagePrompt;
+      targetMsg.imageLoading = true;
+      targetMsg.content = "";
+      targetMsg.generationStage = "SAMPLING LATENT SPACE";
       saveJson(STORAGE.CHATS, conversations);
       render();
       scrollToBottom();
 
-      let targetUrl = "";
-      try {
-        const candidateEndpoints = [
-          "http://127.0.0.1:3456/api/generate/image",
-          "http://localhost:3456/api/generate/image",
-          "https://lumi-backend-v4-production.up.railway.app/api/generate/image"
-        ];
-        if (window.location.origin && window.location.origin.startsWith("http")) {
-          candidateEndpoints.unshift(`${window.location.origin}/api/generate/image`);
+      const stages = [
+        "SAMPLING LATENT SPACE",
+        "DIFFUSION DENOISING (24/30)",
+        "SYNTHESIZING 8K TEXTURES",
+        "FINALIZING MASTERPIECE"
+      ];
+      let stageIdx = 0;
+      const stageTimer = setInterval(() => {
+        if (!targetMsg.imageLoading) {
+          clearInterval(stageTimer);
+          return;
         }
+        stageIdx = (stageIdx + 1) % stages.length;
+        targetMsg.generationStage = stages[stageIdx];
+        render();
+      }, 1000);
 
+      const candidateEndpoints = [
+        "http://127.0.0.1:3456/api/generate/image",
+        "http://localhost:3456/api/generate/image",
+        "https://lumi-backend-v4-production.up.railway.app/api/generate/image"
+      ];
+      if (window.location.origin && window.location.origin.startsWith("http")) {
+        candidateEndpoints.unshift(`${window.location.origin}/api/generate/image`);
+      }
+
+      (async () => {
+        let targetUrl = "";
         for (const ep of candidateEndpoints) {
           try {
             const imgCtrl = new AbortController();
-            const imgTid = setTimeout(() => imgCtrl.abort(), 8000);
+            const imgTid = setTimeout(() => imgCtrl.abort(), 40000);
             const imgResp = await fetch(ep, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -3675,40 +3740,142 @@
                 break;
               }
             }
-          } catch (e) {
-            // try next
-          }
+          } catch (e) {}
         }
-      } catch (err) {
-        console.warn("Backend image generation bypassed:", err);
+
+        if (!targetUrl) {
+          clearInterval(stageTimer);
+          targetMsg.imageLoading = false;
+          targetMsg.content = `❌ Image generation failed on AI cluster. Please retry in a few moments.`;
+          isStreaming = false;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+          scrollToBottom();
+          return;
+        }
+
+        const preloader = new Image();
+        preloader.onload = () => {
+          clearInterval(stageTimer);
+          targetMsg.imageUrl = targetUrl;
+          targetMsg.imageLoading = false;
+          targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+          isStreaming = false;
+          saveJson(STORAGE.CHATS, conversations);
+          AudioEffects.play("success");
+          render();
+          scrollToBottom();
+        };
+        preloader.onerror = () => {
+          clearInterval(stageTimer);
+          targetMsg.imageUrl = targetUrl;
+          targetMsg.imageLoading = false;
+          targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+          isStreaming = false;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+          scrollToBottom();
+        };
+        preloader.src = targetUrl;
+      })();
+    };
+
+    // Reusable Suno & Udio Song Generation Flow
+    const triggerSongGeneration = (songPrompt, targetMsg, style = "Bollywood / Pop") => {
+      targetMsg.musicPrompt = songPrompt;
+      targetMsg.musicLoading = true;
+      targetMsg.content = "";
+      saveJson(STORAGE.CHATS, conversations);
+      render();
+      scrollToBottom();
+
+      const candidateEndpoints = [
+        "http://127.0.0.1:3456/api/music/generate",
+        "http://localhost:3456/api/music/generate",
+        "https://lumi-backend-v4-production.up.railway.app/api/music/generate"
+      ];
+      if (window.location.origin && window.location.origin.startsWith("http")) {
+        candidateEndpoints.unshift(`${window.location.origin}/api/music/generate`);
       }
 
-      if (!targetUrl) {
-        const seed = Math.floor(Math.random() * 999999);
-        targetUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&nologo=true&model=flux&seed=${seed}`;
-      }
+      (async () => {
+        let resData = null;
+        for (const ep of candidateEndpoints) {
+          try {
+            const mCtrl = new AbortController();
+            const mTid = setTimeout(() => mCtrl.abort(), 60000);
+            const mResp = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt: songPrompt, style: style }),
+              signal: mCtrl.signal
+            });
+            clearTimeout(mTid);
+            if (mResp.ok) {
+              resData = await mResp.json();
+              break;
+            }
+          } catch (e) {}
+        }
 
-      const preloader = new Image();
-      preloader.onload = () => {
-        assistantMsg.imageUrl = targetUrl;
-        assistantMsg.imageLoading = false;
-        assistantMsg.content = `✨ **FLUX.1 High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
-        isStreaming = false;
-        saveJson(STORAGE.CHATS, conversations);
-        AudioEffects.play("success");
-        render();
-        scrollToBottom();
-      };
-      preloader.onerror = () => {
-        assistantMsg.imageUrl = targetUrl;
-        assistantMsg.imageLoading = false;
-        assistantMsg.content = `✨ **FLUX.1 High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+        targetMsg.musicLoading = false;
+        if (resData && resData.status === "success") {
+          targetMsg.musicTrack = {
+            title: resData.title || songPrompt,
+            style: resData.style || style,
+            composition: resData.composition || (resData.data ? JSON.stringify(resData.data, null, 2) : "")
+          };
+          targetMsg.content = `✨ **AI Song Track Composed Successfully!**`;
+          AudioEffects.play("success");
+        } else {
+          targetMsg.content = `❌ Song generation error. Please check your network and try again.`;
+        }
         isStreaming = false;
         saveJson(STORAGE.CHATS, conversations);
         render();
         scrollToBottom();
-      };
-      preloader.src = targetUrl;
+      })();
+    };
+
+    // 1. FREE HIGH-RESOLUTION IMAGE GENERATION (/image, /imagine, or natural prompt)
+    const isImageCommand =
+      /^\/(?:image|img|imagine)\s+/i.test(prompt) ||
+      /^(?:generate image|image of|draw|paint|create image|render image|sketch)\b/i.test(prompt) ||
+      /\b(?:photo|image|tasveer|picture|pic|wallpaper|drawing|portrait)\s+(?:banao|banado|bana\s+do|generate|create|render|dikhao|kheecho)\b/i.test(prompt) ||
+      /\b(?:banao|banado|bana\s+do|generate|create|render|dikhao)\s+.*?\b(?:photo|image|tasveer|picture|pic|wallpaper)\b/i.test(prompt) ||
+      /\b(?:ki|ka|ek|koi)\s+(?:photo|image|tasveer|picture|pic|wallpaper)?\s*(?:banao|banado|bana\s+do)\b/i.test(prompt) ||
+      /\b(ki\s+banao|ka\s+banao|ki\s+tasveer|ka\s+photo|ki\s+photo|ki\s+pic)\b/i.test(prompt) ||
+      activePersona === "artist";
+
+    if (isImageCommand) {
+      let imagePrompt = prompt
+        .replace(/^\/(?:image|img|imagine)\s+/i, "")
+        .replace(/^(?:generate image of|generate image|image of|draw a|draw an|paint a|create an image of|create image of|draw|paint)\s*/i, "")
+        .replace(/\b(?:photo|image|tasveer|picture|pic|wallpaper)\s+(?:banao|banado|bana\s+do|generate|create|render|dikhao|kheecho)\b/gi, "")
+        .replace(/\b(?:banao|banado|bana\s+do|generate|create|render|dikhao)\s+/gi, "")
+        .replace(/\b(?:ki\s+banao|ka\s+banao|ki\s+tasveer|ka\s+photo|ki\s+photo|ki\s+pic)\b/gi, "")
+        .replace(/\b(?:ki|ka|ke|ek|koi)\b/gi, "")
+        .trim();
+      if (!imagePrompt) imagePrompt = prompt.trim();
+      triggerImageGeneration(imagePrompt, assistantMsg);
+      return;
+    }
+
+    // 1B. SUNO & UDIO AI MUSIC & SONG GENERATION (/song, /music, or natural prompt)
+    const isMusicCommand =
+      /^\/(?:music|song|suno|udio)\s+/i.test(prompt) ||
+      /\b(?:gaana|gana|song|music|track)\s+(?:banao|banado|bana\s+do|create|generate|compose)\b/i.test(prompt) ||
+      /\b(?:banao|banado|bana\s+do|create|generate|compose)\s+.*?\b(?:gaana|gana|song|music|track)\b/i.test(prompt) ||
+      /\b(?:suno|udio)\s+(?:song|music|track)?\b/i.test(prompt);
+
+    if (isMusicCommand) {
+      let songPrompt = prompt
+        .replace(/^\/(?:music|song|suno|udio)\s+/i, "")
+        .replace(/\b(?:gaana|gana|song|music|track)\s+(?:banao|banado|bana\s+do|create|generate|compose)\b/gi, "")
+        .replace(/\b(?:banao|banado|bana\s+do|create|generate|compose)\s+(?:ek|koi)?\s*(?:gaana|gana|song|music|track)?\b/gi, "")
+        .trim();
+      if (!songPrompt) songPrompt = prompt.trim();
+      triggerSongGeneration(songPrompt, assistantMsg);
       return;
     }
 
@@ -4115,6 +4282,23 @@
         if (!streamedSuccessfully && !streamAbortController.signal.aborted) {
           assistantMsg.content = "⚠️ AI server se reply connect nahi ho paaya. Kripya apna internet connection check karein ya thodi der baad dobara try karein.";
           showToast("AI reply connect nahi ho paaya. Please try again.");
+        }
+
+        // Automatic Interceptor: If model emitted tool_calls for image generation (mcp_render_image / render_image)
+        if (assistantMsg.content && (assistantMsg.content.includes("mcp_render_image") || assistantMsg.content.includes("tool_calls:") || assistantMsg.content.includes("render_image"))) {
+          const promptMatch = assistantMsg.content.match(/"prompt"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/i);
+          if (promptMatch && promptMatch[1]) {
+            try {
+              const cleanPrompt = JSON.parse(`"${promptMatch[1]}"`);
+              if (cleanPrompt && cleanPrompt.trim().length > 2) {
+                assistantMsg.content = "";
+                triggerImageGeneration(cleanPrompt.trim(), assistantMsg);
+                return;
+              }
+            } catch (e) {
+              console.warn("Failed to parse intercepted tool prompt:", e);
+            }
+          }
         }
       }
     } catch (err) {
@@ -6607,6 +6791,43 @@
         }
       });
     }
+
+    // 16b. Suno & Udio AI Music Studio Button
+    const musicStudioBtn = document.querySelector("#music-studio-btn");
+    if (musicStudioBtn) {
+      musicStudioBtn.addEventListener("click", () => {
+        const ta = document.querySelector("#composer-textarea");
+        if (ta) {
+          const val = ta.value.trim();
+          if (val) {
+            if (!val.startsWith("/song ")) {
+              ta.value = `/song ${val}`;
+            }
+            const form = document.querySelector("#chat-composer-form");
+            if (form) {
+              if (form.requestSubmit) form.requestSubmit();
+              else form.dispatchEvent(new Event("submit"));
+            }
+          } else {
+            ta.value = "/song ";
+            ta.focus();
+            showToast("🎵 Type your song topic (e.g. /song Bollywood romantic monsoon rain)");
+          }
+        }
+      });
+    }
+
+    // 16c. Copy Music Lyrics & Score
+    document.querySelectorAll("[data-action='copy-music']").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const text = btn.getAttribute("data-text") || "";
+        if (text) {
+          navigator.clipboard.writeText(text);
+          showToast("🎵 Full score & lyrics copied!");
+        }
+      });
+    });
 
     // 17. Image Action Delegation (Download, Regenerate, Zoom)
     document.querySelectorAll("[data-action='download-image']").forEach((btn) => {
