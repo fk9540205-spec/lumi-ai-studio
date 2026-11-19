@@ -352,6 +352,9 @@
   let settingsModalOpen = false;
   let attachedFiles = []; // [{ name, size, type, content, isPdf, pages }]
   let activeHtmlModal = null; // code string for HTML preview modal
+  let lightboxImageSrc = null; // active full image URL for in-app lightbox
+  let lightboxImagePrompt = ""; // prompt/title for lightbox
+  let lightboxZoomed = false; // toggle for 1x vs 1.6x zoom
 
   function formatBytes(bytes) {
     if (!bytes || bytes === 0) return "0 B";
@@ -2324,6 +2327,41 @@
           <div class="html-preview-body">
             <iframe id="html-modal-iframe" sandbox="allow-scripts allow-modals"></iframe>
           </div>
+        </div>
+      </div>`;
+  }
+
+  function renderImageLightbox() {
+    if (!lightboxImageSrc) return "";
+    return `
+      <div class="lightbox-modal" id="image-lightbox-modal">
+        <div class="lightbox-header">
+          <button type="button" class="lightbox-back-btn" id="close-lightbox-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>Back</span>
+          </button>
+          <div class="lightbox-title">
+            🎨 ${escapeHtml(lightboxImagePrompt || "AI Generated Image")}
+          </div>
+          <div class="lightbox-actions">
+            <button type="button" class="lightbox-icon-btn" id="lightbox-download-action-btn" title="Download Image">
+              ${ICONS.download}
+            </button>
+            <button type="button" class="lightbox-icon-btn" id="lightbox-zoom-toggle-btn" title="Toggle Zoom">
+              ${lightboxZoomed ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>` : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>`}
+            </button>
+          </div>
+        </div>
+        <div class="lightbox-body" id="lightbox-stage">
+          <img
+            id="lightbox-main-img"
+            src="${escapeHtml(lightboxImageSrc)}"
+            alt="${escapeHtml(lightboxImagePrompt || "AI Generated Image")}"
+            class="lightbox-img ${lightboxZoomed ? 'zoomed' : ''}"
+          />
+        </div>
+        <div class="lightbox-footer">
+          Tap image to zoom • Tap Back or background to return to chat
         </div>
       </div>`;
   }
@@ -5667,6 +5705,14 @@
   window.LumiVoiceCall = LumiVoiceCall;
 
   window.handleAndroidBack = function() {
+    // 0. If Image Lightbox is open, close it cleanly
+    if (lightboxImageSrc) {
+      lightboxImageSrc = null;
+      lightboxZoomed = false;
+      render();
+      return true;
+    }
+
     // 1. If Live Voice Call is open
     if (window.LumiVoiceCall && window.LumiVoiceCall.isOpen) {
       const voiceMenu = document.querySelector("#live-voice-menu");
@@ -5844,6 +5890,9 @@
     root.innerHTML += renderHtmlModal();
     if (settingsModalOpen) {
       root.innerHTML += renderSettingsModal();
+    }
+    if (lightboxImageSrc) {
+      root.innerHTML += renderImageLightbox();
     }
     attachEventListeners();
   }
@@ -6900,12 +6949,62 @@
       });
     });
 
+    // In-App Fullscreen Image Lightbox Handlers
+    const closeLightboxBtn = document.querySelector("#close-lightbox-btn");
+    if (closeLightboxBtn) {
+      closeLightboxBtn.addEventListener("click", () => {
+        lightboxImageSrc = null;
+        lightboxZoomed = false;
+        render();
+      });
+    }
+
+    const lightboxStage = document.querySelector("#lightbox-stage");
+    if (lightboxStage) {
+      lightboxStage.addEventListener("click", (e) => {
+        if (e.target === lightboxStage) {
+          lightboxImageSrc = null;
+          lightboxZoomed = false;
+          render();
+        }
+      });
+    }
+
+    const lightboxMainImg = document.querySelector("#lightbox-main-img");
+    const lightboxZoomToggleBtn = document.querySelector("#lightbox-zoom-toggle-btn");
+    if (lightboxMainImg) {
+      lightboxMainImg.addEventListener("click", (e) => {
+        e.stopPropagation();
+        lightboxZoomed = !lightboxZoomed;
+        render();
+      });
+    }
+    if (lightboxZoomToggleBtn) {
+      lightboxZoomToggleBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        lightboxZoomed = !lightboxZoomed;
+        render();
+      });
+    }
+
+    const lightboxDownloadActionBtn = document.querySelector("#lightbox-download-action-btn");
+    if (lightboxDownloadActionBtn && lightboxImageSrc) {
+      lightboxDownloadActionBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        downloadImageFile(lightboxImageSrc, lightboxImagePrompt || "lumi-image");
+      });
+    }
+
     document.querySelectorAll("[data-action='zoom-image']").forEach((img) => {
       img.addEventListener("click", (e) => {
         e.stopPropagation();
         const src = img.getAttribute("data-src") || img.src;
+        const prompt = img.getAttribute("alt") || img.getAttribute("data-prompt") || "AI Generated Image";
         if (src) {
-          window.open(src, "_blank");
+          lightboxImageSrc = src;
+          lightboxImagePrompt = prompt;
+          lightboxZoomed = false;
+          render();
         }
       });
     });
