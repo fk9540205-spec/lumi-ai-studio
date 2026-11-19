@@ -67,12 +67,40 @@ WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 FREE_HUB_URL = "https://text.pollinations.ai/openai/chat/completions"
 _pollinations_blocked_until = 0
 FREE_MODELS = [
+    {"id": "openai-fast", "name": "GPT-OSS 20B Fast (Pollinations)", "provider": "free-hub", "description": "Fast reasoning and coding model with tool calling"},
     {"id": "qwen-2.5-coder-32b", "name": "Qwen 2.5 Coder 32B (Free Coding)", "provider": "free-hub", "description": "Top-tier AI coding model (Fast & Free)"},
     {"id": "llama-3.3-70b", "name": "Llama 3.3 70B (Free Fast)", "provider": "free-hub", "description": "Flagship Meta Llama 3.3 70B (Fluent Hindi/English)"},
-    {"id": "gpt-4o-mini", "name": "GPT-4o Mini (Free)", "provider": "free-hub", "description": "OpenAI GPT-4o Mini via Free Engine"},
     {"id": "deepseek-distill-qwen-32b", "name": "DeepSeek R1 Distill (Free)", "provider": "free-hub", "description": "DeepSeek reasoning & math model"},
     {"id": "mistral-small-3.1-24b", "name": "Mistral Small (Free)", "provider": "free-hub", "description": "Fast European reasoning model"},
 ]
+
+def _serialize_g4f_tool_call(tool_call):
+    if isinstance(tool_call, dict):
+        return tool_call
+    model_dump = getattr(tool_call, "model_dump", None)
+    if callable(model_dump):
+        return model_dump(exclude_none=True)
+
+    serialized = {}
+    for key in ("index", "id", "type"):
+        value = getattr(tool_call, key, None)
+        if value is not None:
+            serialized[key] = value
+    function = getattr(tool_call, "function", None)
+    if function is not None:
+        serialized["function"] = {
+            key: value
+            for key in ("name", "arguments")
+            if (value := function.get(key) if isinstance(function, dict) else getattr(function, key, None)) is not None
+        }
+    return serialized
+
+def _g4f_retry_delay(error):
+    match = re.search(r"retry after (?P<seconds>\d+(?:\.\d+)?) seconds", str(error), re.IGNORECASE)
+    if not match:
+        return None
+    delay = float(match.group("seconds"))
+    return delay + 0.1 if 0 <= delay <= 5 else None
 
 # ---------------------------------------------------------------------------
 # Duck.ai configuration
@@ -366,22 +394,98 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         if "/" in raw_model:
             raw_model = raw_model.split("/")[-1]
 
-        # Map to reliable working models
-        if "qwen" in raw_model or "code" in raw_model:
-            target_model = "qwen-2.5-coder-32b"
-        elif "llama" in raw_model:
-            target_model = "llama-3.3-70b"
-        elif "deepseek" in raw_model:
-            target_model = "deepseek-distill-qwen-32b"
-        elif "mistral" in raw_model:
-            target_model = "mistral-small-3.1-24b"
-        else:
-            target_model = "llama-3.3-70b"
-
         messages = data.get("messages", [])
         stream = data.get("stream", True)
         image = data.get("image")
         max_tokens = int(data.get("max_tokens", 4096))
+
+        # 0. CLIProxyAPI Upstream (Google Antigravity Authenticated High-Tier Models)
+        antigravity_models = [
+            "claude-sonnet-4-6", "claude-opus-4-6-thinking", "gemini-3-flash",
+            "gemini-3.8-flash-tiered", "gemini-3.8-flash-high", "gemini-3.1-flash-image",
+            "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gpt-oss-120b-medium"
+        ]
+        if raw_model in antigravity_models or raw_model.startswith("antigravity-"):
+            clean_m = raw_model.replace("antigravity-", "")
+            # Inject clean Hindi / Hinglish instruction
+            clean_lang_rule = (
+                "CRITICAL LANGUAGE RULE: When speaking or replying in Hindi or Hinglish, ALWAYS use pure, clean, standard, "
+                "and grammatically correct natural Hindi (in Roman script or Devanagari). "
+                "STRICTLY FORBIDDEN: NEVER use broken slang, bizarre corrupted words (like 'tero', 'bhir se', 'kaafi boss'), "
+                "or strange dialects. Speak smoothly, clearly, respectfully, and naturally like an educated native Hindi speaker."
+            )
+            cpa_messages = []
+            has_sys = False
+            for m in messages:
+                if m.get("role") == "system":
+                    has_sys = True
+                    cpa_messages.append({"role": "system", "content": m.get("content", "") + "\n\n" + clean_lang_rule})
+                else:
+                    cpa_messages.append(m)
+            if not has_sys:
+                cpa_messages.insert(0, {"role": "system", "content": clean_lang_rule})
+
+            try:
+                cpa_req = urllib.request.Request(
+                    "http://127.0.0.1:8317/v1/chat/completions",
+                    data=json.dumps({"model": clean_m, "messages": cpa_messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer lumi-antigravity-local",
+                        "Accept": "text/event-stream" if stream else "application/json"
+                    },
+                    method="POST"
+                )
+                cpa_resp = urllib.request.urlopen(cpa_req, timeout=45)
+                if stream:
+                    self._start_sse()
+                    for raw_line in cpa_resp:
+                        line = raw_line.decode(errors="replace")
+                        if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                            try:
+                                chunk_json = json.loads(line[6:])
+                                choices = chunk_json.get("choices", [])
+                                if choices:
+                                    delta = choices[0].get("delta", {})
+                                    imgs = delta.get("images")
+                                    if imgs and isinstance(imgs, list) and len(imgs) > 0:
+                                        img_url = imgs[0].get("image_url", {}).get("url")
+                                        if img_url:
+                                            delta["content"] = f"\n\n![Generated Image]({img_url})\n\n"
+                                            line = "data: " + json.dumps(chunk_json) + "\n\n"
+                            except Exception:
+                                pass
+                            self._send_chunk(line.encode("utf-8"))
+                        elif line.strip() == "data: [DONE]":
+                            break
+                    self._send_chunk(b"data: [DONE]\n\n")
+                    self._end_chunks()
+                    return
+                else:
+                    raw_data = json.loads(cpa_resp.read().decode())
+                    choices = raw_data.get("choices", [])
+                    if choices:
+                        msg = choices[0].get("message", {})
+                        imgs = msg.get("images")
+                        if imgs and isinstance(imgs, list) and len(imgs) > 0:
+                            img_url = imgs[0].get("image_url", {}).get("url")
+                            if img_url and not msg.get("content"):
+                                msg["content"] = f"![Generated Image]({img_url})"
+                    self._json_response(raw_data)
+                    return
+            except Exception as cpa_err:
+                sys.stderr.write(f"CLIProxyAPI upstream attempt failed, falling back: {cpa_err}\n")
+
+        # Map to reliable working models
+        if "gemini" in raw_model:
+            target_model = "gemini-2.5-flash"
+        tools = data.get("tools") or []
+        tool_choice = data.get("tool_choice", "auto")
+        allowed_tool_names = {
+            tool.get("function", {}).get("name")
+            for tool in tools
+            if isinstance(tool, dict) and isinstance(tool.get("function"), dict) and isinstance(tool["function"].get("name"), str)
+        }
 
         # 0. Multimodal Vision: If user uploaded an image, route to Gemini Vision
         if image and G4F_AVAILABLE and _g4f_client:
@@ -431,13 +535,21 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             try:
                 req = urllib.request.Request(
                     FREE_HUB_URL,
-                    data=json.dumps({"model": "openai", "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
+                    data=json.dumps({
+                        "model": target_model if target_model == "openai-fast" else "openai",
+                        "messages": messages,
+                        "stream": stream,
+                        "max_tokens": max_tokens,
+                        **({"reasoning_effort": "low"} if target_model == "openai-fast" else {}),
+                        **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+                    }).encode("utf-8"),
                     headers={"Content-Type": "application/json", "Accept": "text/event-stream" if stream else "application/json"},
                     method="POST",
                 )
-                resp = urllib.request.urlopen(req, timeout=2.0, context=_get_ssl_context())
+                resp = urllib.request.urlopen(req, timeout=4.0, context=_get_ssl_context())
                 if stream:
                     self._start_sse()
+                    streamed_tool_names = {}
                     for raw_line in resp:
                         line = raw_line.decode(errors="replace").strip()
                         if line.startswith("data: "):
@@ -448,9 +560,21 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                                 parsed = json.loads(data_part)
                                 delta = parsed.get("choices", [{}])[0].get("delta", {})
                                 content = delta.get("content") or ""
-                                if content:
+                                tool_calls = []
+                                for tool_call in delta.get("tool_calls", []):
+                                    function = tool_call.get("function") or {}
+                                    name = function.get("name")
+                                    index = tool_call.get("index")
+                                    if name and index is not None:
+                                        streamed_tool_names[index] = name
+                                    active_name = name or streamed_tool_names.get(index)
+                                    if active_name in allowed_tool_names:
+                                        tool_calls.append(tool_call)
+                                    else:
+                                        content += function.get("arguments") or ""
+                                if content or tool_calls:
                                     chunk_payload = {
-                                        "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
+                                        "choices": [{"index": 0, "delta": {**({"content": content} if content else {}), **({"tool_calls": tool_calls} if tool_calls else {})}, "finish_reason": None}],
                                         "provider": "free-ai-hub",
                                         "model": target_model,
                                     }
@@ -462,6 +586,17 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     return
                 else:
                     data_resp = json.loads(resp.read().decode())
+                    choice = data_resp.get("choices", [{}])[0]
+                    message = choice.get("message", {})
+                    kept_tool_calls = []
+                    for tool_call in message.get("tool_calls", []):
+                        function = tool_call.get("function") or {}
+                        if function.get("name") in allowed_tool_names:
+                            kept_tool_calls.append(tool_call)
+                        else:
+                            message["content"] = (message.get("content") or "") + (function.get("arguments") or "")
+                    if "tool_calls" in message:
+                        message["tool_calls"] = kept_tool_calls
                     self._json_response(data_resp)
                     return
             except Exception as e:
@@ -469,7 +604,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 sys.stderr.write(f"Primary Free AI Hub attempt failed (circuit open 120s), falling back to in-process engine: {e}\n")
 
         # 2. Secondary fallback: In-process Cloudflare G4F Engine
-        if G4F_AVAILABLE and _g4f_client:
+        if target_model != "openai-fast" and G4F_AVAILABLE and _g4f_client:
             try:
                 import g4f.Provider
                 provider = g4f.Provider.Cloudflare
@@ -533,6 +668,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
         # 3. Third fallback: Direct text endpoint with prompt
         try:
+            if target_model == "openai-fast":
+                raise RuntimeError("GPT-OSS Fast is temporarily unavailable; no different model was substituted.")
             last_prompt = ""
             for m in reversed(messages):
                 if m.get("role") == "user":
@@ -604,6 +741,12 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     "provider": "g4f",
                     "description": f"GPT4Free · {m}",
                 })
+            models.append({
+                "id": "llm7-coder",
+                "name": "LLM7 (Coding + Native Tools)",
+                "provider": "g4f",
+                "description": "Remote coding model with tested consecutive workspace tool calls",
+            })
             self._json_response({
                 "provider": "g4f",
                 "status": "online",
@@ -659,48 +802,91 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             return
 
         model = data.get("model", "gpt-4o-mini")
+        requested_model = model
         messages = data.get("messages", [])
         stream = data.get("stream", True)
+        tools = data.get("tools") or []
+        tool_choice = data.get("tool_choice", "auto")
+        selected_provider = None
+
+        if model == "llm7-coder":
+            if not G4F_AVAILABLE or not _g4f_client:
+                self._error(503, "LLM7 requires the in-process GPT4Free provider, which is unavailable.")
+                return
+            selected_provider = g4f.Provider.LLM7
+            model = "default"
 
         if not messages:
             self._error(400, "No messages provided")
             return
+
+        provider_options = {"provider": selected_provider} if selected_provider else {}
 
         # A. In-process G4F Client (Fastest & direct)
         if G4F_AVAILABLE and _g4f_client:
             try:
                 if stream:
                     self._start_sse()
-                    response = _g4f_client.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        stream=True,
-                    )
-                    for chunk in response:
-                        content = ""
-                        if hasattr(chunk, "choices") and chunk.choices:
-                            content = getattr(chunk.choices[0].delta, "content", "") or ""
-                        if content:
-                            chunk_payload = {
-                                "choices": [{"index": 0, "delta": {"content": content}, "finish_reason": None}],
-                                "provider": "g4f",
-                                "model": model,
-                            }
-                            self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                    for attempt in range(2):
+                        emitted_chunk = False
+                        try:
+                            response = _g4f_client.chat.completions.create(
+                                model=model,
+                                **provider_options,
+                                messages=messages,
+                                stream=True,
+                                **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+                            )
+                            for chunk in response:
+                                content = ""
+                                tool_calls = []
+                                if hasattr(chunk, "choices") and chunk.choices:
+                                    delta = chunk.choices[0].delta
+                                    content = getattr(delta, "content", "") or ""
+                                    raw_tool_calls = getattr(delta, "tool_calls", None) or []
+                                    tool_calls = [_serialize_g4f_tool_call(call) for call in raw_tool_calls]
+                                if content or tool_calls:
+                                    chunk_payload = {
+                                        "choices": [{"index": 0, "delta": {**({"content": content} if content else {}), **({"tool_calls": tool_calls} if tool_calls else {})}, "finish_reason": None}],
+                                        "provider": "g4f",
+                                        "model": requested_model,
+                                    }
+                                    self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
+                                    emitted_chunk = True
+                            break
+                        except Exception as e:
+                            retry_delay = _g4f_retry_delay(e)
+                            if selected_provider and attempt == 0 and not emitted_chunk and retry_delay is not None:
+                                time.sleep(retry_delay)
+                                continue
+                            raise
                     self._send_chunk(b"data: [DONE]\n\n")
                     self._end_chunks()
                     return
                 else:
-                    response = _g4f_client.chat.completions.create(
-                        model=model,
-                        messages=messages,
-                        stream=False,
-                    )
-                    content = response.choices[0].message.content or ""
+                    for attempt in range(2):
+                        try:
+                            response = _g4f_client.chat.completions.create(
+                                model=model,
+                                **provider_options,
+                                messages=messages,
+                                stream=False,
+                                **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+                            )
+                            break
+                        except Exception as e:
+                            retry_delay = _g4f_retry_delay(e)
+                            if selected_provider and attempt == 0 and retry_delay is not None:
+                                time.sleep(retry_delay)
+                                continue
+                            raise
+                    message = response.choices[0].message
+                    content = message.content or ""
+                    tool_calls = [_serialize_g4f_tool_call(call) for call in (getattr(message, "tool_calls", None) or [])]
                     self._json_response({
-                        "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+                        "choices": [{"index": 0, "message": {**{"role": "assistant", "content": content}, **({"tool_calls": tool_calls} if tool_calls else {})}, "finish_reason": "stop"}],
                         "provider": "g4f",
-                        "model": model,
+                        "model": requested_model,
                     })
                     return
             except Exception as e:
@@ -708,7 +894,13 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 sys.stderr.write(f"In-process G4F failed, falling back: {e}\n")
 
         # B. Fallback to G4F HTTP server or proxy
-        g4f_body = json.dumps({"model": model, "messages": messages, "stream": stream}).encode()
+        g4f_body = json.dumps({
+            "model": model,
+            "messages": messages,
+            "stream": stream,
+            **({"provider": "LLM7"} if selected_provider else {}),
+            **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+        }).encode()
         req = urllib.request.Request(
             f"{G4F_URL}/chat/completions",
             data=g4f_body,

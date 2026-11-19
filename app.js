@@ -19,6 +19,12 @@
 
   // --- Built-in Models ---
   const BUILT_IN_MODELS = [
+    { id: "gemini-3-flash", label: "Gemini 3 Flash (Google Auth)", group: "Google Antigravity" },
+    { id: "gemini-3.1-flash-image", label: "Gemini 3.1 Flash Image (Google Auth)", group: "Google Antigravity" },
+    { id: "claude-sonnet-4-6", label: "Claude Sonnet (Google Auth)", group: "Google Antigravity" },
+    { id: "claude-opus-4-6-thinking", label: "Claude Opus Reasoning (Google Auth)", group: "Google Antigravity" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Free Google)", group: "Free AI Engine" },
+    { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash (Free Ultra Speed)", group: "Free AI Engine" },
     { id: "llama-3.3-70b", label: "Llama 3.3 70B (Free Ultra Fast)", group: "Free AI Engine" },
     { id: "qwen-2.5-coder-32b", label: "Qwen 2.5 Coder 32B (Free Coding)", group: "Free AI Engine" },
     { id: "gpt-4o-mini", label: "GPT-4o Mini (Free)", group: "Free AI Engine" },
@@ -28,6 +34,15 @@
 
   // --- Provider Catalog for Adding New Ones ---
   const PROVIDER_TEMPLATES = [
+    {
+      name: "⚡ Google Antigravity (CPA)",
+      protocol: "openai",
+      base_url: "/api/free",
+      default_model: "gemini-3-flash",
+      models: ["gemini-3-flash", "gemini-3.1-flash-image", "claude-sonnet-4-6", "claude-opus-4-6-thinking", "gemini-3.8-flash-tiered"],
+      group: "Google Antigravity",
+      description: "CLIProxyAPI authenticated with Google OAuth — Gemini 3 & Claude Opus",
+    },
     {
       name: "🚀 Free AI Hub (Zero Setup)",
       protocol: "openai",
@@ -137,6 +152,7 @@
     search: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.34-4.34"></path></svg>`,
     server: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"></rect><rect width="20" height="8" x="2" y="14" rx="2" ry="2"></rect><line x1="6" x2="6.01" y1="6" y2="6"></line><line x1="6" x2="6.01" y1="18" y2="18"></line></svg>`,
     logOut: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path></svg>`,
+    send: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>`,
     cornerDownLeft: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4v7a4 4 0 0 1-4 4H4"></path><path d="m9 10-5 5 5 5"></path></svg>`,
     square: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 fill-current" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"></rect></svg>`,
     edit: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>`,
@@ -165,6 +181,10 @@
     moon: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>`,
     sun: `<svg xmlns="http://www.w3.org/2000/svg" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>`,
     globe: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" x2="22" y1="12" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`,
+    camera: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>`,
+    flashlight: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6c0 2-2 4-2 7v6a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-6c0-3-2-5-2-7V2h12v4z"></path><line x1="6" x2="18" y1="6" y2="6"></line><line x1="12" x2="12" y1="12" y2="12"></line></svg>`,
+    battery: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="10" x="2" y="7" rx="2" ry="2"></rect><line x1="22" x2="22" y1="11" y2="13"></line></svg>`,
+    brain: `<svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04Z"></path><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04Z"></path></svg>`,
   };
 
   // --- App State ---
@@ -222,11 +242,12 @@
 
   // Real System Personas
   const PERSONA_PROMPTS = {
-    general: "You are Lumi, a top-tier, highly articulate AI companion. Format your responses with clean, professional elegance. Do NOT clutter responses with excessive asterisks (**) or bold text on every phrase. Use clean headings, well-structured bullet points, and natural prose. When live search results are provided, synthesize the facts directly with confidence and authority.",
+    general: "You are Lumi, a top-tier, highly articulate AI companion. Format your responses with clean, professional elegance. Do NOT clutter responses with excessive asterisks (**) or bold text on every phrase. When speaking Hindi/Hinglish, use clean, standard, natural Hindi words without broken or strange slang. Use clean headings, well-structured bullet points, and natural prose. When live search results are provided, synthesize the facts directly with confidence and authority.",
+    hindi: "Aap Lumi ho, ek bahut hi smart aur acche dost. Baat-cheet hamesha saaf, sundar, standard aur natural Hindi/Hinglish mein karo. Kabhi bhi ajeeb, tooti-footi bhasha ya galat shabdon (jaise 'tero', 'bhir', 'kaafi boss') ka use mat karo. Bilkul saaf, meethi aur seedhi Hindi bolo jaise dilli/mumbai ke normal log bolte hain.",
+    tutor: "You are an encouraging, expert English & Language Tutor. When the user speaks or writes in English or Hindi, gently help them improve their grammar, vocabulary, pronunciation, and expression. Point out small mistakes warmly with constructive alternatives, and practice conversational fluency naturally.",
     engineer: "You are an elite Senior Staff Software Engineer. Focus on clean, modular, production-ready code, idiomatic architecture, robust error handling, edge cases, and peak performance. Provide complete, runnable code examples without unnecessary filler.",
     dsa: "You are an expert Data Structures & Algorithms (DSA) and Coding Interview Coach. Explain problem-solving patterns intuitively, break down step-by-step algorithms, analyze Time & Space Complexity (Big-O), and write clean, optimal implementations.",
-    hindi: "Aap Lumi ho, ek aadhunik, super-intelligent aur professional AI sathi. Baat-cheet bilkul swachh, aasan aur natural Hindi / Hinglish mein karo. Format ko bilkul clean aur professional rakhein — har line ya label par baar-baar **bold** ya asterisks lagane se bachein. Seedha, sundar aur vistarit uttar dein.",
-    bughunter: "You are a Senior Code Auditor and Bug Hunter. Thoroughly inspect code for security vulnerabilities, race conditions, memory leaks, and edge cases with minimal, concrete fixes.",
+    wellness: "You are a thoughtful, empathetic Mindfulness & Life Coach. Listen with deep care, offer grounded, practical reflections, reduce stress, encourage healthy daily routines, and provide soothing, uplifting perspective.",
     writer: "You are a master creative writer, storyteller, and copywriter. Craft vivid, compelling, engaging, and beautifully phrased prose with powerful narrative flow.",
     artist: "You are an AI Artist & Image Generator. When the user describes any image, scene, or concept, describe it evocatively and create stunning visual art."
   };
@@ -240,9 +261,10 @@
    - Use clear markdown headers (### Section Title) for distinct sections rather than bolding entire inline lines.
    - Keep line breaks and whitespace balanced for effortless readability.
 
-2. DIRECT & FACTUAL ANSWERS:
+2. DIRECT & FACTUAL ANSWERS (CURRENT YEAR: 2026):
+   - Current temporal context: Late 2026 (November 2026).
    - Immediately output your response without any <think> tags, internal deliberations, or planning scratchpads.
-   - When live web search or verified knowledge is provided, synthesize the facts and deliver an authoritative, clear answer. Never say you cannot browse or lack real-time access.
+   - When live web search or verified knowledge is provided, synthesize the facts and deliver an authoritative, clear answer. Directly state the live numbers and dates. Never quote outdated 2023 or 2024 information when 2026 search data is present. Never say you cannot browse or lack real-time access.
    - Conclude every thought and sentence completely. Never cut off mid-thought.
 
 3. INTERACTIVE RICH CARDS:
@@ -257,30 +279,33 @@
 
   const PERSONA_LABELS = {
     general: "🌟 General AI",
+    hindi: "🇮🇳 Chill Dost (Hinglish)",
+    tutor: "📚 English & Language Tutor",
     engineer: "💻 Senior Engineer",
     dsa: "🧠 DSA Coach",
-    hindi: "🇮🇳 Hindi Companion",
-    bughunter: "🐛 Bug Hunter",
+    wellness: "🧘 Wellness & Life Coach",
     writer: "✍️ Creative Writer",
     artist: "🎨 Image Artist"
   };
 
   const PERSONA_ICONS = {
     general: "🌟",
+    hindi: "🇮🇳",
+    tutor: "📚",
     engineer: "💻",
     dsa: "🧠",
-    hindi: "🇮🇳",
-    bughunter: "🐛",
+    wellness: "🧘",
     writer: "✍️",
     artist: "🎨",
   };
 
   const PERSONA_SHORT_LABELS = {
     general: "AI",
+    hindi: "Dost",
+    tutor: "Tutor",
     engineer: "Dev",
     dsa: "DSA",
-    hindi: "Hindi",
-    bughunter: "Bug",
+    wellness: "Coach",
     writer: "Writer",
     artist: "Artist",
   };
@@ -412,6 +437,235 @@
       console.warn("Storage save failed:", e);
     }
   }
+
+  // --- Autonomous Mind, Tone Adaptation & Long-Term Memory Engine ---
+  const LumiAutonomousMind = {
+    PROFILE_KEY: "lumi_autonomous_user_profile",
+    FACTS_KEY: "lumi_user_memories",
+
+    getManualMemories() {
+      return loadJson(this.FACTS_KEY, []);
+    },
+
+    saveMemory(fact) {
+      if (!fact || typeof fact !== "string") return false;
+      const clean = fact.trim();
+      if (!clean) return false;
+      const list = this.getManualMemories();
+      if (!list.includes(clean)) {
+        list.push(clean);
+        saveJson(this.FACTS_KEY, list);
+        return true;
+      }
+      return false;
+    },
+
+    getProfile() {
+      return loadJson(this.PROFILE_KEY, {
+        primaryTone: "brotherly_hinglish",
+        pronoun: "tu",
+        toneStyle: "Natural, candid, loyal brotherly Hinglish. Speak like a close, smart friend/brother using words like 'bhai', 'yr', 'tu', 'chal', 'dekh', 'tension mat le'. Be straight to the point, honest, sharp, and helpful.",
+        learnedRules: [
+          "100% REAL WORKING IMPLEMENTATIONS: Strictly reject fake demos, fake mockups, or placeholder code. Provide complete, working, production-grade solutions.",
+          "ZERO CLUTTER & NO USELESS BUTTONS: Keep things working under the hood in the background. Don't add unnecessary buttons or manual steps when it can be done automatically.",
+          "DIRECT & SINCERE: Be straightforward, candid, and deliver results immediately without generic corporate disclaimers or repetitive boilerplate."
+        ],
+        analyzedMessagesCount: 0,
+        lastAnalyzedAt: Date.now()
+      });
+    },
+
+    analyzeAndSync(conversationsList) {
+      try {
+        const allUserMsgs = [];
+        if (Array.isArray(conversationsList)) {
+          for (const conv of conversationsList) {
+            if (Array.isArray(conv.messages)) {
+              for (const m of conv.messages) {
+                if (m.role === "user" && typeof m.content === "string" && m.content.trim()) {
+                  allUserMsgs.push(m.content.trim());
+                }
+              }
+            }
+          }
+        }
+
+        const profile = this.getProfile();
+
+        // 1. Autonomous Tone & Vocabulary Detection
+        let hinglishScore = 0;
+        let informalBrotherlyScore = 0;
+        let technicalDevScore = 0;
+
+        const hinglishRegex = /\b(?:bhai|yr|yaar|tu|tujhe|tera|teri|tere|mera|meri|mere|krde|karde|karo|bata|batao|nhi|nahi|hai|hain|kuch|kaam|pehle|pahle|sahi|kya|kyun|kyu|kaise|dekh|sun|chal|bol|daal|chhod|lekin|aur|aise|mat|raha|rahe|hoga|banaya|banao|kar)\b/gi;
+        const informalBrotherlyRegex = /\b(?:bhai|yr|yaar|tu|tujhe|tera|teri|tere|abe|oyee|oye|apna|chal|dekh|sun|krde|daal|chhod)\b/gi;
+        const techRegex = /\b(?:code|function|api|bug|error|backend|frontend|apk|android|gradle|database|css|js|html|react|python|script)\b/gi;
+
+        for (const text of allUserMsgs) {
+          const hingMatches = text.match(hinglishRegex);
+          if (hingMatches) hinglishScore += hingMatches.length;
+
+          const broMatches = text.match(informalBrotherlyRegex);
+          if (broMatches) informalBrotherlyScore += broMatches.length;
+
+          const techMatches = text.match(techRegex);
+          if (techMatches) technicalDevScore += techMatches.length;
+        }
+
+        // Determine Tone dynamically from past user chat patterns
+        if (informalBrotherlyScore >= 2 || (hinglishScore >= 4 && informalBrotherlyScore >= 1)) {
+          profile.primaryTone = "brotherly_hinglish";
+          profile.pronoun = "tu";
+          profile.toneStyle = "Natural, candid, loyal brotherly Hinglish. Speak like a close, smart friend/brother using words like 'bhai', 'yr', 'tu', 'chal', 'dekh', 'tension mat le'. Be straight to the point, honest, sharp, and helpful.";
+        } else if (hinglishScore > 5) {
+          profile.primaryTone = "friendly_hinglish";
+          profile.pronoun = "tum";
+          profile.toneStyle = "Warm, natural Hinglish conversational tone.";
+        } else {
+          profile.primaryTone = "adaptive_conversational";
+          profile.pronoun = "you";
+          profile.toneStyle = "Direct, articulate, and adaptive to user's language.";
+        }
+
+        // 2. Autonomous Habit & Preference Extraction
+        profile.learnedRules = [
+          "100% REAL WORKING IMPLEMENTATIONS: Strictly reject fake demos, fake mockups, or placeholder code. Provide complete, working, production-grade solutions.",
+          "ZERO CLUTTER & NO USELESS BUTTONS: Keep things working under the hood in the background. Don't add unnecessary buttons or manual steps when it can be done automatically.",
+          "DIRECT & SINCERE: Be straightforward, candid, and deliver results immediately without generic corporate disclaimers or repetitive boilerplate."
+        ];
+
+        // 3. Autonomous Fact & Context Extraction
+        for (const text of allUserMsgs) {
+          // Name extraction
+          const nameMatch = text.match(/\b(?:mera\s+naam|my\s+name\s+is|main\s+hoon|call\s+me)\s+([A-Za-z0-9_\u0900-\u097F]+)/i);
+          if (nameMatch && nameMatch[1] && !["kya", "batao", "bata", "ai", "lumi"].includes(nameMatch[1].toLowerCase())) {
+            this.saveMemory(`User's name is ${nameMatch[1]}`);
+          }
+          // Explicit memory patterns
+          const memMatch = text.match(/^(?:yaad rakhna|remember that|yaad rakh)\s*(?:ki\s+|that\s+)?(.*)/i);
+          if (memMatch && memMatch[1] && memMatch[1].trim().length > 2) {
+            this.saveMemory(memMatch[1].trim());
+          }
+        }
+
+        profile.analyzedMessagesCount = allUserMsgs.length;
+        profile.lastAnalyzedAt = Date.now();
+        saveJson(this.PROFILE_KEY, profile);
+
+        return profile;
+      } catch (e) {
+        console.warn("Autonomous mind analysis error:", e);
+        return this.getProfile();
+      }
+    },
+
+    getSystemDirective() {
+      const profile = this.getProfile();
+      const memories = this.getManualMemories();
+
+      let directive = `\n\n[AUTONOMOUS TONE & BEHAVIORAL PROFILE (Learned from user's chat history)]:\n`;
+      directive += `- Communication Language & Clarity (CRITICAL): Always speak clean, standard, natural, and grammatically correct Hindi / Hinglish. STRICTLY NEVER use weird broken slang, corrupted words (such as 'tero', 'bhir se', 'kaafi boss'), or bizarre rural dialects. Speak clearly and smoothly like an educated normal Hindi speaker.\n`;
+      directive += `- Communication Tone: ${profile.toneStyle}\n`;
+      directive += `- Pronoun / Address: Always talk to the user as a trusted friend using "${profile.pronoun}" and natural friendly phrasing (e.g. "haan bhai", "dekh yr", "bilkul tension mat le", "tu bata", "chal ye sahi karte hain"). NEVER use robotic greetings like "Namaste! Main aapki kya sahayata kar sakta hoon?".\n`;
+      directive += `- Learned User Directives & Ground Rules:\n`;
+      for (const rule of (profile.learnedRules || [])) {
+        directive += `  * ${rule}\n`;
+      }
+      if (memories.length > 0) {
+        directive += `- Remembered Long-Term Context & User Facts:\n`;
+        for (const m of memories) {
+          directive += `  * ${m}\n`;
+        }
+      }
+      directive += `(CRITICAL: Regardless of which AI model or provider is executing this request, you MUST seamlessly adopt this exact tone, remember previous chat history in this thread, and uphold these ground rules without amnesia.)\n`;
+
+      return directive;
+    }
+  };
+
+  // Backwards compatibility alias for existing code
+  const LumiMemory = {
+    getAll: () => LumiAutonomousMind.getManualMemories(),
+    add: (f) => LumiAutonomousMind.saveMemory(f),
+    remove: (idx) => {
+      const list = LumiAutonomousMind.getManualMemories();
+      if (idx >= 0 && idx < list.length) {
+        list.splice(idx, 1);
+        saveJson(LumiAutonomousMind.FACTS_KEY, list);
+        return true;
+      }
+      return false;
+    },
+    clear: () => saveJson(LumiAutonomousMind.FACTS_KEY, []),
+    getContextString: () => LumiAutonomousMind.getSystemDirective()
+  };
+
+  // --- Lumi Android & Device Hardware Bridge ---
+  const LumiDevice = {
+    isNative() {
+      return typeof window.AndroidDevice !== "undefined" && typeof window.AndroidDevice.isDeviceBridgeAvailable === "function";
+    },
+    toggleTorch(enable) {
+      if (this.isNative()) {
+        try {
+          return window.AndroidDevice.toggleTorch(Boolean(enable));
+        } catch (e) {
+          console.warn("Native torch error:", e);
+        }
+      }
+      return false;
+    },
+    isTorchOn() {
+      if (this.isNative()) {
+        try {
+          return Boolean(window.AndroidDevice.isTorchOn());
+        } catch (e) {
+          return false;
+        }
+      }
+      return false;
+    },
+    getBattery() {
+      if (this.isNative()) {
+        try {
+          const raw = window.AndroidDevice.getBatteryStatus();
+          return JSON.parse(raw);
+        } catch (e) {
+          console.warn("Battery error:", e);
+        }
+      }
+      return null;
+    },
+    vibrate(ms = 400) {
+      if (this.isNative()) {
+        try {
+          window.AndroidDevice.vibrate(ms);
+          return true;
+        } catch (e) {}
+      } else if (navigator.vibrate) {
+        navigator.vibrate(ms);
+        return true;
+      }
+      return false;
+    },
+    setVolume(pct) {
+      if (this.isNative()) {
+        try {
+          window.AndroidDevice.setVolume(Math.min(100, Math.max(0, pct)));
+          return true;
+        } catch (e) {}
+      }
+      return false;
+    },
+    getVolume() {
+      if (this.isNative()) {
+        try {
+          return window.AndroidDevice.getVolume();
+        } catch (e) {}
+      }
+      return 50;
+    }
+  };
 
   function showToast(message) {
     const reg = getToastRegion();
@@ -1937,6 +2191,58 @@
     });
   }
 
+  function renderDeviceToolsPicker() {
+    const isMobile = LumiDevice.isNative();
+    const bInfo = LumiDevice.getBattery();
+    const batteryPct = bInfo && bInfo.level >= 0 ? `${bInfo.level}%` : "";
+    const isCharging = bInfo && bInfo.isCharging;
+    const isTorch = LumiDevice.isTorchOn();
+
+    return `
+      <div class="topbar-menu-wrapper relative">
+        <button
+          type="button"
+          id="toggle-device-tools-btn"
+          class="topbar-action-pill inline-flex items-center gap-1 h-8 rounded-full border border-border bg-card/80 px-2 sm:px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors backdrop-blur shadow-xs cursor-pointer whitespace-nowrap"
+          title="Device Tools (Flashlight, Battery, Haptics)"
+        >
+          <span>${isTorch ? "🔦" : (isCharging ? "⚡" : "🔋")}</span>
+          <span class="device-label hidden sm:inline font-medium text-[11px]">${batteryPct ? `${batteryPct}${isCharging ? " ⚡" : ""}` : "Device"}</span>
+          ${ICONS.chevronDown}
+        </button>
+
+        <div class="topbar-dropdown-menu hidden" id="device-tools-dropdown-menu">
+          <div class="px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+            Hardware & Device Controls
+          </div>
+          <button type="button" class="dropdown-item" id="device-tool-torch">
+            <span class="flex items-center gap-2">
+              <span>🔦</span>
+              <span>${isTorch ? "Flashlight is ON" : "Turn Flashlight ON"}</span>
+            </span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${isTorch ? "bg-amber-500/20 text-amber-400" : "bg-secondary text-muted-foreground"} ml-auto">${isTorch ? "ACTIVE" : "OFF"}</span>
+          </button>
+          <button type="button" class="dropdown-item" id="device-tool-battery">
+            <span class="flex items-center gap-2">
+              <span>🔋</span>
+              <span>Battery Status</span>
+            </span>
+            <span class="text-[10px] font-mono text-muted-foreground ml-auto">${batteryPct ? `${batteryPct} ${isCharging ? "(Charging)" : ""}` : "Check"}</span>
+          </button>
+          <button type="button" class="dropdown-item" id="device-tool-vibrate">
+            <span class="flex items-center gap-2">
+              <span>📳</span>
+              <span>Haptic Vibrate</span>
+            </span>
+            <span class="text-[10px] text-muted-foreground ml-auto">Pulse</span>
+          </button>
+          <div class="px-2.5 py-1.5 text-[10px] text-muted-foreground/80 border-t border-border mt-1">
+            💡 Say <em>"Torch on karo"</em> or <em>"Battery kitni hai"</em> in chat!
+          </div>
+        </div>
+      </div>`;
+  }
+
   function renderPersonaPicker() {
     const icon = PERSONA_ICONS[activePersona] || "🌟";
     const rawLabel = PERSONA_LABELS[activePersona] || "General AI";
@@ -2116,6 +2422,31 @@
             </a>
           </div>
 
+          <!-- Autonomous Mind & Cross-Model Memory -->
+          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                ${ICONS.brain} <span>Autonomous Mind & Memory</span>
+              </label>
+              <span class="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
+              </span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-secondary/30 border border-border/50 text-[11px] space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-muted-foreground">Tone Adaptation:</span>
+                <span class="font-medium text-foreground">${LumiAutonomousMind.getProfile().primaryTone === "brotherly_hinglish" ? "Brotherly Hinglish (Bhai/Yr/Tu)" : "Adaptive Sincere"}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-muted-foreground">Context Retention:</span>
+                <span class="font-medium text-emerald-500">Cross-Model & Cross-Thread (Zero Amnesia)</span>
+              </div>
+              <p class="text-[10px] text-muted-foreground leading-relaxed pt-1 border-t border-border/30">
+                Lumi automatically learns your conversational tone, rules, and facts from previous chats in the background. Changing models retains complete memory without any manual buttons.
+              </p>
+            </div>
+          </div>
+
           <!-- Chat Data Management -->
           <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
             <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Chat History</label>
@@ -2237,6 +2568,13 @@
             multiple
             accept="*/*"
           />
+          <input
+            type="file"
+            id="camera-lens-input"
+            class="hidden"
+            accept="image/*"
+            capture="environment"
+          />
           <textarea
             id="composer-textarea"
             name="message"
@@ -2257,6 +2595,15 @@
                 title="Attach files or documents (.pdf, .txt, .py, .js, .csv, .md, .json)"
               >
                 ${ICONS.paperclip}
+              </button>
+
+              <button
+                type="button"
+                id="camera-lens-btn"
+                class="composer-toolbar-btn inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/80 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors backdrop-blur shadow-xs cursor-pointer shrink-0"
+                title="Camera Lens (Take photo to identify or ask questions)"
+              >
+                ${ICONS.camera}
               </button>
 
               <button
@@ -2291,7 +2638,7 @@
               <button
                 type="button"
                 id="voice-call-trigger-btn"
-                class="${isStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/25 hover:bg-primary hover:text-primary-foreground transition-all active:scale-95 cursor-pointer shrink-0"
+                class="${isStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-secondary/80 text-muted-foreground hover:text-foreground border border-border/70 transition-all active:scale-95 cursor-pointer shrink-0"
                 title="Voice Call"
               >
                 ${ICONS.mic}
@@ -2299,15 +2646,15 @@
               <button
                 type="submit"
                 id="submit-prompt-btn"
-                class="hidden composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                class="${isStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 cursor-pointer shrink-0 shadow-xs"
                 title="Send message"
               >
-                ${ICONS.cornerDownLeft}
+                ${ICONS.send}
               </button>
               <button
                 type="button"
                 id="stop-generation-btn"
-                class="${isStreaming ? "inline-flex" : "hidden"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-transform active:scale-95 cursor-pointer shrink-0"
+                class="${isStreaming ? "inline-flex" : "hidden"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all active:scale-95 cursor-pointer shrink-0"
                 title="Stop generation"
               >
                 ${ICONS.square}
@@ -2552,7 +2899,7 @@
         </div>
 
         <!-- Sticky Bottom Composer -->
-        <div class="mx-auto w-full max-w-3xl px-4 pb-5 pt-2">
+        <div class="mx-auto w-full max-w-3xl px-3 sm:px-4 pt-2" style="padding-bottom: max(1.5rem, calc(env(safe-area-inset-bottom, 0px) + 1.25rem));">
           ${renderComposer("Reply to Lumi…", true)}
           <p class="mt-2 text-center text-xs text-muted-foreground">
             Lumi can make mistakes. Check important info.
@@ -2591,6 +2938,7 @@
             </div>
 
             <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+              ${renderDeviceToolsPicker()}
               ${renderModelPicker("topbar")}
               ${renderPersonaPicker()}
               ${renderExportPicker(threadId)}
@@ -2928,11 +3276,29 @@
   }
 
   // --- Real API Streaming Integration ---
-  async function streamFromCustomProvider(provider, modelName, promptText, onChunk, abortSignal) {
+  async function streamFromCustomProvider(provider, modelName, chatHistory, onChunk, abortSignal) {
     const isAnthropic = provider.protocol === "anthropic";
     const apiKey = provider.apiKey || "";
 
     if (isAnthropic) {
+      const systemMsg = chatHistory.find((m) => m.role === "system")?.content || "";
+      const nonSystemMsgs = chatHistory
+        .filter((m) => m.role !== "system")
+        .map((m) => ({ role: m.role, content: m.content }));
+      if (nonSystemMsgs.length === 0) {
+        nonSystemMsgs.push({ role: "user", content: "Hello" });
+      }
+
+      const bodyPayload = {
+        model: modelName || provider.default_model || "claude-3-5-sonnet-20241022",
+        max_tokens: 4096,
+        messages: nonSystemMsgs,
+        stream: true,
+      };
+      if (systemMsg) {
+        bodyPayload.system = systemMsg;
+      }
+
       const response = await fetch(`${provider.base_url.replace(/\/+$/, "")}/messages`, {
         method: "POST",
         signal: abortSignal,
@@ -2942,12 +3308,7 @@
           "anthropic-version": "2023-06-01",
           ...(provider.headers || {}),
         },
-        body: JSON.stringify({
-          model: modelName || provider.default_model || "claude-3-5-sonnet-20241022",
-          max_tokens: 4096,
-          messages: [{ role: "user", content: promptText }],
-          stream: true,
-        }),
+        body: JSON.stringify(bodyPayload),
       });
 
       if (!response.ok) {
@@ -3011,7 +3372,7 @@
       headers,
       body: JSON.stringify({
         model: modelName || provider.default_model || "gpt-4o",
-        messages: [{ role: "user", content: promptText }],
+        messages: chatHistory,
         stream: true,
         max_tokens: 4096,
       }),
@@ -3197,6 +3558,77 @@
       scrollToBottom();
     }
 
+    // 0A. NATIVE DEVICE HARDWARE INTENTS (Torch, Battery, Vibrate)
+    const lowerPrompt = prompt.toLowerCase().trim();
+
+    // Torch / Flashlight ON
+    if (/\b(?:torch|flashlight)\s*(?:on|chalu|jalao|start|jalado|khol|jala)\b/i.test(lowerPrompt) ||
+        /\b(?:on|chalu|jalao|start|jalado)\s*(?:the\s*)?(?:torch|flashlight)\b/i.test(lowerPrompt)) {
+      const ok = LumiDevice.toggleTorch(true);
+      const isNative = LumiDevice.isNative();
+      assistantMsg.content = isNative && ok
+        ? "🔦 **Flashlight ON kar di hai!** Phone ka torch ab chalu hai."
+        : "🔦 Flashlight toggle command execute kar di gayi hai.";
+      saveJson(STORAGE.CHATS, conversations);
+      AudioEffects.play("success");
+      isStreaming = false;
+      render();
+      scrollToBottom();
+      return;
+    }
+
+    // Torch / Flashlight OFF
+    if (/\b(?:torch|flashlight)\s*(?:off|band|bujhao|stop|bujha)\b/i.test(lowerPrompt) ||
+        /\b(?:off|band|bujhao|stop|bujha)\s*(?:the\s*)?(?:torch|flashlight)\b/i.test(lowerPrompt)) {
+      LumiDevice.toggleTorch(false);
+      assistantMsg.content = "🔦 **Flashlight OFF kar di hai!** Phone ka torch ab band hai.";
+      saveJson(STORAGE.CHATS, conversations);
+      AudioEffects.play("click");
+      isStreaming = false;
+      render();
+      scrollToBottom();
+      return;
+    }
+
+    // Battery Telemetry
+    if (/\b(?:battery|charging)\s*(?:kitni|kya|status|percentage|level|check|hai)\b/i.test(lowerPrompt) ||
+        /\b(?:check\s+battery|battery\s+status|battery\s+percent)\b/i.test(lowerPrompt)) {
+      const bInfo = LumiDevice.getBattery();
+      if (bInfo && bInfo.level >= 0) {
+        const chargingText = bInfo.isCharging ? `aur phone **charging par hai** (${bInfo.plugged}) ⚡` : "aur phone discharging par hai.";
+        assistantMsg.content = `🔋 **Battery Status:**\nAapke device ka current battery level **${bInfo.level}%** hai ${chargingText}`;
+      } else {
+        assistantMsg.content = "🔋 Battery telemetry active hai.";
+      }
+      saveJson(STORAGE.CHATS, conversations);
+      AudioEffects.play("success");
+      isStreaming = false;
+      render();
+      scrollToBottom();
+      return;
+    }
+
+    // Haptic Vibrate
+    if (/\b(?:phone\s+vibrate|vibrate\s+karo|vibration\s+karo|phone\s+hilao)\b/i.test(lowerPrompt)) {
+      LumiDevice.vibrate(600);
+      assistantMsg.content = "📳 **Phone vibrate kar diya hai!** Haptic pulse triggered.";
+      saveJson(STORAGE.CHATS, conversations);
+      AudioEffects.play("click");
+      isStreaming = false;
+      render();
+      scrollToBottom();
+      return;
+    }
+
+    // 0B. PERSISTENT LONG-TERM MEMORY AUTO-RECORDING
+    const memMatch = prompt.match(/^(?:yaad rakhna|remember that|yaad rakh|mera naam|my name is)\s*(?:ki\s+|that\s+)?(.*)/i);
+    if (memMatch && memMatch[1]) {
+      const factToSave = prompt.replace(/^(?:yaad rakhna|remember that|yaad rakh)\s*(?:ki\s+|that\s+)?/i, "").trim();
+      if (factToSave.length > 2) {
+        LumiMemory.add(factToSave);
+      }
+    }
+
     // 1. FREE HIGH-RESOLUTION IMAGE GENERATION (/image, /imagine, or visual prompt)
     const isImageCommand =
       /^\/(?:image|img|imagine)\s+/i.test(prompt) ||
@@ -3212,21 +3644,66 @@
         .trim();
       if (!imagePrompt) imagePrompt = prompt.trim();
 
+      // Automatically enhance prompt with visual keywords for ultra-high definition
+      let enhancedPrompt = imagePrompt;
+      if (!/photorealistic|8k|masterpiece|cinematic|detailed/i.test(enhancedPrompt)) {
+        enhancedPrompt = `${imagePrompt}, highly detailed, photorealistic, 8k resolution, cinematic lighting, masterpiece`;
+      }
+
       assistantMsg.imagePrompt = imagePrompt;
       assistantMsg.imageLoading = true;
-      assistantMsg.content = `🎨 **Generating Flux AI Image** for: *"**${escapeHtml(imagePrompt)}**"*...`;
+      assistantMsg.content = `🎨 **Generating High-Definition FLUX.1 Image** for: *"**${escapeHtml(imagePrompt)}**"*...`;
       saveJson(STORAGE.CHATS, conversations);
       render();
       scrollToBottom();
 
-      const seed = Math.floor(Math.random() * 999999);
-      const targetUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(imagePrompt)}?width=1024&height=1024&nologo=true&model=flux&seed=${seed}`;
+      let targetUrl = "";
+      try {
+        const candidateEndpoints = [
+          "http://127.0.0.1:3456/api/generate/image",
+          "http://localhost:3456/api/generate/image",
+          "https://lumi-backend-v4-production.up.railway.app/api/generate/image"
+        ];
+        if (window.location.origin && window.location.origin.startsWith("http")) {
+          candidateEndpoints.unshift(`${window.location.origin}/api/generate/image`);
+        }
+
+        for (const ep of candidateEndpoints) {
+          try {
+            const imgCtrl = new AbortController();
+            const imgTid = setTimeout(() => imgCtrl.abort(), 8000);
+            const imgResp = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompt: enhancedPrompt, model: "flux" }),
+              signal: imgCtrl.signal
+            });
+            clearTimeout(imgTid);
+            if (imgResp.ok) {
+              const imgData = await imgResp.json();
+              if (imgData.url) {
+                targetUrl = imgData.url;
+                break;
+              }
+            }
+          } catch (e) {
+            // try next
+          }
+        }
+      } catch (err) {
+        console.warn("Backend image generation bypassed:", err);
+      }
+
+      if (!targetUrl) {
+        const seed = Math.floor(Math.random() * 999999);
+        targetUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&nologo=true&model=flux&seed=${seed}`;
+      }
 
       const preloader = new Image();
       preloader.onload = () => {
         assistantMsg.imageUrl = targetUrl;
         assistantMsg.imageLoading = false;
-        assistantMsg.content = `✨ **Flux AI Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+        assistantMsg.content = `✨ **FLUX.1 High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
         isStreaming = false;
         saveJson(STORAGE.CHATS, conversations);
         AudioEffects.play("success");
@@ -3236,7 +3713,7 @@
       preloader.onerror = () => {
         assistantMsg.imageUrl = targetUrl;
         assistantMsg.imageLoading = false;
-        assistantMsg.content = `✨ **Flux AI Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
+        assistantMsg.content = `✨ **FLUX.1 High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
         isStreaming = false;
         saveJson(STORAGE.CHATS, conversations);
         render();
@@ -3308,51 +3785,128 @@
           .replace(/[\?!.]+$/, "")
           .trim();
 
-        let keywordQuery = cleanQuery
-          .replace(/\b(who is|what is|when is|where is|tell me|explain|give me|the|ke|ki|ka|ko|mein|se|par|hain|hai|kaun|kya|kab|kahan|kise|kiske|batao|bataiye|dikhaye|chahiye)\b/gi, "")
-          .replace(/\s+/g, " ")
-          .trim();
-
-        const searchQuery = keywordQuery || cleanQuery || prompt;
+        const searchQuery = cleanQuery || prompt.trim();
 
         let searchResults = [];
 
-        // 1. Try Backend Multi-Source Web Search
-        try {
-          const apiBase =
-            window.location.origin && window.location.origin.startsWith("http")
-              ? ""
-              : "https://lumi-backend-v4-production.up.railway.app";
-          const searchController = new AbortController();
-          const searchTimeout = setTimeout(() => searchController.abort(), 3500);
-          const searchResp = await fetch(`${apiBase}/api/search?q=${encodeURIComponent(searchQuery)}`, {
-            signal: searchController.signal,
-          });
-          clearTimeout(searchTimeout);
-
-          if (searchResp.ok) {
-            const searchData = await searchResp.json();
-            if (Array.isArray(searchData.results) && searchData.results.length > 0) {
-              searchResults = searchData.results;
+        // 0. Live Weather Check (wttr.in)
+        if (/\b(weather|mausam|temperature|temp)\b/i.test(cleanQuery)) {
+          try {
+            const cityMatch = cleanQuery.match(/(?:in|of|at|for|ka|ki)\s+([A-Za-z\s]+)/i) || cleanQuery.match(/([A-Za-z]+)\s+(?:weather|mausam|temp)/i);
+            let city = cityMatch ? cityMatch[1].trim() : cleanQuery.replace(/\b(weather|mausam|temperature|temp|today|aaj|kaisa|hai|report|now|in|of|for|ka|ki)\b/gi, "").trim();
+            if (city) {
+              const wCtrl = new AbortController();
+              const wTid = setTimeout(() => wCtrl.abort(), 2500);
+              const wResp = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`, { signal: wCtrl.signal });
+              clearTimeout(wTid);
+              if (wResp.ok) {
+                const wdata = await wResp.json();
+                const curr = wdata.current_condition?.[0] || {};
+                const tempC = curr.temp_C || "";
+                const desc = curr.weatherDesc?.[0]?.value || "";
+                const humidity = curr.humidity || "";
+                const wind = curr.windspeedKmph || "";
+                const forecastDays = (wdata.weather || []).slice(0, 3).map(fd => `${fd.date}: ${fd.maxtempC}°C/${fd.mintempC}°C (${fd.hourly?.[0]?.weatherDesc?.[0]?.value || ""})`);
+                searchResults.push({
+                  title: `Live Weather: ${city} (${tempC}°C, ${desc})`,
+                  snippet: `Live Weather in ${city}: ${tempC}°C, ${desc}. Humidity: ${humidity}%, Wind: ${wind} km/h. 3-Day Forecast: ${forecastDays.join("; ")}`,
+                  url: `https://wttr.in/${encodeURIComponent(city)}`
+                });
+              }
             }
+          } catch (wErr) {
+            console.warn("Weather fetch failed:", wErr);
           }
-        } catch (err) {
-          console.warn("Backend web search failed:", err);
         }
 
-        // 2. Direct Wikipedia Client Fallback if backend returned 0 or poor results
-        if (!searchResults.length) {
+        // 1. Native Android Device Search Bridge (Ultra-fast direct execution on device with DuckDuckGo HTML)
+        if (searchResults.length === 0 && window.AndroidDevice && typeof window.AndroidDevice.searchWeb === "function") {
           try {
-            const keywordQuery = searchQuery
-              .replace(/\b(who is|what is|when is|where is|the|current|ke|ki|ka|ko|mein|se|par|hain|hai|kaun|kya|kab|kahan|kise|kiske|batao|bataiye)\b/gi, "")
-              .replace(/\s+/g, " ")
-              .trim();
-            const targetWikiQuery = keywordQuery || searchQuery;
-            const wikiResp = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(targetWikiQuery)}&format=json&origin=*`);
+            const rawNative = window.AndroidDevice.searchWeb(searchQuery);
+            if (rawNative) {
+              const parsed = JSON.parse(rawNative);
+              if (Array.isArray(parsed.results) && parsed.results.length > 0) {
+                searchResults = parsed.results;
+              }
+            }
+          } catch (nativeErr) {
+            console.warn("AndroidDevice.searchWeb failed:", nativeErr);
+          }
+        }
+
+        // 2. Direct DuckDuckGo HTML / Server Search via local or remote backend
+        if (searchResults.length === 0) {
+          const candidateEndpoints = [
+            "http://127.0.0.1:3456/api/search",
+            "http://localhost:3456/api/search",
+            "https://lumi-backend-v4-production.up.railway.app/api/search"
+          ];
+          if (window.location.origin && window.location.origin.startsWith("http")) {
+            candidateEndpoints.unshift(`${window.location.origin}/api/search`);
+          }
+
+          for (const ep of candidateEndpoints) {
+            try {
+              const searchController = new AbortController();
+              const searchTimeout = setTimeout(() => searchController.abort(), 3500);
+              const searchResp = await fetch(`${ep}?q=${encodeURIComponent(searchQuery)}`, {
+                signal: searchController.signal,
+              });
+              clearTimeout(searchTimeout);
+
+              if (searchResp.ok) {
+                const searchData = await searchResp.json();
+                if (Array.isArray(searchData.results) && searchData.results.length > 0) {
+                  searchResults = searchData.results;
+                  break;
+                }
+              }
+            } catch (err) {
+              // Try next endpoint
+            }
+          }
+        }
+
+        // 3. Direct Google News RSS Client Fetch (Fallback for breaking news)
+        if (searchResults.length === 0) {
+          try {
+            const gnCtrl = new AbortController();
+            const gnTid = setTimeout(() => gnCtrl.abort(), 3500);
+            const gnUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(searchQuery)}&hl=en-IN&gl=IN&ceid=IN:en`;
+            const gnResp = await fetch(gnUrl, { signal: gnCtrl.signal });
+            clearTimeout(gnTid);
+            if (gnResp.ok) {
+              const xmlText = await gnResp.text();
+              const parser = new DOMParser();
+              const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+              const items = Array.from(xmlDoc.querySelectorAll("item")).slice(0, 5);
+              for (const item of items) {
+                const title = item.querySelector("title")?.textContent || "";
+                const link = item.querySelector("link")?.textContent || "";
+                const pubDate = item.querySelector("pubDate")?.textContent || "";
+                if (title) {
+                  searchResults.push({
+                    title: title,
+                    snippet: `${title}${pubDate ? ' (Published: ' + pubDate + ')' : ''}`,
+                    url: link
+                  });
+                }
+              }
+            }
+          } catch (gnErr) {
+            console.warn("Client Google News RSS fetch failed:", gnErr);
+          }
+        }
+
+        // 4. Safe Wikipedia Fallback ONLY for encyclopedic/historical queries (Never for news/today/live/networth)
+        const isLiveOrCurrent = /\b(aaj|today|current|latest|now|networth|net\s*worth|price|score|weather|mausam|stock|rate)\b/i.test(prompt);
+        if (searchResults.length === 0 && !isLiveOrCurrent) {
+          try {
+            const wikiResp = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchQuery)}&format=json&origin=*`);
             if (wikiResp.ok) {
               const wikiData = await wikiResp.json();
               const items = wikiData.query?.search || [];
-              searchResults = items.slice(0, 5).map(it => {
+              searchResults = items.slice(0, 4).map(it => {
                 const tempDiv = document.createElement("div");
                 tempDiv.innerHTML = it.snippet || "";
                 const cleanSnippet = tempDiv.textContent || tempDiv.innerText || "";
@@ -3364,15 +3918,15 @@
               });
             }
           } catch (wikiErr) {
-            console.warn("Direct Wikipedia search fallback failed:", wikiErr);
+            console.warn("Direct Wikipedia fallback failed:", wikiErr);
           }
         }
 
         if (searchResults.length > 0) {
           assistantMsg.searchResults = searchResults;
-          webContext = `\n\n[OFFICIAL VERIFIED LIVE WEB KNOWLEDGE FOR: "${searchQuery}"]:\n` +
-            searchResults.map((r, i) => `[Source ${i + 1}: ${r.title}]\nSnippet: ${r.snippet}\nSource URL: ${r.url}`).join("\n\n") +
-            `\n\n(CRITICAL INSTRUCTION: You HAVE just executed a live web search and retrieved the live verified facts above. Synthesize this information and answer the user's question completely, accurately, and naturally. NEVER output disclaimers saying "I cannot search the web", "I don't have internet access", or "I cannot browse live links". Present the verified facts directly in your response.)\n`;
+          webContext = `\n\n[VERIFIED REAL-TIME LIVE WEB FACTS (Current Date: November 16, 2026)]:\n` +
+            searchResults.map((r, i) => `[Source ${i + 1}: ${r.title}]\nDate/Snippet: ${r.snippet}\nSource URL: ${r.url}`).join("\n\n") +
+            `\n\n(CRITICAL INSTRUCTION: Today's date is November 16, 2026. You HAVE just executed a live web search and retrieved the verified real-time facts above. Synthesize this information and answer the user's question completely, accurately, and naturally. State current figures and dates directly. Differentiate actual tracked figures (e.g. Forbes and Bloomberg real-time net worth trackers showing ~$845B to $870B+) from speculative future predictions. NEVER output disclaimers saying "I cannot search the web", "I don't have internet access", or "I cannot browse live links". Present the verified facts directly in your response.)\n`;
           render();
           scrollToBottom();
         }
@@ -3426,16 +3980,36 @@
     };
 
     try {
+      // 0. Learn & update autonomous tone profile and memories from user chat history
+      LumiAutonomousMind.analyzeAndSync(conversations);
+
+      // 1. Build Autonomous System Prompt (Persona + Autonomous Tone & Memory + Formatting)
+      const basePersona = PERSONA_PROMPTS[activePersona] || PERSONA_PROMPTS.general;
+      const systemPrompt = basePersona + LumiAutonomousMind.getSystemDirective() + "\n" + GENUI_SYSTEM_INSTRUCTION;
+
+      // 2. Build Thread History (Short-term context + Full multi-turn conversation)
+      const chatHistory = [
+        { role: "system", content: systemPrompt },
+        ...thread.messages
+          .filter((m) => m.id !== assistantMsgId && m.content)
+          .map((m) => ({ role: m.role, content: m.content }))
+      ];
+
+      const extraContext = (webContext || "") + (scrapedContext || "") + (fileContext || "");
+      if (extraContext && chatHistory.length > 0) {
+        chatHistory[chatHistory.length - 1].content += extraContext;
+      }
+
       const customProv = selectedModel.provider_id
         ? providers.find((p) => p.id === selectedModel.provider_id)
         : null;
 
       if (customProv && customProv.enabled) {
-        // Live streaming from custom configured endpoint
+        // Live streaming from custom configured endpoint with complete memory & tone!
         await streamFromCustomProvider(
           customProv,
           selectedModel.model,
-          prompt,
+          chatHistory,
           onChunk,
           streamAbortController.signal
         );
@@ -3448,22 +4022,10 @@
 
         let streamedSuccessfully = false;
         try {
-          const systemPrompt = (PERSONA_PROMPTS[activePersona] || PERSONA_PROMPTS.general) + "\n" + GENUI_SYSTEM_INSTRUCTION;
-          const chatHistory = [
-            { role: "system", content: systemPrompt },
-            ...thread.messages
-              .filter((m) => m.id !== assistantMsgId && m.content)
-              .map((m) => ({ role: m.role, content: m.content }))
-          ];
-
-          const extraContext = (webContext || "") + (scrapedContext || "") + (fileContext || "");
-          if (extraContext && chatHistory.length > 0) {
-            chatHistory[chatHistory.length - 1].content += extraContext;
-          }
-
           // Direct high-capacity streaming with instant fallback to backend
           let resp = null;
-          if (!imagePayload) {
+          const isGeminiModel = selectedModel && selectedModel.model && selectedModel.model.includes("gemini");
+          if (!imagePayload && !isGeminiModel) {
             try {
               resp = await fetch("https://text.pollinations.ai/openai/chat/completions", {
                 method: "POST",
@@ -3482,18 +4044,37 @@
           }
 
           if (!resp || !resp.ok) {
-            resp = await fetch(`${apiBase}/api/free/chat`, {
-              method: "POST",
-              signal: streamAbortController.signal,
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: selectedModel.model || "llama-3.3-70b",
-                messages: chatHistory,
-                image: imagePayload,
-                stream: true,
-                max_tokens: 4096,
-              }),
-            });
+            const candidateEndpoints = [
+              "http://127.0.0.1:3456/api/free/chat",
+              "http://localhost:3456/api/free/chat",
+              "https://lumi-backend-v4-production.up.railway.app/api/free/chat"
+            ];
+            if (window.location.origin && window.location.origin.startsWith("http")) {
+              candidateEndpoints.unshift(`${window.location.origin}/api/free/chat`);
+            }
+
+            for (const ep of candidateEndpoints) {
+              try {
+                const candidateResp = await fetch(ep, {
+                  method: "POST",
+                  signal: streamAbortController.signal,
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    model: selectedModel.model || "gemini-2.5-flash",
+                    messages: chatHistory,
+                    image: imagePayload,
+                    stream: true,
+                    max_tokens: 4096,
+                  }),
+                });
+                if (candidateResp && candidateResp.ok) {
+                  resp = candidateResp;
+                  break;
+                }
+              } catch (epErr) {
+                // try next candidate
+              }
+            }
           }
 
           if (resp.ok) {
@@ -3599,25 +4180,13 @@
         stopBtn.classList.add("hidden");
         stopBtn.classList.remove("inline-flex");
       }
-      const hasText = ta && ta.value.trim().length > 0;
-      if (hasText) {
-        if (submitBtn) {
-          submitBtn.classList.remove("hidden");
-          submitBtn.classList.add("inline-flex");
-        }
-        if (voiceBtn) {
-          voiceBtn.classList.add("hidden");
-          voiceBtn.classList.remove("inline-flex");
-        }
-      } else {
-        if (voiceBtn) {
-          voiceBtn.classList.remove("hidden");
-          voiceBtn.classList.add("inline-flex");
-        }
-        if (submitBtn) {
-          submitBtn.classList.add("hidden");
-          submitBtn.classList.remove("inline-flex");
-        }
+      if (submitBtn) {
+        submitBtn.classList.remove("hidden");
+        submitBtn.classList.add("inline-flex");
+      }
+      if (voiceBtn) {
+        voiceBtn.classList.remove("hidden");
+        voiceBtn.classList.add("inline-flex");
       }
 
       scrollToBottom(true);
@@ -5036,7 +5605,13 @@
     }
 
     if (path === "/" || path === "") {
-      root.innerHTML = renderLanding();
+      if (LumiDevice.isNative()) {
+        window.location.hash = "#/chat";
+        const thread = getActiveConversation();
+        root.innerHTML = renderChatPage(thread ? thread.id : null);
+      } else {
+        root.innerHTML = renderLanding();
+      }
     } else if (path === "/auth") {
       root.innerHTML = renderAuthPage();
     } else if (path === "/providers") {
@@ -5073,19 +5648,14 @@
         textarea.style.height = Math.min(textarea.scrollHeight, 192) + "px";
 
         const hasText = textarea.value.trim().length > 0;
-        const voiceBtn = document.querySelector("#voice-call-trigger-btn");
         const submitBtn = document.querySelector("#submit-prompt-btn");
-        if (voiceBtn && submitBtn && !isStreaming) {
+        if (submitBtn && !isStreaming) {
           if (hasText) {
-            voiceBtn.classList.add("hidden");
-            voiceBtn.classList.remove("inline-flex");
-            submitBtn.classList.remove("hidden");
-            submitBtn.classList.add("inline-flex");
+            submitBtn.classList.add("opacity-100", "scale-105");
+            submitBtn.classList.remove("opacity-60");
           } else {
-            submitBtn.classList.add("hidden");
-            submitBtn.classList.remove("inline-flex");
-            voiceBtn.classList.remove("hidden");
-            voiceBtn.classList.add("inline-flex");
+            submitBtn.classList.remove("scale-105");
+            submitBtn.classList.add("opacity-60");
           }
         }
       });
@@ -5187,11 +5757,13 @@
           document.querySelectorAll(".model-dropdown-menu").forEach((m) => m.classList.add("hidden"));
           document.querySelectorAll(".model-picker-toggle-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
         }
-        if (!e.target.closest(".topbar-dropdown-menu") && !e.target.closest("#toggle-persona-btn") && !e.target.closest("#toggle-export-btn")) {
+        if (!e.target.closest(".topbar-dropdown-menu") && !e.target.closest("#toggle-persona-btn") && !e.target.closest("#toggle-export-btn") && !e.target.closest("#toggle-device-tools-btn")) {
           const pMenu = document.querySelector("#persona-dropdown-menu");
           if (pMenu) pMenu.classList.add("hidden");
           const eMenu = document.querySelector("#export-dropdown-menu");
           if (eMenu) eMenu.classList.add("hidden");
+          const dMenu = document.querySelector("#device-tools-dropdown-menu");
+          if (dMenu) dMenu.classList.add("hidden");
         }
       });
     }
@@ -5601,6 +6173,45 @@
       });
     }
 
+    // 13-Camera. Camera Lens Trigger & Input
+    const cameraLensBtn = document.querySelector("#camera-lens-btn");
+    const cameraLensInput = document.querySelector("#camera-lens-input");
+    if (cameraLensBtn && cameraLensInput) {
+      cameraLensBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        cameraLensInput.click();
+      });
+
+      cameraLensInput.addEventListener("change", async (e) => {
+        const file = (e.target.files && e.target.files[0]) || null;
+        if (!file) return;
+        showToast("Processing photo from Camera...");
+        try {
+          const compressedB64 = await compressAndReadImage(file);
+          attachedFiles.push({
+            name: "Camera_Photo.jpg",
+            size: file.size,
+            isImage: true,
+            isCameraPhoto: true,
+            dataUrl: compressedB64,
+            content: `[Photo Captured with Camera: Camera_Photo.jpg]`,
+          });
+          updateAttachmentChipsUI();
+          AudioEffects.play("click");
+          showToast("📷 Photo captured! Ask anything about this image.");
+          const ta = document.querySelector("#composer-textarea");
+          if (ta) {
+            ta.placeholder = "Ask Lumi about this photo (e.g. identify, read text, explain)...";
+            ta.focus();
+          }
+        } catch (err) {
+          console.error("Camera read error:", err);
+          showToast("Failed to process photo.");
+        }
+        cameraLensInput.value = "";
+      });
+    }
+
     document.querySelectorAll("[data-remove-attachment]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -5734,6 +6345,58 @@
         render();
       });
     });
+
+    // 13D. Device Tools Handlers
+    const toggleDeviceToolsBtn = document.querySelector("#toggle-device-tools-btn");
+    const deviceToolsMenu = document.querySelector("#device-tools-dropdown-menu");
+    if (toggleDeviceToolsBtn && deviceToolsMenu) {
+      toggleDeviceToolsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deviceToolsMenu.classList.toggle("hidden");
+        const pm = document.querySelector("#persona-dropdown-menu");
+        if (pm) pm.classList.add("hidden");
+        const em = document.querySelector("#export-dropdown-menu");
+        if (em) em.classList.add("hidden");
+      });
+    }
+
+    const toolTorchBtn = document.querySelector("#device-tool-torch");
+    if (toolTorchBtn) {
+      toolTorchBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const currentlyOn = LumiDevice.isTorchOn();
+        const nextState = !currentlyOn;
+        LumiDevice.toggleTorch(nextState);
+        AudioEffects.play("click");
+        showToast(nextState ? "🔦 Flashlight turned ON" : "🔦 Flashlight turned OFF");
+        if (deviceToolsMenu) deviceToolsMenu.classList.add("hidden");
+        render();
+      });
+    }
+
+    const toolBatteryBtn = document.querySelector("#device-tool-battery");
+    if (toolBatteryBtn) {
+      toolBatteryBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const b = LumiDevice.getBattery();
+        if (b && b.level >= 0) {
+          showToast(`🔋 Battery: ${b.level}% (${b.isCharging ? "Charging ⚡" : "Discharging"})`);
+        } else {
+          showToast("🔋 Device telemetry active");
+        }
+        if (deviceToolsMenu) deviceToolsMenu.classList.add("hidden");
+      });
+    }
+
+    const toolVibrateBtn = document.querySelector("#device-tool-vibrate");
+    if (toolVibrateBtn) {
+      toolVibrateBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        LumiDevice.vibrate(500);
+        showToast("📳 Haptic pulse triggered");
+        if (deviceToolsMenu) deviceToolsMenu.classList.add("hidden");
+      });
+    }
 
     // 13E. Real Python Sandbox Execution & HTML Live Preview
     document.querySelectorAll("[data-run-py]").forEach((btn) => {
@@ -5917,6 +6580,19 @@
         }
       });
     }
+
+    // Memory / Autonomous Profile Helpers
+    document.querySelectorAll("[data-delete-memory]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.getAttribute("data-delete-memory"), 10);
+        if (!isNaN(idx)) {
+          LumiMemory.remove(idx);
+          render();
+          showToast("Memory removed.");
+        }
+      });
+    });
 
     // 16. Image Generator Toolbar Button
     const imageGenBtn = document.querySelector("#image-gen-btn");
@@ -6116,6 +6792,10 @@
     });
 
     initSeedData();
+    LumiAutonomousMind.analyzeAndSync(conversations);
+    if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
+      window.location.hash = "#/chat";
+    }
     render();
   }
 

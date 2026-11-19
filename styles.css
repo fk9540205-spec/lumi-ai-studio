@@ -239,8 +239,8 @@ body {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 0.5rem !important;
-  padding: 0 0.75rem 0.75rem !important;
+  gap: 0.35rem !important;
+  padding: 0 0.5rem 0.5rem !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
@@ -248,10 +248,14 @@ body {
 .composer-toolbar-left {
   display: flex !important;
   align-items: center !important;
-  gap: 0.4rem !important;
+  gap: 0.35rem !important;
   min-width: 0 !important;
   flex: 1 1 auto !important;
-  overflow: visible !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  white-space: nowrap !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
 }
 
 .composer-toolbar-left::-webkit-scrollbar {
@@ -965,6 +969,13 @@ body {
   animation: fadeIn 0.15s ease;
 }
 
+#device-tools-dropdown-menu {
+  left: 0 !important;
+  right: auto !important;
+  min-width: 14rem !important;
+  max-width: calc(100vw - 24px) !important;
+}
+
 .dropdown-item {
   display: flex;
   align-items: center;
@@ -1287,6 +1298,10 @@ body {
   }
   .topbar-dropdown-menu {
     max-width: calc(100vw - 24px) !important;
+  }
+  #device-tools-dropdown-menu {
+    left: 0 !important;
+    right: auto !important;
   }
 }
 
