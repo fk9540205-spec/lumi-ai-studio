@@ -460,12 +460,12 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 sys.stderr.write(f"Suno upstream failed: {e}\n")
 
-        # 2. Intelligent Composition & Lyrics Flow via Claude Opus / Gemini 3
+        # 2. Intelligent Composition & Lyrics Flow via Gemini 3 / Claude
         try:
             cpa_req = urllib.request.Request(
                 "http://127.0.0.1:8317/v1/chat/completions",
                 data=json.dumps({
-                    "model": "claude-sonnet-4-6",
+                    "model": "gemini-3-flash",
                     "messages": [
                         {
                             "role": "system",
@@ -481,7 +481,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 },
                 method="POST"
             )
-            with urllib.request.urlopen(cpa_req, timeout=30) as cpa_resp:
+            with urllib.request.urlopen(cpa_req, timeout=60) as cpa_resp:
                 res_data = json.loads(cpa_resp.read().decode())
                 lyrics = res_data["choices"][0]["message"]["content"]
                 self._json_response({
