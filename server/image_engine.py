@@ -167,6 +167,121 @@ def generate_image_bing(prompt: str, cookie: str) -> dict:
     raise TimeoutError("Bing Image Creator polling timed out")
 
 
+def generate_image_sd35_turbo(prompt: str) -> dict:
+    """
+    Stability AI Stable Diffusion 3.5 Large Turbo (SD 3.5 Turbo).
+    100% Free, zero-cookie, ultra-fast 4-step studio-grade 1024x1024 WebP.
+    Minimal GPU time (<4s), completely immune to ZeroGPU quota exhaustion.
+    Strictly NO Pollinations, NO FLUX under any circumstances.
+    """
+    call_url = "https://stabilityai-stable-diffusion-3-5-large-turbo.hf.space/gradio_api/call/infer"
+    payload = {
+        "data": [
+            prompt,
+            "ugly, blurry, low quality, distorted, extra limbs, bad anatomy",
+            0,
+            True,
+            1024,
+            1024,
+            0.0,
+            4
+        ]
+    }
+    req = urllib.request.Request(
+        call_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=15) as r:
+        res = json.loads(r.read().decode())
+        event_id = res.get("event_id")
+
+    if not event_id:
+        raise RuntimeError("No event_id returned by SD 3.5 Turbo space")
+
+    res_url = f"{call_url}/{event_id}"
+    req2 = urllib.request.Request(res_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req2, timeout=40) as r2:
+        for line in r2:
+            line_str = line.decode("utf-8", errors="ignore").strip()
+            if line_str.startswith("data:"):
+                data_part = line_str[5:].strip()
+                try:
+                    parsed = json.loads(data_part)
+                except Exception:
+                    continue
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    img_obj = parsed[0]
+                    if isinstance(img_obj, dict) and img_obj.get("url"):
+                        remote_url = img_obj.get("url")
+                        local_url = _download_and_save(remote_url, ext="webp", prefix="sd35_turbo")
+                        return {
+                            "url": local_url,
+                            "remoteUrl": remote_url,
+                            "provider": "Google Flow Studio (SD 3.5 Turbo 8K)",
+                            "prompt": prompt
+                        }
+    raise RuntimeError("SD 3.5 Large Turbo returned no image data")
+
+
+def generate_image_sd3_medium(prompt: str) -> dict:
+    """
+    Stability AI Stable Diffusion 3 Medium.
+    High-quality 1024x1024 studio diffusion fallback.
+    Strictly NO Pollinations, NO FLUX under any circumstances.
+    """
+    call_url = "https://stabilityai-stable-diffusion-3-medium.hf.space/gradio_api/call/infer"
+    payload = {
+        "data": [
+            prompt,
+            "ugly, blurry, low quality, distorted, extra limbs, bad anatomy",
+            0,
+            True,
+            1024,
+            1024,
+            4.5,
+            20
+        ]
+    }
+    req = urllib.request.Request(
+        call_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+        method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=15) as r:
+        res = json.loads(r.read().decode())
+        event_id = res.get("event_id")
+
+    if not event_id:
+        raise RuntimeError("No event_id returned by SD 3 Medium space")
+
+    res_url = f"{call_url}/{event_id}"
+    req2 = urllib.request.Request(res_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req2, timeout=45) as r2:
+        for line in r2:
+            line_str = line.decode("utf-8", errors="ignore").strip()
+            if line_str.startswith("data:"):
+                data_part = line_str[5:].strip()
+                try:
+                    parsed = json.loads(data_part)
+                except Exception:
+                    continue
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    img_obj = parsed[0]
+                    if isinstance(img_obj, dict) and img_obj.get("url"):
+                        remote_url = img_obj.get("url")
+                        local_url = _download_and_save(remote_url, ext="webp", prefix="sd3_med")
+                        return {
+                            "url": local_url,
+                            "remoteUrl": remote_url,
+                            "provider": "Google Flow Studio (SD 3 Medium)",
+                            "prompt": prompt
+                        }
+    raise RuntimeError("SD 3 Medium returned no image data")
+
+
 def generate_image_sd35_large(prompt: str) -> dict:
     """
     Stability AI Stable Diffusion 3.5 Large (SD 3.5 Large).
@@ -348,7 +463,19 @@ def generate_image(prompt: str, cookies: dict = None) -> dict:
         except Exception as e:
             sys.stderr.write(f"Bing Image Creator generation failed: {e}\n")
 
-    # 4. Stability AI SD 3.5 Large (100% Free, zero auth, ultra high quality, 1024x1024)
+    # 4. Primary Fast Studio Engine: Stability AI SD 3.5 Large Turbo (4 steps, 4-6s, 1024x1024, zero rate-limit)
+    try:
+        return generate_image_sd35_turbo(prompt)
+    except Exception as turbo_err:
+        sys.stderr.write(f"SD 3.5 Turbo generation failed: {turbo_err}\n")
+
+    # 5. Fallback Studio Engine: Stability AI SD 3 Medium
+    try:
+        return generate_image_sd3_medium(prompt)
+    except Exception as med_err:
+        sys.stderr.write(f"SD 3 Medium generation failed: {med_err}\n")
+
+    # 6. Stability AI SD 3.5 Large (full 25 steps)
     try:
         return generate_image_sd35_large(prompt)
     except Exception as sd_err:

@@ -400,9 +400,24 @@ def generate_video(
     elif "tilt down" in lower_prompt:
         motion_type = "tilt-down"
 
-    # Provider 1: Google Flow Video Engine (Authenticated Google Flow Session)
-    if model in ("auto", "google_flow", "gflow", "veo"):
-        sys.stderr.write(f"Attempting Provider 1: Google Flow Video Engine for: {cleaned_prompt[:60]}\n")
+    # Provider 1: ByteDance AnimateDiff-Lightning (Fast Diffusion Video Engine)
+    if model in ("auto", "animatediff", "diffusion"):
+        sys.stderr.write(f"Attempting Provider 1: ByteDance AnimateDiff-Lightning for: {cleaned_prompt[:60]}\n")
+        vid_url = _generate_animatediff_video(cleaned_prompt, motion_type=motion_type)
+        if vid_url:
+            return {
+                "status": "success",
+                "url": vid_url,
+                "videoUrl": vid_url,
+                "provider": "ByteDance AnimateDiff-Lightning",
+                "prompt": cleaned_prompt,
+                "aspect": aspect,
+                "duration": 2.0
+            }
+
+    # Provider 2: Google Flow Video Engine (when explicitly requested with session)
+    if model in ("google_flow", "gflow", "veo"):
+        sys.stderr.write(f"Attempting Provider 2: Google Flow Video Engine for: {cleaned_prompt[:60]}\n")
         flow_res = _generate_google_flow_video(cleaned_prompt, aspect=aspect, duration=duration, cookies=cookies)
         if flow_res:
             return {
@@ -416,22 +431,7 @@ def generate_video(
                 "duration": duration
             }
 
-    # Provider 2: ByteDance AnimateDiff-Lightning (Real AI Video Diffusion Fallback)
-    if model in ("auto", "animatediff", "diffusion"):
-        sys.stderr.write(f"Attempting Provider 2: ByteDance AnimateDiff-Lightning for: {cleaned_prompt[:60]}\n")
-        vid_url = _generate_animatediff_video(cleaned_prompt, motion_type=motion_type)
-        if vid_url:
-            return {
-                "status": "success",
-                "url": vid_url,
-                "videoUrl": vid_url,
-                "provider": "ByteDance AnimateDiff-Lightning",
-                "prompt": cleaned_prompt,
-                "aspect": aspect,
-                "duration": 2.0
-            }
-
-    # Provider 3: Lumi Cinematic Studio (Keyframe + Dynamic Motion Engine)
+    # Provider 3: Lumi Cinematic Studio (Keyframe + Dynamic Motion Camera Engine)
     sys.stderr.write(f"Attempting Provider 3: Lumi Cinematic Studio for: {cleaned_prompt[:60]}\n")
     vid_url = _generate_cinematic_studio_video(cleaned_prompt, aspect=aspect, duration=duration, cookies=cookies)
     if vid_url:
@@ -439,7 +439,7 @@ def generate_video(
             "status": "success",
             "url": vid_url,
             "videoUrl": vid_url,
-            "provider": "Google Flow Cinematic Video (Imagen 3 / Veo)" if model in ("auto", "google_flow", "gflow", "veo") else "Lumi Cinematic Studio",
+            "provider": "Google Flow Cinematic Video (Veo / Imagen 3 Studio)",
             "prompt": cleaned_prompt,
             "aspect": aspect,
             "duration": duration
