@@ -66,15 +66,19 @@ if WORKSPACE_ROOT not in sys.path:
 try:
     from server.image_engine import generate_image
     from server.music_engine import generate_music
+    from server.video_engine import generate_video
 except Exception as _engines_err:
     try:
         import image_engine
         import music_engine
+        import video_engine
         generate_image = image_engine.generate_image
         generate_music = music_engine.generate_music
+        generate_video = video_engine.generate_video
     except Exception:
         generate_image = None
         generate_music = None
+        generate_video = None
 
 # ---------------------------------------------------------------------------
 # Antigravity Core Proxy Engine (Google Auth & Claude 4.6)
@@ -369,6 +373,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_extract_pdf()
         elif path in ("/api/generate/image", "/api/image/generate", "/v1/images/generations"):
             self._handle_generate_image()
+        elif path in ("/api/generate/video", "/api/video/generate", "/v1/videos/generations"):
+            self._handle_generate_video()
         elif path in ("/api/music/generate", "/api/music/create", "/api/suno/generate"):
             self._handle_music_generate()
         elif path in ("/api/music/lyrics", "/api/suno/lyrics"):
@@ -379,6 +385,36 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_tts()
         else:
             self._error(404, f"API endpoint {path} not found")
+
+    def _handle_generate_video(self):
+        body = self._read_body()
+        if body is None:
+            return
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self._error(400, "Invalid JSON")
+            return
+        prompt = data.get("prompt", "a cinematic video")
+        model = data.get("model", "auto")
+        aspect = data.get("aspect", "16:9")
+        duration = float(data.get("duration", 4.0))
+        cookies = {
+            "google": data.get("googleCookie") or data.get("google_cookie") or os.environ.get("GOOGLE_COOKIE", ""),
+            "bing": data.get("bingCookie") or data.get("bing_cookie") or os.environ.get("BING_COOKIE", "")
+        }
+
+        if generate_video:
+            try:
+                res = generate_video(prompt, model=model, aspect=aspect, duration=duration, cookies=cookies)
+                self._json_response(res)
+                return
+            except Exception as e:
+                sys.stderr.write(f"Video engine error: {e}\n")
+                self._error(500, f"Video generation failed: {e}")
+                return
+
+        self._error(500, "Video generation engine not available")
 
     def _handle_generate_image(self):
         body = self._read_body()

@@ -12,3 +12,5 @@ server/cliproxy/cli-proxy-api
 server/cliproxy/*.tar.gz
 *.apk
 generated_media/
+*.png
+server/google_flow_cookies.json

@@ -2739,6 +2739,15 @@
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
               </button>
+
+              <button
+                type="button"
+                id="video-gen-btn"
+                class="composer-toolbar-btn inline-flex size-8 items-center justify-center rounded-full border border-purple-500/30 bg-card/80 text-xs text-purple-400 hover:text-purple-300 hover:border-purple-500/60 transition-colors backdrop-blur shadow-xs cursor-pointer shrink-0"
+                title="AI Video Studio (/video)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+              </button>
             </div>
 
             <div class="flex items-center gap-1.5 shrink-0 ml-auto" id="composer-submit-wrapper">
@@ -3005,8 +3014,56 @@
                           : ""
                       }
 
+                      <!-- Ultra-Clean Studio Video Generator Card -->
                       ${
-                        !isCurrentlyStreaming && (rawText || msg.imageUrl)
+                        msg.videoLoading
+                          ? `
+                        <div class="pro-gen-card my-3" style="border-color: rgba(168, 85, 247, 0.45);">
+                          <div class="pro-gen-header">
+                            <div class="pro-gen-badge">
+                              <span class="pro-pulse-dot" style="background: #a855f7;"></span>
+                              <span>${escapeHtml(msg.videoProvider || "AI Video Studio")}</span>
+                            </div>
+                            <span class="pro-gen-timer">${escapeHtml(msg.generationStage || "Synthesizing Motion")}</span>
+                          </div>
+                          <div class="pro-gen-body">
+                            <div class="pro-shimmer-sweep"></div>
+                            <div class="pro-spinner-ring" style="border-top-color: #a855f7;"></div>
+                            <div class="pro-gen-title">Generating Cinematic AI Video</div>
+                            <div class="pro-gen-prompt">"${escapeHtml(msg.videoPrompt || "")}"</div>
+                          </div>
+                          <div class="pro-progress-track">
+                            <div class="pro-progress-fill" style="background: linear-gradient(90deg, #a855f7, #ec4899);"></div>
+                          </div>
+                        </div>`
+                          : msg.videoUrl
+                          ? `
+                        <div class="ai-video-card my-3">
+                          <video controls autoplay loop playsinline preload="auto" src="${escapeHtml(msg.videoUrl)}" class="cursor-pointer w-full rounded-2xl">
+                            Your browser does not support the video tag.
+                          </video>
+                          <div class="ai-video-overlay">
+                            <span class="ai-video-badge">
+                              🎬 ${escapeHtml(msg.videoProvider || "AI Video Engine")}
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-black/60 hover:bg-black/80 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer border border-white/20"
+                                data-action="download-video"
+                                data-url="${escapeHtml(msg.videoUrl)}"
+                                data-name="${escapeHtml(msg.videoPrompt || "lumi-video")}"
+                              >
+                                ${ICONS.download} <span>Download MP4</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>`
+                          : ""
+                      }
+
+                      ${
+                        !isCurrentlyStreaming && (rawText || msg.imageUrl || msg.videoUrl)
                           ? `
                         <div class="mt-2.5 flex items-center flex-wrap gap-2">
                           <button
@@ -3798,6 +3855,119 @@
       }
     }
 
+    // Reusable Real-Time Generative Video Flow
+    const triggerVideoGeneration = (videoPrompt, targetMsg, aspect = "16:9") => {
+      let enhancedPrompt = videoPrompt;
+      if (!/cinematic|motion|smooth|camera|photorealistic|4k|8k/i.test(enhancedPrompt)) {
+        enhancedPrompt = `${videoPrompt}, cinematic motion, highly detailed, photorealistic 8k, smooth movement, masterpiece`;
+      }
+
+      targetMsg.videoPrompt = videoPrompt;
+      targetMsg.videoLoading = true;
+      targetMsg.videoProvider = "Google Flow (Veo / Imagen 3 Studio)";
+      targetMsg.content = "";
+      targetMsg.generationStage = "CONNECTING TO GOOGLE FLOW STUDIO";
+      saveJson(STORAGE.CHATS, conversations);
+      render();
+      scrollToBottom();
+
+      const stages = [
+        "CONNECTING TO GOOGLE FLOW STUDIO",
+        "SYNTHESIZING FLOW MASTER ASSET",
+        "CHOREOGRAPHING 60FPS CAMERA MOTION",
+        "ENCODING H.264 CINEMATIC MP4"
+      ];
+      let stageIdx = 0;
+      const stageTimer = setInterval(() => {
+        if (!targetMsg.videoLoading) {
+          clearInterval(stageTimer);
+          return;
+        }
+        stageIdx = (stageIdx + 1) % stages.length;
+        targetMsg.generationStage = stages[stageIdx];
+        render();
+      }, 1500);
+
+      const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const candidateEndpoints = isLocalHost
+        ? [
+            "http://127.0.0.1:3456/api/generate/video",
+            "http://localhost:3456/api/generate/video",
+            "https://lumi-backend-v4-production.up.railway.app/api/generate/video"
+          ]
+        : [
+            "https://lumi-backend-v4-production.up.railway.app/api/generate/video",
+            "http://127.0.0.1:3456/api/generate/video",
+            "http://localhost:3456/api/generate/video"
+          ];
+      if (window.location.origin && window.location.origin.startsWith("http") && !candidateEndpoints.includes(`${window.location.origin}/api/generate/video`)) {
+        candidateEndpoints.unshift(`${window.location.origin}/api/generate/video`);
+      }
+
+      (async () => {
+        let targetUrl = "";
+        let targetProvider = "";
+        for (const ep of candidateEndpoints) {
+          try {
+            const vidCtrl = new AbortController();
+            const vidTid = setTimeout(() => vidCtrl.abort(), 95000);
+            const vidResp = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: enhancedPrompt,
+                model: "auto",
+                aspect: aspect,
+                duration: 4.0,
+                googleCookie: localStorage.getItem("lumi_google_cookie") || "",
+                bingCookie: localStorage.getItem("lumi_bing_cookie") || ""
+              }),
+              signal: vidCtrl.signal
+            });
+            clearTimeout(vidTid);
+            if (vidResp.ok) {
+              const vidData = await vidResp.json();
+              if (vidData.url || vidData.videoUrl) {
+                let finalUrl = vidData.url || vidData.videoUrl;
+                if (finalUrl.startsWith("/") && ep.startsWith("http")) {
+                  try {
+                    const epOrigin = new URL(ep).origin;
+                    if (window.location.origin !== epOrigin) {
+                      finalUrl = `${epOrigin}${finalUrl}`;
+                    }
+                  } catch (e) {}
+                }
+                targetUrl = finalUrl;
+                targetProvider = vidData.provider || "Google Flow (Veo / Imagen 3 Studio)";
+                break;
+              }
+            }
+          } catch (e) {}
+        }
+
+        clearInterval(stageTimer);
+        targetMsg.videoLoading = false;
+
+        if (!targetUrl) {
+          targetMsg.content = `❌ Video generation failed on AI cluster. Please retry in a few moments.`;
+          isStreaming = false;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+          scrollToBottom();
+          return;
+        }
+
+        targetMsg.videoUrl = targetUrl;
+        targetMsg.videoProvider = targetProvider || "Google Flow (Veo / Imagen 3 Studio)";
+        targetMsg.content = `🎬 **Google Flow AI Video Generated** for: *"**${escapeHtml(videoPrompt)}**"*`;
+        isStreaming = false;
+        saveJson(STORAGE.CHATS, conversations);
+        AudioEffects.play("success");
+        render();
+        scrollToBottom();
+      })();
+    };
+
     // Reusable Real-Time Generative Image Flow
     const triggerImageGeneration = (imagePrompt, targetMsg) => {
       let enhancedPrompt = imagePrompt;
@@ -3852,13 +4022,13 @@
         for (const ep of candidateEndpoints) {
           try {
             const imgCtrl = new AbortController();
-            const imgTid = setTimeout(() => imgCtrl.abort(), 40000);
+            const imgTid = setTimeout(() => imgCtrl.abort(), 75000);
             const imgResp = await fetch(ep, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 prompt: enhancedPrompt,
-                model: "sd-3.5-large",
+                model: "google-flow",
                 googleCookie: localStorage.getItem("lumi_google_cookie") || "",
                 bingCookie: localStorage.getItem("lumi_bing_cookie") || ""
               }),
@@ -3868,7 +4038,17 @@
             if (imgResp.ok) {
               const imgData = await imgResp.json();
               if (imgData.url) {
-                targetUrl = imgData.url; targetProvider = imgData.provider || "";
+                let finalUrl = imgData.url;
+                if (finalUrl.startsWith("/") && ep.startsWith("http")) {
+                  try {
+                    const epOrigin = new URL(ep).origin;
+                    if (window.location.origin !== epOrigin) {
+                      finalUrl = `${epOrigin}${finalUrl}`;
+                    }
+                  } catch (e) {}
+                }
+                targetUrl = finalUrl;
+                targetProvider = imgData.provider || "Google Flow (Imagen 3)";
                 break;
               }
             }
@@ -3985,6 +4165,28 @@
         scrollToBottom();
       })();
     };
+
+    // 0C. REAL AI VIDEO GENERATION (/video, /vid, or natural prompt)
+    const isVideoCommand =
+      /^\/(?:video|vid|movie|clip|animate)\s+/i.test(prompt) ||
+      /^(?:generate video|video of|create video|render video|make video|animate)\b/i.test(prompt) ||
+      /\b(?:video|clip|movie|animation)\s+(?:banao|banado|bana\s+do|generate|create|render|dikhao|karo)\b/i.test(prompt) ||
+      /\b(?:banao|banado|bana\s+do|generate|create|render|dikhao)\s+.*?\b(?:video|clip|movie|animation)\b/i.test(prompt) ||
+      /\b(?:ki|ka|ek|koi)\s+(?:video|clip|movie)\s*(?:banao|banado|bana\s+do)\b/i.test(prompt);
+
+    if (isVideoCommand) {
+      let videoPrompt = prompt
+        .replace(/^\/(?:video|vid|movie|clip|animate)\s+/i, "")
+        .replace(/^(?:generate video of|generate video|video of|create video of|create a video of|create video|make video of|make a video of|make video|render video|animate)\s*/i, "")
+        .replace(/\b(?:video|clip|movie|animation)\s+(?:banao|banado|bana\s+do|generate|create|render|dikhao|karo)\b/gi, "")
+        .replace(/\b(?:banao|banado|bana\s+do|generate|create|render|dikhao)\s+/gi, "")
+        .replace(/\b(?:ki\s+banao|ka\s+banao|ki\s+video|ka\s+video|ki\s+clip|ka\s+clip)\b/gi, "")
+        .replace(/\b(?:ki|ka|ke|ek|koi)\b/gi, "")
+        .trim();
+      if (!videoPrompt) videoPrompt = prompt.trim();
+      triggerVideoGeneration(videoPrompt, assistantMsg);
+      return;
+    }
 
     // 1. FREE HIGH-RESOLUTION IMAGE GENERATION (/image, /imagine, or natural prompt)
     const isImageCommand =
@@ -7023,6 +7225,31 @@
       });
     }
 
+    // 16d. AI Video Studio Button
+    const videoGenBtn = document.querySelector("#video-gen-btn");
+    if (videoGenBtn) {
+      videoGenBtn.addEventListener("click", () => {
+        const ta = document.querySelector("#composer-textarea");
+        if (ta) {
+          const val = ta.value.trim();
+          if (val) {
+            if (!val.startsWith("/video ")) {
+              ta.value = `/video ${val}`;
+            }
+            const form = document.querySelector("#chat-composer-form");
+            if (form) {
+              if (form.requestSubmit) form.requestSubmit();
+              else form.dispatchEvent(new Event("submit"));
+            }
+          } else {
+            ta.value = "/video ";
+            ta.focus();
+            showToast("🎬 Type your video prompt (e.g. /video a futuristic flying car over city)");
+          }
+        }
+      });
+    }
+
     // 16c. Copy Music Lyrics & Score
     document.querySelectorAll("[data-action='copy-music']").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -7042,6 +7269,21 @@
         const url = btn.getAttribute("data-url");
         const name = btn.getAttribute("data-name") || "image";
         downloadImageFile(url, name);
+      });
+    });
+
+    document.querySelectorAll("[data-action='download-video']").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const url = btn.getAttribute("data-url");
+        const name = (btn.getAttribute("data-name") || "lumi_video").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${name}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast("🎬 Downloading AI video MP4...");
       });
     });
 

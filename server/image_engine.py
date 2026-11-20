@@ -254,25 +254,33 @@ def generate_image_sd35_large(prompt: str) -> dict:
 def generate_image(prompt: str, cookies: dict = None) -> dict:
     """
     Unified entry point for image generation.
-    Checks user credentials first, then falls back to free high-res SD 3.5 Large.
+    Checks authenticated Google Flow first, then user cookies, then falls back to free high-res SD 3.5 Large.
     """
     cookies = cookies or {}
     google_cookie = cookies.get("google") or os.environ.get("GOOGLE_COOKIE")
     bing_cookie = cookies.get("bing") or os.environ.get("BING_COOKIE")
 
-    # 1. Google ImageFX (if user provided cookie)
+    # 1. Google Flow (Imagen 3) — Authenticated Google Account with 1050 credits
+    try:
+        from google_flow_engine import generate_image_google_flow, PROFILE_DIR
+        if PROFILE_DIR.exists():
+            return generate_image_google_flow(prompt)
+    except Exception as e:
+        sys.stderr.write(f"Google Flow engine failed, falling back: {e}\n")
+
+    # 2. Google ImageFX (if user provided cookie)
     if google_cookie:
         try:
             return generate_image_google_imagefx(prompt, google_cookie)
         except Exception as e:
             sys.stderr.write(f"Google ImageFX generation failed: {e}\n")
 
-    # 2. Bing Image Creator (if user provided cookie)
+    # 3. Bing Image Creator (if user provided cookie)
     if bing_cookie:
         try:
             return generate_image_bing(prompt, bing_cookie)
         except Exception as e:
             sys.stderr.write(f"Bing Image Creator generation failed: {e}\n")
 
-    # 3. Stability AI SD 3.5 Large (100% Free, zero auth, ultra high quality)
+    # 4. Stability AI SD 3.5 Large (100% Free, zero auth, ultra high quality)
     return generate_image_sd35_large(prompt)
