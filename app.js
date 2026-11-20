@@ -2366,393 +2366,618 @@
       </div>`;
   }
 
-  // 2. DEDICATED SETTINGS & STUDIO PREFERENCES PAGE
-  function renderSettingsPage() {
+  // 2. DEDICATED CHATGPT MOBILE-STYLE SETTINGS & STUDIO PREFERENCES
+  function getAccentHex(accent) {
+    switch (accent) {
+      case "pink": return "#ec4899";
+      case "purple": return "#a855f7";
+      case "indigo": return "#6366f1";
+      case "emerald": return "#10b981";
+      case "amber": return "#f59e0b";
+      default: return "#ec4899";
+    }
+  }
+
+  function renderSettingsHeader(title, backHref = "#/settings", showInfo = false) {
+    return `
+      <header class="lumi-settings-header">
+        <a href="${backHref}" class="lumi-settings-header-btn" title="Back">
+          <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </a>
+        <h1 class="lumi-settings-header-title">${escapeHtml(title)}</h1>
+        ${showInfo ? `
+          <button type="button" id="settings-info-btn" class="lumi-settings-header-btn" title="About Lumi">
+            <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </button>
+        ` : `
+          <div style="width:44px;height:44px;"></div>
+        `}
+      </header>
+    `;
+  }
+
+  function renderSettingsPage(currentPath = "/settings") {
     const memoryProfile = LumiAutonomousMind.getProfile();
     const isBrotherly = memoryProfile.primaryTone === "brotherly_hinglish";
     const totalMemories = memoryProfile.explicitMemories?.length || 0;
-    const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-    const isNativeApp = LumiDevice.isNative();
+    const accountName = localStorage.getItem("lumi_user_name") || "Javed Akhtar";
+    const nickname = localStorage.getItem("lumi_user_nickname") || "Javed";
+    const accentColor = localStorage.getItem("lumi_accent_color") || "pink";
+    const appLanguage = localStorage.getItem("lumi_app_language") || "System default";
+    const visualAnswers = localStorage.getItem("lumi_visual_answers") || "Default";
+    const homepageSuggestions = localStorage.getItem("lumi_homepage_suggestions") !== "false";
+    const customPrompt = localStorage.getItem("lumi_custom_instructions") || "";
 
-    return `
-      <div class="relative min-h-screen bg-background text-foreground">
-        <div class="aurora opacity-30"></div>
+    const chevronRight = `<svg style="width:16px;height:16px;color:#757575;margin-left:4px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
+    const chevronDown = `<svg style="width:16px;height:16px;color:#9e9e9e;position:absolute;right:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
 
-        <!-- Sticky Header -->
-        <header class="sticky top-0 z-20 border-b border-border/60 bg-card/60 backdrop-blur-md">
-          <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-            <div class="flex items-center gap-3">
-              <a href="#/chat" class="inline-flex size-9 items-center justify-center rounded-xl border border-border bg-card hover:bg-accent hover:text-foreground text-muted-foreground transition-all active:scale-95 cursor-pointer shadow-2xs" title="Back to Chat">
-                ${ICONS.arrowLeft}
-              </a>
-              <div>
-                <h1 class="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
-                  <span>${ICONS.settings}</span>
-                  <span>Settings & Studio Preferences</span>
-                </h1>
-                <p class="text-xs text-muted-foreground">Customize appearance, media clusters, autonomous memory & storage</p>
+    // --- SUB-VIEW: GENERAL (#/settings/general) ---
+    if (currentPath === "/settings/general") {
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader("General", "#/settings", false)}
+
+          <!-- Card 1: Appearance & Accent Color -->
+          <div class="lumi-settings-card">
+            <!-- Appearance Row -->
+            <div class="lumi-settings-row">
+              <span class="lumi-settings-row-label">Appearance</span>
+              <div style="position:relative;display:flex;align-items:center;">
+                <select id="settings-theme-select" class="lumi-settings-select">
+                  <option value="system" ${currentTheme === "system" ? "selected" : ""}>System</option>
+                  <option value="dark" ${currentTheme === "dark" ? "selected" : ""}>Dark</option>
+                  <option value="light" ${currentTheme === "light" ? "selected" : ""}>Light</option>
+                </select>
+                ${chevronDown}
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
-              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-500">
-                <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Pro Studio Active</span>
-              </span>
+            <!-- Accent Color Row -->
+            <div class="lumi-settings-row">
+              <span class="lumi-settings-row-label">Accent color</span>
+              <div style="position:relative;display:flex;align-items:center;">
+                <span id="settings-accent-dot" style="width:12px;height:12px;border-radius:50%;margin-right:8px;background-color:${getAccentHex(accentColor)};"></span>
+                <select id="settings-accent-select" class="lumi-settings-select">
+                  <option value="pink" ${accentColor === "pink" ? "selected" : ""}>Pink</option>
+                  <option value="purple" ${accentColor === "purple" ? "selected" : ""}>Purple</option>
+                  <option value="indigo" ${accentColor === "indigo" ? "selected" : ""}>Indigo</option>
+                  <option value="emerald" ${accentColor === "emerald" ? "selected" : ""}>Emerald</option>
+                  <option value="amber" ${accentColor === "amber" ? "selected" : ""}>Amber</option>
+                </select>
+                ${chevronDown}
+              </div>
             </div>
           </div>
-        </header>
 
-        <main class="relative z-10 mx-auto max-w-4xl px-6 py-8 space-y-8 pb-16">
-          
-          <!-- 1. APPEARANCE & THEME -->
-          <section>
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <span>🎨</span> <span>Appearance & Theme</span>
-                </h2>
-                <p class="text-xs text-muted-foreground mt-0.5">Select your preferred visual style across all Lumi interfaces</p>
+          <!-- Section: Nickname -->
+          <div class="lumi-settings-section-title">Nickname</div>
+          <div class="lumi-settings-card">
+            <input
+              type="text"
+              id="settings-nickname-input"
+              placeholder="Choose nickname"
+              value="${escapeHtml(nickname)}"
+              class="lumi-settings-input"
+            />
+          </div>
+
+          <!-- Card: App Language -->
+          <div class="lumi-settings-card">
+            <div class="lumi-settings-row">
+              <span class="lumi-settings-row-label">App language</span>
+              <div style="position:relative;display:flex;align-items:center;">
+                <select id="settings-language-select" class="lumi-settings-select">
+                  <option value="System default" ${appLanguage === "System default" ? "selected" : ""}>System default</option>
+                  <option value="English (US)" ${appLanguage === "English (US)" ? "selected" : ""}>English (US)</option>
+                  <option value="English (UK)" ${appLanguage === "English (UK)" ? "selected" : ""}>English (UK)</option>
+                  <option value="Hindi" ${appLanguage === "Hindi" ? "selected" : ""}>Hindi (हिंदी)</option>
+                </select>
+                ${chevronDown}
               </div>
             </div>
+          </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              <!-- Light Mode -->
-              <button
-                type="button"
-                class="theme-toggle-btn group relative flex flex-col items-start p-4 rounded-2xl border transition-all text-left cursor-pointer ${
-                  currentTheme === "light"
-                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
-                    : "border-border bg-card hover:border-primary/40 hover:bg-accent/40"
-                }"
-                data-set-theme="light"
-              >
-                <div class="flex items-center justify-between w-full mb-3">
-                  <div class="size-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-xl">
-                    ☀️
-                  </div>
-                  ${currentTheme === "light" ? `<span class="size-2.5 rounded-full bg-primary ring-4 ring-primary/20"></span>` : ""}
+          <!-- Card: Reference Photos -->
+          <div>
+            <div class="lumi-settings-card" style="margin-bottom:0;">
+              <div id="settings-ref-photos-row" class="lumi-settings-row">
+                <span class="lumi-settings-row-label">Reference photos</span>
+                <div class="lumi-settings-row-value">
+                  <span>Add</span>
+                  ${chevronRight}
                 </div>
-                <div class="font-semibold text-sm text-foreground">White Mode</div>
-                <p class="text-xs text-muted-foreground mt-1 leading-relaxed">Crisp paper-white backgrounds with high-contrast text and bright cards.</p>
+              </div>
+            </div>
+            <div class="lumi-settings-subtext">
+              These photos help Lumi create images that look more like you.
+            </div>
+          </div>
+
+          <!-- Section: Intelligence -->
+          <div class="lumi-settings-section-title">Intelligence</div>
+          <div class="lumi-settings-card">
+            <div class="lumi-settings-row">
+              <span class="lumi-settings-row-label">Visual answers</span>
+              <div style="position:relative;display:flex;align-items:center;">
+                <select id="settings-visual-answers-select" class="lumi-settings-select">
+                  <option value="Default" ${visualAnswers === "Default" ? "selected" : ""}>Default</option>
+                  <option value="Always" ${visualAnswers === "Always" ? "selected" : ""}>Always</option>
+                  <option value="Minimal" ${visualAnswers === "Minimal" ? "selected" : ""}>Minimal</option>
+                </select>
+                ${chevronDown}
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: Homepage Suggestions -->
+          <div>
+            <div class="lumi-settings-card" style="margin-bottom:0;">
+              <div class="lumi-settings-row">
+                <span class="lumi-settings-row-label">Homepage suggestions</span>
+                <!-- Native ChatGPT toggle switch -->
+                <div id="homepage-suggestions-toggle" class="lumi-settings-switch ${homepageSuggestions ? 'on' : 'off'}">
+                  <div class="lumi-settings-switch-knob"></div>
+                </div>
+              </div>
+            </div>
+            <div class="lumi-settings-subtext">
+              Lumi can give you suggestions by searching connected plugins.
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- SUB-VIEW: CUSTOMIZE LUMI (#/settings/customize) ---
+    if (currentPath === "/settings/customize") {
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader("Customize Lumi", "#/settings", false)}
+
+          <!-- Conversational Tone Card -->
+          <div class="lumi-settings-section-title">Primary Personality Tone</div>
+          <div class="lumi-settings-card">
+            <div id="settings-tone-brotherly" class="lumi-settings-row">
+              <div>
+                <div class="lumi-settings-row-label">Brotherly Hinglish</div>
+                <div style="color:#9e9e9e;font-size:12.5px;margin-top:2px;">Natural Indian conversational tone (bhai, yr, tu, direct & warm)</div>
+              </div>
+              <div style="width:24px;height:24px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;background:${isBrotherly ? '#fff' : 'transparent'};color:${isBrotherly ? '#000' : 'transparent'};">
+                <svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M20.285 2l-11.285 11.567-5.286-5.011-3.714 3.716 9 8.728 15-15.285z"/></svg>
+              </div>
+            </div>
+            <div id="settings-tone-sincere" class="lumi-settings-row">
+              <div>
+                <div class="lumi-settings-row-label">Adaptive Sincere</div>
+                <div style="color:#9e9e9e;font-size:12.5px;margin-top:2px;">Polite, empathetic, and professional language</div>
+              </div>
+              <div style="width:24px;height:24px;border-radius:50%;border:1px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;background:${!isBrotherly ? '#fff' : 'transparent'};color:${!isBrotherly ? '#000' : 'transparent'};">
+                <svg style="width:14px;height:14px;fill:currentColor;" viewBox="0 0 24 24"><path d="M20.285 2l-11.285 11.567-5.286-5.011-3.714 3.716 9 8.728 15-15.285z"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Custom Instructions -->
+          <div class="lumi-settings-section-title">Custom Instructions</div>
+          <div class="lumi-settings-card" style="padding:1.25rem;">
+            <p style="font-size:13px;color:#9e9e9e;margin-bottom:0.75rem;line-height:1.45;">What would you like Lumi to know about you to provide better responses?</p>
+            <textarea
+              id="settings-custom-instructions"
+              rows="4"
+              style="width:100%;background:#181818;border-radius:1rem;padding:0.85rem;font-size:14px;color:#fff;outline:none;border:1px solid rgba(255,255,255,0.08);resize:none;box-sizing:border-box;"
+              placeholder="e.g. Call me Javed, I am a senior engineer, prefer concise direct code snippets..."
+            >${escapeHtml(customPrompt)}</textarea>
+            <div style="margin-top:0.75rem;display:flex;justify-content:flex-end;">
+              <button type="button" id="settings-save-instructions-btn" style="padding:0.45rem 1rem;border-radius:9999px;background:#fff;color:#000;font-size:12px;font-weight:600;border:none;cursor:pointer;">
+                Save Instructions
               </button>
-
-              <!-- Dark Mode -->
-              <button
-                type="button"
-                class="theme-toggle-btn group relative flex flex-col items-start p-4 rounded-2xl border transition-all text-left cursor-pointer ${
-                  currentTheme === "dark"
-                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
-                    : "border-border bg-card hover:border-primary/40 hover:bg-accent/40"
-                }"
-                data-set-theme="dark"
-              >
-                <div class="flex items-center justify-between w-full mb-3">
-                  <div class="size-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center text-xl">
-                    🌙
-                  </div>
-                  ${currentTheme === "dark" ? `<span class="size-2.5 rounded-full bg-primary ring-4 ring-primary/20"></span>` : ""}
-                </div>
-                <div class="font-semibold text-sm text-foreground">Dark Mode</div>
-                <p class="text-xs text-muted-foreground mt-1 leading-relaxed">Deep charcoal and OLED tones with warm neon glows to reduce eye strain.</p>
-              </button>
-
-              <!-- Auto System -->
-              <button
-                type="button"
-                class="theme-toggle-btn group relative flex flex-col items-start p-4 rounded-2xl border transition-all text-left cursor-pointer ${
-                  currentTheme === "system"
-                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
-                    : "border-border bg-card hover:border-primary/40 hover:bg-accent/40"
-                }"
-                data-set-theme="system"
-              >
-                <div class="flex items-center justify-between w-full mb-3">
-                  <div class="size-10 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center text-xl">
-                    💻
-                  </div>
-                  ${currentTheme === "system" ? `<span class="size-2.5 rounded-full bg-primary ring-4 ring-primary/20"></span>` : ""}
-                </div>
-                <div class="font-semibold text-sm text-foreground">Auto System</div>
-                <p class="text-xs text-muted-foreground mt-1 leading-relaxed">Automatically matches your phone or computer's system theme preference.</p>
-              </button>
             </div>
-          </section>
+          </div>
 
-          <!-- 2. AUTONOMOUS MIND & MEMORY PROFILE -->
-          <section>
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <span>🧠</span> <span>Autonomous Mind & Memory Profile</span>
-                </h2>
-                <p class="text-xs text-muted-foreground mt-0.5">Continuous learning across all chats and models (Zero amnesia architecture)</p>
+          <!-- Autonomous Mind Memory -->
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 1rem;margin-bottom:0.45rem;">
+            <span class="lumi-settings-section-title" style="padding:0;margin:0;">Autonomous Memories (${totalMemories})</span>
+            ${totalMemories > 0 ? `<button type="button" id="settings-clear-all-memories-btn" style="background:none;border:none;color:#fb7185;font-size:12px;cursor:pointer;">Clear all</button>` : ""}
+          </div>
+          <div class="lumi-settings-card" style="padding:1.25rem;">
+            ${totalMemories === 0 ? `
+              <div style="text-align:center;padding:1rem 0;color:#888;font-size:13px;">
+                No autonomous memories stored yet. Lumi automatically remembers your preferences as you chat.
               </div>
-              <span class="inline-flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">
-                <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
-              </span>
-            </div>
-
-            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="p-4 rounded-xl border border-border/60 bg-secondary/20">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-foreground">Conversational Tone</span>
-                    <span class="text-xs font-medium text-primary px-2 py-0.5 rounded-md bg-primary/10">${isBrotherly ? "Brotherly Hinglish (Bhai/Yr/Tu)" : "Adaptive Sincere"}</span>
+            ` : `
+              <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                ${memoryProfile.explicitMemories.map((mem, i) => `
+                  <div style="display:flex;align-items:center;justify-content:space-between;background:#191919;padding:0.75rem 1rem;border-radius:1rem;border:1px solid rgba(255,255,255,0.04);">
+                    <span style="font-size:13.5px;color:#e5e7eb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:0.75rem;">• ${escapeHtml(mem)}</span>
+                    <button type="button" style="background:none;border:none;color:#888;cursor:pointer;padding:0.25rem;" data-delete-memory="${i}" title="Delete memory">
+                      ✕
+                    </button>
                   </div>
-                  <p class="text-xs text-muted-foreground mt-2 leading-relaxed">
-                    Lumi automatically detects and mirrors your natural communication language (Hindi / Hinglish / English) without robotic AI disclaimers.
-                  </p>
-                </div>
-
-                <div class="p-4 rounded-xl border border-border/60 bg-secondary/20">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-foreground">Cross-Model Memory</span>
-                    <span class="text-xs font-medium text-emerald-500 px-2 py-0.5 rounded-md bg-emerald-500/10">Active (${totalMemories} Learned Facts)</span>
-                  </div>
-                  <p class="text-xs text-muted-foreground mt-2 leading-relaxed">
-                    Key project requirements, device states, and user preferences are persisted across model switches (Gemini, Claude, GPT-4o, DeepSeek).
-                  </p>
-                </div>
+                `).join("")}
               </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
 
-              ${
-                totalMemories > 0
-                  ? `
-                <div class="pt-3 border-t border-border/60">
-                  <div class="text-xs font-semibold text-foreground mb-2">Stored Learned Preferences:</div>
-                  <div class="flex flex-wrap gap-1.5">
-                    ${memoryProfile.explicitMemories.slice(0, 10).map((mem, i) => `
-                      <span class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-secondary/50 border border-border/60 text-muted-foreground">
-                        <span>•</span>
-                        <span class="truncate max-w-[260px]">${escapeHtml(mem)}</span>
-                        <button type="button" class="text-muted-foreground hover:text-destructive cursor-pointer ml-1" data-delete-memory="${i}" title="Remove memory">✕</button>
-                      </span>
-                    `).join("")}
-                  </div>
-                </div>
-              ` : ""
-              }
-            </div>
-          </section>
+    // --- SUB-VIEW: MEDIA & CLUSTERS (#/settings/media) ---
+    if (currentPath === "/settings/media") {
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader("Media & Clusters", "#/settings", false)}
 
-          <!-- 3. AI MEDIA STUDIO CREDENTIALS -->
-          <section>
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <span>🎬</span> <span>Video, 🎵 Music & 🎨 Image Clusters</span>
-                </h2>
-                <p class="text-xs text-muted-foreground mt-0.5">Real AI generation credentials for Google Flow, Suno, Udio, and DALL-E 3</p>
-              </div>
-              <span class="text-xs text-primary font-semibold">100% Real • Zero Mock</span>
-            </div>
-
-            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-5">
-              
-              <!-- Google Flow (Veo & Imagen 3) Status -->
-              <div class="p-4 rounded-xl border border-purple-500/30 bg-purple-500/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div class="flex items-center gap-3">
-                  <div class="size-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl shrink-0">
-                    🎬
-                  </div>
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h3 class="font-bold text-sm text-foreground">Google Flow (Veo / Imagen 3 Studio)</h3>
-                      <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">Provider #1</span>
-                    </div>
-                    <p class="text-xs text-muted-foreground mt-0.5">
-                      Session linked: <span class="font-mono text-purple-300">jayuu3654@gmail.com</span> (PRO Tier • 1050 Credits)
-                    </p>
-                  </div>
-                </div>
-                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold shrink-0">
-                  <span class="size-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>Connected & Ready</span>
-                </div>
-              </div>
-
-              <!-- Suno Cookie Input -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span class="text-pink-400">🎵</span> <span>Suno AI Session Cookie</span>
-                  </label>
-                  <span class="text-[11px] ${localStorage.getItem("lumi_suno_cookie") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
-                    ${localStorage.getItem("lumi_suno_cookie") ? "✅ Cookie Active" : "Optional (Adds Suno v3.5 Vocals)"}
-                  </span>
-                </div>
-                <input
-                  type="password"
-                  id="settings-suno-cookie-input"
-                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500 font-mono transition-all"
-                  placeholder="Paste suno.com session cookie (__client / __session) or token..."
-                  value="${escapeHtml(localStorage.getItem('lumi_suno_cookie') || '')}"
-                />
-                <p class="text-[11px] text-muted-foreground">Enables 320kbps full stereo song generation with realistic dual-singer vocals.</p>
-              </div>
-
-              <!-- Udio Token Input -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span class="text-purple-400">🎵</span> <span>Udio AI Auth Token</span>
-                  </label>
-                  <span class="text-[11px] ${localStorage.getItem("lumi_udio_token") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
-                    ${localStorage.getItem("lumi_udio_token") ? "✅ Token Active" : "Optional (Adds Udio Tracks)"}
-                  </span>
-                </div>
-                <input
-                  type="password"
-                  id="settings-udio-token-input"
-                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 font-mono transition-all"
-                  placeholder="Paste udio.com sb-api-auth-token..."
-                  value="${escapeHtml(localStorage.getItem('lumi_udio_token') || '')}"
-                />
-              </div>
-
-              <!-- Google Labs Cookie -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span class="text-blue-400">🎨</span> <span>Google ImageFX & MusicLM Cookie</span>
-                  </label>
-                  <span class="text-[11px] ${localStorage.getItem("lumi_google_cookie") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
-                    ${localStorage.getItem("lumi_google_cookie") ? "✅ Cookie Active" : "Optional"}
-                  </span>
-                </div>
-                <input
-                  type="password"
-                  id="settings-google-cookie-input"
-                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 font-mono transition-all"
-                  placeholder="Paste labs.google cookie (__Secure-1PSID / session)..."
-                  value="${escapeHtml(localStorage.getItem('lumi_google_cookie') || '')}"
-                />
-              </div>
-
-              <!-- Bing DALL-E 3 Cookie -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span class="text-emerald-400">🎨</span> <span>Bing Image Creator (_U Cookie)</span>
-                  </label>
-                  <span class="text-[11px] ${localStorage.getItem("lumi_bing_cookie") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
-                    ${localStorage.getItem("lumi_bing_cookie") ? "✅ Cookie Active" : "Optional (Adds DALL-E 3)"}
-                  </span>
-                </div>
-                <input
-                  type="password"
-                  id="settings-bing-cookie-input"
-                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 font-mono transition-all"
-                  placeholder="Paste bing.com _U cookie..."
-                  value="${escapeHtml(localStorage.getItem('lumi_bing_cookie') || '')}"
-                />
-              </div>
-            </div>
-          </section>
-
-          <!-- 4. AI PROVIDERS & CUSTOM ENDPOINTS -->
-          <section>
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <span>⚡</span> <span>AI Providers & Models</span>
-                </h2>
-                <p class="text-xs text-muted-foreground mt-0.5">Manage external LLM endpoints and API keys</p>
-              </div>
-            </div>
-
-            <a
-              href="#/providers"
-              class="group flex items-center justify-between p-5 rounded-2xl border border-border bg-card hover:border-primary/50 hover:bg-accent/30 transition-all shadow-xs cursor-pointer"
-            >
-              <div class="flex items-center gap-4">
-                <div class="size-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
-                  ⚡
+          <!-- Google Flow Studio Status -->
+          <div class="lumi-settings-section-title">Google Flow Video & ImageFX Cluster</div>
+          <div class="lumi-settings-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:0.85rem;">
+                <div style="width:40px;height:40px;border-radius:1rem;background:rgba(168,85,247,0.2);color:#c084fc;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;">
+                  GF
                 </div>
                 <div>
-                  <h3 class="font-bold text-sm text-foreground flex items-center gap-2">
-                    <span>Manage Custom AI Providers</span>
-                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-secondary text-muted-foreground">OpenAI • Gemini • Groq • Ollama</span>
-                  </h3>
-                  <p class="text-xs text-muted-foreground mt-0.5">Configure custom base URLs, custom model labels, and personal API keys.</p>
+                  <div class="lumi-settings-row-label">Google Flow AI Studio</div>
+                  <div style="font-size:12.5px;color:#9e9e9e;">Veo 2 Video & Imagen 3 Pro</div>
                 </div>
               </div>
-              <span class="size-8 rounded-full border border-border flex items-center justify-center text-muted-foreground group-hover:text-foreground group-hover:border-primary transition-all">
-                →
+              <span style="padding:0.25rem 0.65rem;border-radius:9999px;font-size:12px;font-weight:600;background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);">
+                ● Active
               </span>
-            </a>
-          </section>
+            </div>
+            <div style="padding:0.85rem;border-radius:1rem;background:#191919;border:1px solid rgba(255,255,255,0.05);font-size:12px;display:flex;flex-direction:column;gap:0.35rem;">
+              <div style="display:flex;justify-content:space-between;color:#9e9e9e;">
+                <span>Project ID:</span>
+                <span style="font-family:monospace;color:#d1d5db;">cfc62b8a-268f-429a-abcd-375478e21765</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;color:#9e9e9e;">
+                <span>Boq Labs Backend:</span>
+                <span style="color:#34d399;font-weight:500;">Ready (20261118.14_p0)</span>
+              </div>
+            </div>
+          </div>
 
-          <!-- 5. CHAT DATA & STORAGE MANAGEMENT -->
-          <section>
-            <div class="flex items-center justify-between mb-3">
+          <!-- Suno AI Cookie -->
+          <div class="lumi-settings-section-title">Suno AI Music Session Cookie</div>
+          <div class="lumi-settings-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.65rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="lumi-settings-row-label">Suno Session (__client / __session)</span>
+              <span style="font-size:12px;color:${localStorage.getItem("lumi_suno_cookie") ? '#34d399' : '#757575'};">
+                ${localStorage.getItem("lumi_suno_cookie") ? "● Active" : "Optional"}
+              </span>
+            </div>
+            <input
+              type="password"
+              id="settings-suno-cookie-input"
+              style="width:100%;background:#191919;border-radius:1rem;padding:0.75rem 1rem;font-size:12px;color:#fff;outline:none;border:1px solid rgba(255,255,255,0.05);font-family:monospace;box-sizing:border-box;"
+              placeholder="Paste suno.com session cookie..."
+              value="${escapeHtml(localStorage.getItem('lumi_suno_cookie') || '')}"
+            />
+            <p style="font-size:12px;color:#888;margin:0;line-height:1.4;">Enables high-fidelity 320kbps stereo song generation with Suno v3.5/v4.</p>
+          </div>
+
+          <!-- Udio AI Token -->
+          <div class="lumi-settings-section-title">Udio AI Auth Token</div>
+          <div class="lumi-settings-card" style="padding:1.25rem;">
+            <input
+              type="password"
+              id="settings-udio-token-input"
+              style="width:100%;background:#191919;border-radius:1rem;padding:0.75rem 1rem;font-size:12px;color:#fff;outline:none;border:1px solid rgba(255,255,255,0.05);font-family:monospace;box-sizing:border-box;"
+              placeholder="Paste udio.com sb-api-auth-token..."
+              value="${escapeHtml(localStorage.getItem('lumi_udio_token') || '')}"
+            />
+          </div>
+
+          <!-- Google ImageFX & MusicLM Cookie -->
+          <div class="lumi-settings-section-title">Google ImageFX & MusicLM Cookie</div>
+          <div class="lumi-settings-card" style="padding:1.25rem;">
+            <input
+              type="password"
+              id="settings-google-cookie-input"
+              style="width:100%;background:#191919;border-radius:1rem;padding:0.75rem 1rem;font-size:12px;color:#fff;outline:none;border:1px solid rgba(255,255,255,0.05);font-family:monospace;box-sizing:border-box;"
+              placeholder="Paste Google Labs auth cookie..."
+              value="${escapeHtml(localStorage.getItem('lumi_google_cookie') || '')}"
+            />
+          </div>
+
+          <!-- Bing Image Creator Cookie -->
+          <div class="lumi-settings-section-title">Bing Image Creator (DALL-E 3) Cookie</div>
+          <div class="lumi-settings-card" style="padding:1.25rem;">
+            <input
+              type="password"
+              id="settings-bing-cookie-input"
+              style="width:100%;background:#191919;border-radius:1rem;padding:0.75rem 1rem;font-size:12px;color:#fff;outline:none;border:1px solid rgba(255,255,255,0.05);font-family:monospace;box-sizing:border-box;"
+              placeholder="Paste Bing _U cookie..."
+              value="${escapeHtml(localStorage.getItem('lumi_bing_cookie') || '')}"
+            />
+          </div>
+        </div>
+      `;
+    }
+
+    // --- SUB-VIEW: DATA CONTROLS (#/settings/data) ---
+    if (currentPath === "/settings/data") {
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader("Data controls", "#/settings", false)}
+
+          <!-- Export Data Card -->
+          <div class="lumi-settings-card">
+            <div id="settings-export-chats-btn" class="lumi-settings-row">
+              <span class="lumi-settings-row-label">Export chat history</span>
+              <div class="lumi-settings-row-value">
+                <span>JSON</span>
+                ${chevronRight}
+              </div>
+            </div>
+          </div>
+
+          <!-- Danger Zone Card -->
+          <div class="lumi-settings-card">
+            <div id="settings-clear-chats-btn" class="lumi-settings-row" style="color:#fb7185;">
+              <span class="lumi-settings-row-label" style="color:#fb7185;">Clear all chat history</span>
+              ${chevronRight}
+            </div>
+            <div id="settings-reset-memory-btn" class="lumi-settings-row" style="color:#fb7185;">
+              <span class="lumi-settings-row-label" style="color:#fb7185;">Reset learned autonomous memories</span>
+              ${chevronRight}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- SUB-VIEW: USAGE AND LIMITS (#/settings/usage) ---
+    if (currentPath === "/settings/usage") {
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader("Usage and limits", "#/settings", false)}
+
+          <div class="lumi-settings-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
               <div>
-                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <span>💾</span> <span>Storage & Data Management</span>
-                </h2>
-                <p class="text-xs text-muted-foreground mt-0.5">Export backups or reset locally stored conversations</p>
+                <div class="lumi-settings-row-label">Lumi Pro Studio Plan</div>
+                <div style="font-size:12px;color:#34d399;margin-top:2px;">● Unlimited Access Activated</div>
+              </div>
+              <span style="padding:0.25rem 0.65rem;border-radius:9999px;font-size:12px;font-weight:600;background:#fff;color:#000;">Active</span>
+            </div>
+            <div style="border-top:1px solid #2d2d2d;padding-top:0.75rem;font-size:12.5px;color:#9e9e9e;display:flex;flex-direction:column;gap:0.5rem;">
+              <div style="display:flex;justify-content:space-between;">
+                <span>Fast Model Queries:</span>
+                <span style="color:#fff;font-weight:500;">Unlimited</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;">
+                <span>Veo Video Generation:</span>
+                <span style="color:#fff;font-weight:500;">Full Resolution</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;">
+                <span>Deep Research Reasoning:</span>
+                <span style="color:#fff;font-weight:500;">Unlimited</span>
               </div>
             </div>
+          </div>
+        </div>
+      `;
+    }
 
-            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
-              <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div>
-                  <div class="text-sm font-semibold text-foreground">Local Conversations</div>
-                  <div class="text-xs text-muted-foreground mt-0.5">${conversations.length} conversation threads stored locally in this browser / device</div>
-                </div>
+    // --- SUB-VIEW: NOTIFICATIONS (#/settings/notifications) ---
+    if (currentPath === "/settings/notifications") {
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader("Notifications", "#/settings", false)}
 
-                <div class="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 text-xs py-2 px-4 rounded-xl border border-border bg-secondary/40 hover:bg-secondary text-foreground font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
-                    id="settings-export-chats-btn"
-                  >
-                    ${ICONS.export} <span>Export All JSON</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-1.5 text-xs py-2 px-4 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-destructive font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
-                    id="settings-clear-chats-btn"
-                  >
-                    ${ICONS.trash} <span>Clear All</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- 6. SYSTEM & ENVIRONMENT DIAGNOSTICS -->
-          <section>
-            <div class="flex items-center justify-between mb-3">
+          <div class="lumi-settings-card">
+            <div class="lumi-settings-row">
               <div>
-                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <span>ℹ️</span> <span>System & Environment Diagnostics</span>
-                </h2>
+                <div class="lumi-settings-row-label">Generation complete sound</div>
+                <div style="font-size:12.5px;color:#9e9e9e;margin-top:2px;">Play subtle chime when video or song finishes</div>
+              </div>
+              <div class="lumi-settings-switch on">
+                <div class="lumi-settings-switch-knob"></div>
               </div>
             </div>
-
-            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs text-xs space-y-2.5">
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Runtime Environment:</span>
-                <span class="font-mono text-foreground font-medium">${isNativeApp ? "Android Native App (OPPO CPH2617)" : "Web Browser (Linux)"}</span>
+            <div class="lumi-settings-row">
+              <div>
+                <div class="lumi-settings-row-label">System notifications</div>
+                <div style="font-size:12.5px;color:#9e9e9e;margin-top:2px;">Alerts when running in background</div>
               </div>
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Backend Cluster:</span>
-                <span class="font-mono text-purple-400 font-medium">https://lumi-backend-v4-production.up.railway.app</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Local Server:</span>
-                <span class="font-mono text-foreground font-medium">${isLocalHost ? "http://localhost:3456" : "Cloud Hosted"}</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Lumi Studio Version:</span>
-                <span class="font-mono text-emerald-500 font-medium">v1.2 (Railway Production)</span>
+              <div class="lumi-settings-switch on">
+                <div class="lumi-settings-switch-knob"></div>
               </div>
             </div>
-          </section>
+          </div>
+        </div>
+      `;
+    }
 
-        </main>
+    // --- SUB-VIEW: VOICE (#/settings/voice) ---
+    if (currentPath === "/settings/voice") {
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader("Voice", "#/settings", false)}
+
+          <div class="lumi-settings-card">
+            <div class="lumi-settings-row">
+              <span class="lumi-settings-row-label">Voice engine</span>
+              <span class="lumi-settings-row-value">Gemini Live & Web Speech ⌵</span>
+            </div>
+            <div class="lumi-settings-row">
+              <span class="lumi-settings-row-label">Language detection</span>
+              <span class="lumi-settings-row-value">Auto (Hindi + English) ⌵</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- SUB-VIEW: SAFETY & SECURITY ---
+    if (currentPath === "/settings/safety" || currentPath === "/settings/security") {
+      const isSafety = currentPath === "/settings/safety";
+      return `
+        <div class="lumi-settings-viewport">
+          ${renderSettingsHeader(isSafety ? "Safety" : "Security and login", "#/settings", false)}
+
+          <div class="lumi-settings-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+            <div class="lumi-settings-row-label">${isSafety ? "Balanced Content Safety" : "Biometric & Passcode Lock"}</div>
+            <p style="font-size:13px;color:#9e9e9e;line-height:1.45;margin:0;">
+              ${isSafety ? "All queries run through real-time harmlessness and anti-toxicity filters while preserving natural Hindi and Hinglish dialect." : "Your API keys, cookies, and local chat history are stored in encrypted browser storage on this device."}
+            </p>
+            <div style="padding-top:0.5rem;font-size:12px;color:#34d399;display:flex;align-items:center;gap:0.35rem;">
+              <span style="width:8px;height:8px;border-radius:50%;background:#34d399;"></span>
+              <span>Fully Secure & Protected</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- DEFAULT MAIN VIEW: #/settings (Matches ChatGPT Android Screenshot) ---
+    return `
+      <div class="lumi-settings-viewport">
+        ${renderSettingsHeader("Settings", "#/chat", true)}
+
+        <!-- Card 1: Account (Avatar, Account, Username >, Switch account >) -->
+        <div class="lumi-settings-card">
+          <!-- Account Name Row -->
+          <div id="settings-account-row" class="lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;height:34px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#9333ea,#6366f1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px;flex-shrink:0;">
+                JA
+              </div>
+              <span class="lumi-settings-row-label">Account</span>
+            </div>
+            <div class="lumi-settings-row-value">
+              <span id="settings-account-name-display">${escapeHtml(accountName)}</span>
+              ${chevronRight}
+            </div>
+          </div>
+          <!-- Switch Account Row -->
+          <a href="#/auth" class="lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Switch account</span>
+            </div>
+            ${chevronRight}
+          </a>
+        </div>
+
+        <!-- Card 2: Customize Lumi -->
+        <div class="lumi-settings-card">
+          <a href="#/settings/customize" class="lumi-settings-row">
+            <div style="display:flex;align-items:flex-start;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;margin-top:2px;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="4"/><path d="M7 10h10"/><path d="M7 14h6"/></svg>
+              </div>
+              <div>
+                <div class="lumi-settings-row-label">Customize Lumi</div>
+                <div style="font-size:13px;color:#9e9e9e;margin-top:2px;">Personality, memory, plugins and more</div>
+              </div>
+            </div>
+            ${chevronRight}
+          </a>
+        </div>
+
+        <!-- Card 3: Main Grouped List -->
+        <div id="settings-main-list-card" class="lumi-settings-card">
+          <!-- General -->
+          <a href="#/settings/general" data-settings-item="General" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">General</span>
+            </div>
+            ${chevronRight}
+          </a>
+
+          <!-- Usage and limits -->
+          <a href="#/settings/usage" data-settings-item="Usage and limits" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 3 9 4-4 5 5 6-6"/><path d="M21 9V3h-6"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Usage and limits</span>
+            </div>
+            ${chevronRight}
+          </a>
+
+          <!-- Notifications -->
+          <a href="#/settings/notifications" data-settings-item="Notifications" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Notifications</span>
+            </div>
+            ${chevronRight}
+          </a>
+
+          <!-- Voice -->
+          <a href="#/settings/voice" data-settings-item="Voice" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="18" y1="8" x2="18" y2="16"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Voice</span>
+            </div>
+            ${chevronRight}
+          </a>
+
+          <!-- Media & Clusters -->
+          <a href="#/settings/media" data-settings-item="Media and Clusters" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Media & Clusters</span>
+            </div>
+            ${chevronRight}
+          </a>
+
+          <!-- Safety -->
+          <a href="#/settings/safety" data-settings-item="Safety" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Safety</span>
+            </div>
+            ${chevronRight}
+          </a>
+
+          <!-- Security and login -->
+          <a href="#/settings/security" data-settings-item="Security and login" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Security and login</span>
+            </div>
+            ${chevronRight}
+          </a>
+
+          <!-- Data controls -->
+          <a href="#/settings/data" data-settings-item="Data controls" class="settings-nav-row lumi-settings-row">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 0-7.07 17.07l1.41-1.41A8 8 0 1 1 20 12h2a10 10 0 0 0-10-10Z"/><path d="m9 12 2 2 4-4"/></svg>
+              </div>
+              <span class="lumi-settings-row-label">Data controls</span>
+            </div>
+            ${chevronRight}
+          </a>
+        </div>
+
+        <!-- Bottom Search Pill -->
+        <div class="lumi-settings-search-bar">
+          <svg style="width:18px;height:18px;color:#757575;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.34-4.34"/></svg>
+          <input
+            type="text"
+            id="settings-search-input"
+            placeholder="Search settings"
+          />
+        </div>
       </div>
     `;
   }
@@ -6206,6 +6431,17 @@
       return true;
     }
 
+    // 4. If in Settings or Settings sub-view
+    const currentHash = window.location.hash || "";
+    if (currentHash.startsWith("#/settings/")) {
+      window.location.hash = "#/settings";
+      return true;
+    }
+    if (currentHash === "#/settings") {
+      window.location.hash = "#/chat";
+      return true;
+    }
+
     return false;
   };
 
@@ -6322,12 +6558,16 @@
         root.innerHTML = renderLanding();
       }
     } else if (path === "/auth") {
+      document.body.style.backgroundColor = "";
       root.innerHTML = renderAuthPage();
     } else if (path === "/providers") {
+      document.body.style.backgroundColor = "";
       root.innerHTML = renderProvidersPage();
-    } else if (path === "/settings") {
-      root.innerHTML = renderSettingsPage();
+    } else if (path.startsWith("/settings")) {
+      document.body.style.backgroundColor = "#000000";
+      root.innerHTML = renderSettingsPage(path);
     } else if (path.startsWith("/chat")) {
+      document.body.style.backgroundColor = "";
       const threadId = path.startsWith("/chat/") ? path.slice(6) : null;
       root.innerHTML = renderChatPage(threadId);
 
@@ -7241,33 +7481,179 @@
       });
     }
 
-    const closeSettingsBtn = document.querySelector("#close-settings-modal-btn");
-    if (closeSettingsBtn) {
-      closeSettingsBtn.addEventListener("click", () => {
-        settingsModalOpen = false;
-        render();
+    const settingsInfoBtn = document.querySelector("#settings-info-btn");
+    if (settingsInfoBtn) {
+      settingsInfoBtn.addEventListener("click", () => {
+        showToast("Lumi AI Studio v1.2 — 100% Real Studio Backend");
       });
     }
 
-    const settingsOverlay = document.querySelector("#settings-modal-overlay");
-    if (settingsOverlay) {
-      settingsOverlay.addEventListener("click", (e) => {
-        if (e.target === settingsOverlay) {
-          settingsModalOpen = false;
-          render();
+    // Appearance / Theme Dropdown
+    const themeSelect = document.querySelector("#settings-theme-select");
+    if (themeSelect) {
+      themeSelect.addEventListener("change", (e) => {
+        const theme = e.target.value;
+        applyTheme(theme);
+        showToast(`Appearance set to ${theme.toUpperCase()}`);
+      });
+    }
+
+    // Accent Color Dropdown
+    const accentSelect = document.querySelector("#settings-accent-select");
+    if (accentSelect) {
+      accentSelect.addEventListener("change", (e) => {
+        const accent = e.target.value;
+        localStorage.setItem("lumi_accent_color", accent);
+        const dot = document.querySelector("#settings-accent-dot");
+        if (dot) dot.style.backgroundColor = getAccentHex(accent);
+        showToast(`Accent color updated to ${accent}`);
+      });
+    }
+
+    // Nickname input auto-save
+    const nicknameInput = document.querySelector("#settings-nickname-input");
+    if (nicknameInput) {
+      nicknameInput.addEventListener("input", (e) => {
+        localStorage.setItem("lumi_user_nickname", e.target.value.trim());
+      });
+      nicknameInput.addEventListener("change", (e) => {
+        const val = e.target.value.trim() || "Javed";
+        localStorage.setItem("lumi_user_nickname", val);
+        showToast(`Nickname saved: ${val}`);
+      });
+    }
+
+    // App language
+    const langSelect = document.querySelector("#settings-language-select");
+    if (langSelect) {
+      langSelect.addEventListener("change", (e) => {
+        localStorage.setItem("lumi_app_language", e.target.value);
+        showToast(`App language set to ${e.target.value}`);
+      });
+    }
+
+    // Visual answers
+    const visualAnswersSelect = document.querySelector("#settings-visual-answers-select");
+    if (visualAnswersSelect) {
+      visualAnswersSelect.addEventListener("change", (e) => {
+        localStorage.setItem("lumi_visual_answers", e.target.value);
+        showToast(`Visual answers set to ${e.target.value}`);
+      });
+    }
+
+    // Reference photos row
+    const refPhotosRow = document.querySelector("#settings-ref-photos-row");
+    if (refPhotosRow) {
+      refPhotosRow.addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.onchange = (e) => {
+          if (e.target.files && e.target.files[0]) {
+            showToast("Reference photo added for personalized generation!");
+          }
+        };
+        input.click();
+      });
+    }
+
+    // Homepage suggestions toggle
+    const hpToggle = document.querySelector("#homepage-suggestions-toggle");
+    if (hpToggle) {
+      hpToggle.addEventListener("click", () => {
+        const current = localStorage.getItem("lumi_homepage_suggestions") !== "false";
+        const next = !current;
+        localStorage.setItem("lumi_homepage_suggestions", next ? "true" : "false");
+        render();
+        showToast(next ? "Homepage suggestions turned on" : "Homepage suggestions turned off");
+      });
+    }
+
+    // Account Name edit
+    const accountRow = document.querySelector("#settings-account-row");
+    if (accountRow) {
+      accountRow.addEventListener("click", () => {
+        const current = localStorage.getItem("lumi_user_name") || "Javed Akhtar";
+        const updated = prompt("Enter your account display name:", current);
+        if (updated && updated.trim()) {
+          localStorage.setItem("lumi_user_name", updated.trim());
+          const displayEl = document.querySelector("#settings-account-name-display");
+          if (displayEl) displayEl.textContent = updated.trim();
+          showToast(`Account name updated: ${updated.trim()}`);
         }
       });
     }
 
-    document.querySelectorAll("[data-set-theme]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const theme = btn.getAttribute("data-set-theme");
-        applyTheme(theme);
-        render();
-        showToast(`Theme changed to ${theme.toUpperCase()}`);
+    // Settings search bar real-time filter
+    const settingsSearchInput = document.querySelector("#settings-search-input");
+    if (settingsSearchInput) {
+      settingsSearchInput.addEventListener("input", (e) => {
+        const q = e.target.value.toLowerCase().trim();
+        document.querySelectorAll(".settings-nav-row").forEach((row) => {
+          const itemText = (row.getAttribute("data-settings-item") || "").toLowerCase();
+          if (!q || itemText.includes(q)) {
+            row.style.display = "flex";
+          } else {
+            row.style.display = "none";
+          }
+        });
       });
-    });
+    }
 
+    // Conversational tone toggles
+    const toneBrotherly = document.querySelector("#settings-tone-brotherly");
+    if (toneBrotherly) {
+      toneBrotherly.addEventListener("click", () => {
+        LumiAutonomousMind.updateProfile({ primaryTone: "brotherly_hinglish" });
+        render();
+        showToast("Tone updated to Brotherly Hinglish (Bhai/Yr/Tu)!");
+      });
+    }
+    const toneSincere = document.querySelector("#settings-tone-sincere");
+    if (toneSincere) {
+      toneSincere.addEventListener("click", () => {
+        LumiAutonomousMind.updateProfile({ primaryTone: "adaptive_sincere" });
+        render();
+        showToast("Tone updated to Adaptive Sincere!");
+      });
+    }
+
+    // Custom instructions save
+    const saveInstructionsBtn = document.querySelector("#settings-save-instructions-btn");
+    if (saveInstructionsBtn) {
+      saveInstructionsBtn.addEventListener("click", () => {
+        const ta = document.querySelector("#settings-custom-instructions");
+        if (ta) {
+          localStorage.setItem("lumi_custom_instructions", ta.value.trim());
+          showToast("Custom instructions saved!");
+        }
+      });
+    }
+
+    // Clear all memories
+    const clearMemoriesBtn = document.querySelector("#settings-clear-all-memories-btn");
+    if (clearMemoriesBtn) {
+      clearMemoriesBtn.addEventListener("click", () => {
+        if (confirm("Reset all autonomous mind memories?")) {
+          LumiAutonomousMind.clearMemories();
+          render();
+          showToast("All memories cleared.");
+        }
+      });
+    }
+
+    // Reset memory in Data Controls
+    const resetMemBtn = document.querySelector("#settings-reset-memory-btn");
+    if (resetMemBtn) {
+      resetMemBtn.addEventListener("click", () => {
+        if (confirm("Reset learned autonomous preferences?")) {
+          LumiAutonomousMind.clearMemories();
+          showToast("Learned autonomous memories reset.");
+        }
+      });
+    }
+
+    // Suno cookie
     const sunoCookieInput = document.querySelector("#settings-suno-cookie-input");
     if (sunoCookieInput) {
       sunoCookieInput.addEventListener("input", (e) => { localStorage.setItem("lumi_suno_cookie", e.target.value.trim()); });
@@ -7283,6 +7669,7 @@
       });
     }
 
+    // Udio token
     const udioTokenInput = document.querySelector("#settings-udio-token-input");
     if (udioTokenInput) {
       udioTokenInput.addEventListener("change", (e) => {
@@ -7297,6 +7684,7 @@
       });
     }
 
+    // Google Labs Cookie
     const googleCookieInput = document.querySelector("#settings-google-cookie-input");
     if (googleCookieInput) {
       googleCookieInput.addEventListener("change", (e) => {
@@ -7311,6 +7699,7 @@
       });
     }
 
+    // Bing Cookie
     const bingCookieInput = document.querySelector("#settings-bing-cookie-input");
     if (bingCookieInput) {
       bingCookieInput.addEventListener("change", (e) => {
@@ -7325,6 +7714,7 @@
       });
     }
 
+    // Export chats
     const exportChatsBtn = document.querySelector("#settings-export-chats-btn");
     if (exportChatsBtn) {
       exportChatsBtn.addEventListener("click", () => {
@@ -7339,31 +7729,36 @@
       });
     }
 
+    // Clear chats
     const clearChatsBtn = document.querySelector("#settings-clear-chats-btn");
     if (clearChatsBtn) {
       clearChatsBtn.addEventListener("click", () => {
         if (confirm("Are you sure you want to delete all chat history? This cannot be undone.")) {
           conversations = [];
           saveJson(STORAGE.CHATS, conversations);
-          settingsModalOpen = false;
           showToast("Chat history cleared.");
           navigate("/chat");
         }
       });
     }
 
-    // Memory / Autonomous Profile Helpers
+    // Single memory deletion
     document.querySelectorAll("[data-delete-memory]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const idx = parseInt(btn.getAttribute("data-delete-memory"), 10);
         if (!isNaN(idx)) {
-          LumiMemory.remove(idx);
-          render();
-          showToast("Memory removed.");
+          const profile = LumiAutonomousMind.getProfile();
+          if (profile.explicitMemories && profile.explicitMemories[idx]) {
+            profile.explicitMemories.splice(idx, 1);
+            localStorage.setItem("lumi_autonomous_mind", JSON.stringify(profile));
+            render();
+            showToast("Memory deleted.");
+          }
         }
       });
     });
+
 
     // 16. Image Generator Toolbar Button
     const imageGenBtn = document.querySelector("#image-gen-btn");

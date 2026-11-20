@@ -2804,3 +2804,227 @@ html.dark .genui-recom-rank.gold {
   color: rgba(255, 255, 255, 0.45);
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
 }
+
+/* ==========================================================================
+   ChatGPT Android Exact Settings Styles
+   ========================================================================== */
+.lumi-settings-viewport {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding: 1rem 1rem 3.5rem 1rem;
+  max-width: 580px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.lumi-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0 1rem 0;
+  user-select: none;
+}
+
+.lumi-settings-header-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: #212121;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.lumi-settings-header-btn:hover {
+  background-color: #2a2a2a;
+}
+
+.lumi-settings-header-btn:active {
+  background-color: #333333;
+  transform: scale(0.95);
+}
+
+.lumi-settings-header-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.lumi-settings-card {
+  background-color: #212121 !important;
+  border-radius: 26px !important;
+  overflow: hidden;
+  margin-bottom: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+}
+
+.lumi-settings-section-title {
+  color: #9e9e9e;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 1rem;
+  margin-bottom: 0.45rem;
+  user-select: none;
+}
+
+.lumi-settings-row {
+  padding: 1.05rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+  box-sizing: border-box;
+}
+
+.lumi-settings-row:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.lumi-settings-row:active {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.lumi-settings-row + .lumi-settings-row {
+  border-top: 1px solid #2d2d2d;
+}
+
+.lumi-settings-row-label {
+  font-size: 15.5px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.lumi-settings-row-value {
+  display: flex;
+  align-items: center;
+  color: #9e9e9e;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.lumi-settings-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  color: #9e9e9e;
+  font-size: 15px;
+  font-weight: 400;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding-right: 1.4rem;
+  text-align: right;
+  direction: ltr;
+}
+
+.lumi-settings-select option {
+  background-color: #212121;
+  color: #ffffff;
+}
+
+.lumi-settings-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 15.5px;
+  color: #ffffff;
+  padding: 0.95rem 1.25rem;
+  box-sizing: border-box;
+}
+
+.lumi-settings-input::placeholder {
+  color: #666666;
+}
+
+.lumi-settings-subtext {
+  color: #888888;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 0 1rem;
+  margin-top: 0.45rem;
+  margin-bottom: 1.1rem;
+}
+
+/* Switch toggle matching Android / ChatGPT */
+.lumi-settings-switch {
+  width: 50px;
+  height: 30px;
+  border-radius: 9999px;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.lumi-settings-switch.on {
+  background-color: #ffffff;
+  justify-content: flex-end;
+}
+
+.lumi-settings-switch.off {
+  background-color: #39393d;
+  justify-content: flex-start;
+}
+
+.lumi-settings-switch-knob {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+
+.lumi-settings-switch.on .lumi-settings-switch-knob {
+  background-color: #000000;
+}
+
+.lumi-settings-switch.off .lumi-settings-switch-knob {
+  background-color: #8e8e93;
+}
+
+.lumi-settings-search-bar {
+  width: 100%;
+  height: 48px;
+  border-radius: 9999px;
+  background-color: #212121;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  padding: 0 1.15rem;
+  gap: 0.75rem;
+  box-sizing: border-box;
+  margin-top: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.lumi-settings-search-bar input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  color: #ffffff;
+}
+
+.lumi-settings-search-bar input::placeholder {
+  color: #757575;
+}

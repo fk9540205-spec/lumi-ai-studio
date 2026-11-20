@@ -567,6 +567,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         raw_model = data.get("model", "qwen-2.5-coder-32b").lower()
         if "/" in raw_model:
             raw_model = raw_model.split("/")[-1]
+        target_model = raw_model or "gemini-2.5-flash"
 
         messages = data.get("messages", [])
         stream = data.get("stream", True)
