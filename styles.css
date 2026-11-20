@@ -1954,7 +1954,7 @@ html.dark .genui-recom-rank.gold {
 
 /* Chat Scroll Stability */
 #chat-messages-container {
-  overflow-anchor: auto !important;
+  overflow-anchor: none !important;
   scroll-behavior: auto !important;
   overscroll-behavior-y: contain;
 }

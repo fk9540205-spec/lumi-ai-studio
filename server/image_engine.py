@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
 Lumi AI Studio — Multi-Provider Real Image Engine
-Supports:
-  1. Google ImageFX (Imagen 3) — via Google session cookie (rohitaryal/imageFX-api)
+Providers:
+  1. Google Gemini Imagen 3 (via local CLIProxyAPI when available)
   2. Bing Image Creator (DALL-E 3) — via Bing _U cookie (acheong08/BingImageCreator)
-  3. Stability AI SD 3.5 Large — 100% Free, zero-cookie, 1024x1024 WebP
-  (Completely excludes FLUX as per user directive)
+  3. Google ImageFX (Imagen 3) — via Google session cookie (rohitaryal/imageFX-api)
+  4. Stability AI SD 3.5 Large — 100% Free, zero-cookie, direct studio-grade 1024x1024 WebP
+Strictly Prohibited & Completely Excluded:
+  - NO Pollinations AI
+  - NO FLUX models
 """
 
 import os
@@ -59,7 +62,7 @@ def generate_image_google_imagefx(prompt: str, cookie: str) -> dict:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
     )
-    with urllib.request.urlopen(sess_req, timeout=15) as s_resp:
+    with urllib.request.urlopen(sess_req, timeout=10) as s_resp:
         sess_data = json.loads(s_resp.read().decode())
     
     token = sess_data.get("access_token")
@@ -86,7 +89,7 @@ def generate_image_google_imagefx(prompt: str, cookie: str) -> dict:
         },
         method="POST"
     )
-    with urllib.request.urlopen(fx_req, timeout=45) as fx_resp:
+    with urllib.request.urlopen(fx_req, timeout=35) as fx_resp:
         fx_data = json.loads(fx_resp.read().decode())
 
     panels = fx_data.get("imagePanels", [])
@@ -126,12 +129,9 @@ def generate_image_bing(prompt: str, cookie: str) -> dict:
     payload = f"q={url_prompt}&qs=ds".encode("utf-8")
 
     req = urllib.request.Request(create_url, data=payload, headers=headers, method="POST")
-    # Don't follow redirect automatically
-    opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler())
-    
     redirect_url = None
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             redirect_url = resp.getheader("Location")
     except urllib.error.HTTPError as he:
         if he.code in (301, 302, 303, 307):
@@ -148,8 +148,8 @@ def generate_image_bing(prompt: str, cookie: str) -> dict:
 
     # Poll for completion
     start = time.time()
-    while time.time() - start < 70:
-        time.sleep(3)
+    while time.time() - start < 60:
+        time.sleep(2.5)
         poll_req = urllib.request.Request(polling_url, headers=headers)
         with urllib.request.urlopen(poll_req, timeout=15) as poll_resp:
             html = poll_resp.read().decode("utf-8")
@@ -171,18 +171,21 @@ def generate_image_sd35_large(prompt: str) -> dict:
     """
     Stability AI Stable Diffusion 3.5 Large (SD 3.5 Large).
     100% Free, zero-cookie, direct studio-grade 1024x1024 WebP.
+    Strictly NO Pollinations, NO FLUX under any circumstances.
     """
-    # Attempt 1: Direct Gradio Space Call
+    # Attempt 1: Direct Gradio Space Call with exact parameter signature
     try:
         call_url = "https://stabilityai-stable-diffusion-3-5-large.hf.space/gradio_api/call/infer"
         payload = {
             "data": [
                 prompt,
+                "ugly, blurry, low quality, distorted, extra limbs, bad anatomy",
                 0,
                 True,
                 1024,
                 1024,
-                28
+                4.5,
+                25
             ]
         }
         req = urllib.request.Request(
@@ -191,18 +194,22 @@ def generate_image_sd35_large(prompt: str) -> dict:
             headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=15) as r:
             res = json.loads(r.read().decode())
             event_id = res.get("event_id")
 
         if event_id:
             res_url = f"https://stabilityai-stable-diffusion-3-5-large.hf.space/gradio_api/call/infer/{event_id}"
             req2 = urllib.request.Request(res_url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req2, timeout=60) as r2:
-                for line in r2.read().decode().splitlines():
-                    if line.startswith("data:"):
-                        data_part = line[5:].strip()
-                        parsed = json.loads(data_part)
+            with urllib.request.urlopen(req2, timeout=45) as r2:
+                for line in r2:
+                    line_str = line.decode("utf-8", errors="ignore").strip()
+                    if line_str.startswith("data:"):
+                        data_part = line_str[5:].strip()
+                        try:
+                            parsed = json.loads(data_part)
+                        except Exception:
+                            continue
                         if isinstance(parsed, list) and len(parsed) > 0:
                             img_obj = parsed[0]
                             if isinstance(img_obj, dict) and img_obj.get("url"):
@@ -211,7 +218,7 @@ def generate_image_sd35_large(prompt: str) -> dict:
                                 return {
                                     "url": local_url,
                                     "remoteUrl": remote_url,
-                                    "provider": "Stability AI SD 3.5 Large",
+                                    "provider": "Stability AI SD 3.5 Large (Studio Quality)",
                                     "prompt": prompt
                                 }
     except Exception as e:
@@ -237,7 +244,7 @@ def generate_image_sd35_large(prompt: str) -> dict:
                 return {
                     "url": local_url,
                     "remoteUrl": target_url,
-                    "provider": "Stability AI SD 3.5 Large",
+                    "provider": "Stability AI SD 3.5 Large (Studio Quality)",
                     "prompt": prompt
                 }
             elif getattr(item, "b64_json", None):
@@ -245,7 +252,7 @@ def generate_image_sd35_large(prompt: str) -> dict:
                 local_url = _save_media_bytes(b64_bytes, ext="webp", prefix="sd35")
                 return {
                     "url": local_url,
-                    "provider": "Stability AI SD 3.5 Large",
+                    "provider": "Stability AI SD 3.5 Large (Studio Quality)",
                     "prompt": prompt
                 }
     except Exception as e:
@@ -257,6 +264,7 @@ def generate_image_sd35_large(prompt: str) -> dict:
 def generate_image_gemini_antigravity(prompt: str) -> dict:
     """
     Direct high-resolution Google Gemini Imagen 3 generation via local Antigravity/CLIProxyAPI.
+    Fails fast within 3 seconds if unavailable or in quota cooldown.
     """
     req = urllib.request.Request(
         "http://127.0.0.1:8317/v1/chat/completions",
@@ -271,7 +279,7 @@ def generate_image_gemini_antigravity(prompt: str) -> dict:
         },
         method="POST"
     )
-    with urllib.request.urlopen(req, timeout=45) as resp:
+    with urllib.request.urlopen(req, timeout=3.5) as resp:
         raw_data = json.loads(resp.read().decode())
 
     choices = raw_data.get("choices", [])
@@ -310,50 +318,50 @@ def generate_image_gemini_antigravity(prompt: str) -> dict:
 def generate_image(prompt: str, cookies: dict = None) -> dict:
     """
     Unified entry point for image generation.
-    Checks authenticated Google Flow first, then Google Gemini/Antigravity, then user cookies, then SD 3.5 Large.
+    Checks:
+      1. Google Gemini Imagen 3 (via local CLIProxyAPI - fast check)
+      2. User-provided session cookies (Google ImageFX, Bing DALL-E 3)
+      3. Stability AI SD 3.5 Large (Studio Grade 1024x1024 WebP)
+    * Absolutely ZERO Pollinations, ZERO FLUX.
     """
     cookies = cookies or {}
     google_cookie = cookies.get("google") or os.environ.get("GOOGLE_COOKIE")
     bing_cookie = cookies.get("bing") or os.environ.get("BING_COOKIE")
 
-    # 1. Google Flow (Imagen 3) — Authenticated Google Account with 994 credits
-    try:
-        try:
-            from server.google_flow_engine import generate_image_google_flow, PROFILE_DIR, STORAGE_STATE_FILE
-        except ImportError:
-            from google_flow_engine import generate_image_google_flow, PROFILE_DIR, STORAGE_STATE_FILE
-
-        if (PROFILE_DIR and PROFILE_DIR.exists()) or (STORAGE_STATE_FILE and STORAGE_STATE_FILE.exists()):
-            res = generate_image_google_flow(prompt)
-            if res and res.get("url"):
-                return res
-    except Exception as e:
-        sys.stderr.write(f"Google Flow engine failed, falling back: {e}\n")
-
-    # 2. Google Gemini 3.1 Flash Image (Antigravity OAuth / CLIProxyAPI on Railway)
+    # 1. Google Gemini 3.1 Flash Image (Antigravity OAuth / CLIProxyAPI)
     try:
         return generate_image_gemini_antigravity(prompt)
     except Exception as gem_err:
-        sys.stderr.write(f"Google Gemini image generation failed, falling back: {gem_err}\n")
+        sys.stderr.write(f"Google Gemini image generation check: {gem_err}\n")
 
-    # 3. Google ImageFX (if user provided cookie)
+    # 2. Google ImageFX (if user provided cookie)
     if google_cookie:
         try:
             return generate_image_google_imagefx(prompt, google_cookie)
         except Exception as e:
             sys.stderr.write(f"Google ImageFX generation failed: {e}\n")
 
-    # 4. Bing Image Creator (if user provided cookie)
+    # 3. Bing Image Creator (if user provided cookie)
     if bing_cookie:
         try:
             return generate_image_bing(prompt, bing_cookie)
         except Exception as e:
             sys.stderr.write(f"Bing Image Creator generation failed: {e}\n")
 
-    # 5. Stability AI SD 3.5 Large (100% Free, zero auth, ultra high quality)
+    # 4. Stability AI SD 3.5 Large (100% Free, zero auth, ultra high quality, 1024x1024)
     try:
         return generate_image_sd35_large(prompt)
     except Exception as sd_err:
         sys.stderr.write(f"SD 3.5 Large generation failed: {sd_err}\n")
 
-    raise RuntimeError("Image generation failed on all available AI image clusters.")
+    raise RuntimeError("Image generation failed across all verified AI studio clusters.")
+
+
+if __name__ == "__main__":
+    prompt_test = sys.argv[1] if len(sys.argv) > 1 else "A futuristic sports car in neon cyberpunk city, 8k"
+    print(f"Testing unified image engine with prompt: {prompt_test}")
+    start = time.time()
+    res = generate_image(prompt_test)
+    duration = time.time() - start
+    print(f"Success in {duration:.1f}s!")
+    print(json.dumps(res, indent=2))

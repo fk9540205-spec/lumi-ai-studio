@@ -3230,6 +3230,278 @@
 
 
 
+  function renderAssistantMsgHtml(msg, isCurrentlyStreaming = false, isLastAssistant = false) {
+    const rawText = msg.content || "";
+    return `
+      <div class="flex gap-3.5 items-start assistant-msg-row" id="msg-row-${msg.id}">
+        <img src="${LUMI_LOGO}" alt="Lumi" class="mt-0.5 size-6 shrink-0 object-contain select-none" />
+        
+        <div class="min-w-0 flex-1">
+          ${
+            msg.scrapedUrl
+              ? `<div class="mb-2">
+                  <a href="${escapeHtml(msg.scrapedUrl.url)}" target="_blank" rel="noopener" class="url-scrape-badge">
+                    ${ICONS.globe} <span>Scraped: ${escapeHtml(msg.scrapedUrl.title)}</span>
+                  </a>
+                </div>`
+              : ""
+          }
+
+          <!-- Real-Time Web Search Source Badges (if search query) -->
+          ${
+            msg.searchResults && msg.searchResults.length > 0
+              ? `
+            <div class="mb-3">
+              <div class="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold mb-1.5">
+                ${ICONS.globe} <span>Live Web Sources (${msg.searchResults.length}):</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${msg.searchResults
+                  .map(
+                    (s) => `
+                  <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="search-source-card" title="${escapeHtml(s.snippet)}">
+                    <span class="font-medium">${escapeHtml(s.title)}</span>
+                    <span class="text-[10px] text-muted-foreground font-mono">↗</span>
+                  </a>`
+                  )
+                  .join("")}
+              </div>
+            </div>`
+              : ""
+          }
+
+          <div class="markdown-body text-[15px] leading-relaxed text-foreground" id="msg-body-${msg.id}">
+            ${
+              isCurrentlyStreaming && !rawText
+                ? `<div class="thinking-badge-container">
+                    <span class="thinking-spinner"></span>
+                    <span>Thinking…</span>
+                    <span class="thinking-dots">
+                      <span class="thinking-dot"></span>
+                      <span class="thinking-dot"></span>
+                      <span class="thinking-dot"></span>
+                    </span>
+                  </div>`
+                : renderMarkdown(rawText)
+            }
+            ${isCurrentlyStreaming && rawText ? `<span class="streaming-cursor"></span>` : ""}
+          </div>
+
+          <!-- Ultra-Clean Studio Image Generator Card -->
+          ${
+            msg.imageLoading
+              ? `
+            <div class="pro-gen-card pro-image-gen-card my-3" id="pro-img-${msg.id}">
+              <div class="pro-gen-header">
+                <div class="pro-gen-badge">
+                  <span class="pro-pulse-dot"></span>
+                  <span>${escapeHtml(msg.imageProvider || "Stability AI SD 3.5 Large (Studio Quality)")}</span>
+                </div>
+                <span class="pro-gen-timer" id="image-stage-${msg.id}">${escapeHtml(msg.generationStage || "Synthesizing")}</span>
+              </div>
+              <div class="pro-gen-body">
+                <div class="pro-shimmer-sweep"></div>
+                <div class="pro-spinner-ring"></div>
+                <div class="pro-gen-title">Rendering 8K Masterpiece</div>
+                <div class="pro-gen-prompt">"${escapeHtml(msg.imagePrompt || "")}"</div>
+              </div>
+              <div class="pro-progress-track">
+                <div class="pro-progress-fill"></div>
+              </div>
+            </div>`
+              : msg.imageUrl
+              ? `
+            <div class="ai-image-card my-3" id="pro-img-${msg.id}">
+              <img src="${escapeHtml(msg.imageUrl)}" alt="${escapeHtml(msg.imagePrompt || "Generated Image")}" loading="lazy" class="cursor-pointer" data-action="zoom-image" data-src="${escapeHtml(msg.imageUrl)}" />
+              <div class="ai-image-overlay">
+                <span class="text-xs text-white/90 truncate max-w-[200px] font-medium drop-shadow">
+                  🎨 ${escapeHtml(msg.imagePrompt || "AI Generated Image")}
+                </span>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer"
+                    data-action="download-image"
+                    data-url="${escapeHtml(msg.imageUrl)}"
+                    data-name="${escapeHtml(msg.imagePrompt || "image")}"
+                  >
+                    ${ICONS.download} <span>Download</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer"
+                    data-action="regen-image"
+                    data-prompt="${escapeHtml(msg.imagePrompt || "")}"
+                    title="Regenerate variation"
+                  >
+                    ${ICONS.refreshCw}
+                  </button>
+                </div>
+              </div>
+            </div>`
+              : ""
+          }
+
+          <!-- Ultra-Clean Studio Music Generator Card -->
+          ${
+            msg.musicLoading
+              ? `
+            <div class="pro-gen-card pro-music-gen-card my-3" id="pro-music-${msg.id}">
+              <div class="pro-gen-header">
+                <div class="pro-gen-badge music">
+                  <span class="pro-pulse-dot pink"></span>
+                  <span>Suno & Udio Neural Studio</span>
+                </div>
+                <span class="pro-gen-timer">Arranging score</span>
+              </div>
+              <div class="pro-gen-body">
+                <div class="pro-shimmer-sweep"></div>
+                <div class="pro-equalizer-bars">
+                  <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                  <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                  <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                  <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
+                </div>
+                <div class="pro-gen-title">Composing Arrangement & Lyrics</div>
+                <div class="pro-gen-prompt">"${escapeHtml(msg.musicPrompt || "")}"</div>
+              </div>
+              <div class="pro-progress-track">
+                <div class="pro-progress-fill music"></div>
+              </div>
+            </div>`
+              : msg.musicTrack
+              ? `
+            <div class="music-studio-card my-3" id="pro-music-${msg.id}">
+              <div class="music-studio-header">
+                <div class="music-studio-title">
+                  <span>🎵</span>
+                  <span>${escapeHtml(msg.musicTrack.title || "AI Musical Track")}</span>
+                </div>
+                <span class="music-tag-pill">${escapeHtml(msg.musicTrack.style || "Suno / Udio")}</span>
+              </div>
+              ${msg.musicTrack.audioUrl ? `
+                <div class="mb-3">
+                  <audio controls src="${escapeHtml(msg.musicTrack.audioUrl)}" class="w-full rounded-lg"></audio>
+                </div>
+              ` : ''}
+              <div class="music-lyrics-box">${escapeHtml(msg.musicTrack.composition || msg.musicTrack.lyrics || "")}</div>
+              <div class="music-actions-row">
+                <button type="button" class="inline-flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 font-medium transition-colors cursor-pointer" data-action="copy-music" data-text="${escapeHtml(msg.musicTrack.composition || msg.musicTrack.lyrics || '')}">
+                  📋 Copy Score & Lyrics
+                </button>
+              </div>
+            </div>`
+              : ""
+          }
+
+          <!-- Ultra-Clean Studio Video Generator Card -->
+          ${
+            msg.videoLoading
+              ? `
+            <div class="pro-gen-card my-3" id="pro-vid-${msg.id}" style="border-color: rgba(168, 85, 247, 0.45);">
+              <div class="pro-gen-header">
+                <div class="pro-gen-badge">
+                  <span class="pro-pulse-dot" style="background: #a855f7;"></span>
+                  <span>${escapeHtml(msg.videoProvider || "AI Video Studio")}</span>
+                </div>
+                <span class="pro-gen-timer" id="video-stage-${msg.id}">${escapeHtml(msg.generationStage || "Synthesizing Motion")}</span>
+              </div>
+              <div class="pro-gen-body">
+                <div class="pro-shimmer-sweep"></div>
+                <div class="pro-spinner-ring" style="border-top-color: #a855f7;"></div>
+                <div class="pro-gen-title">Generating Cinematic AI Video</div>
+                <div class="pro-gen-prompt">"${escapeHtml(msg.videoPrompt || "")}"</div>
+              </div>
+              <div class="pro-progress-track">
+                <div class="pro-progress-fill" style="background: linear-gradient(90deg, #a855f7, #ec4899);"></div>
+              </div>
+            </div>`
+              : msg.videoUrl
+              ? `
+            <div class="ai-video-card my-3" id="pro-vid-${msg.id}">
+              <video controls autoplay loop playsinline preload="auto" src="${escapeHtml(msg.videoUrl)}" class="cursor-pointer w-full rounded-2xl">
+                Your browser does not support the video tag.
+              </video>
+              <div class="ai-video-overlay">
+                <span class="ai-video-badge">
+                  🎬 ${escapeHtml(msg.videoProvider || "AI Video Engine")}
+                </span>
+                <div class="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-black/60 hover:bg-black/80 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer border border-white/20"
+                    data-action="download-video"
+                    data-url="${escapeHtml(msg.videoUrl)}"
+                    data-name="${escapeHtml(msg.videoPrompt || "lumi-video")}"
+                  >
+                    ${ICONS.download} <span>Download MP4</span>
+                  </button>
+                </div>
+              </div>
+            </div>`
+              : ""
+          }
+
+          ${
+            !isCurrentlyStreaming && (rawText || msg.imageUrl || msg.videoUrl)
+              ? `
+            <div class="mt-2.5 flex items-center flex-wrap gap-2" id="msg-actions-${msg.id}">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                data-action="copy-message"
+                data-text="${escapeHtml(rawText)}"
+                title="Copy reply"
+              >
+                ${ICONS.copy} <span>Copy</span>
+              </button>
+
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs ${currentlySpeakingId === msg.id ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-accent"} transition-colors cursor-pointer"
+                data-action="speak-message"
+                data-id="${msg.id}"
+                data-text="${escapeHtml(rawText)}"
+                title="${currentlySpeakingId === msg.id ? "Stop voice" : "Read aloud"}"
+              >
+                ${currentlySpeakingId === msg.id ? ICONS.volumeMute : ICONS.volume}
+                <span>${currentlySpeakingId === msg.id ? "Speaking..." : "Listen"}</span>
+              </button>
+
+              ${
+                isLastAssistant
+                  ? `
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                  data-action="regenerate-message"
+                  title="Regenerate reply"
+                >
+                  ${ICONS.refreshCw} <span>Regenerate</span>
+                </button>`
+                  : ""
+              }
+            </div>`
+              : ""
+          }
+        </div>
+      </div>`;
+  }
+
+  function updateAssistantMsgDOM(msg, isCurrentlyStreaming = false, isLastAssistant = false) {
+    const el = document.querySelector(`#msg-row-${msg.id}`);
+    if (el) {
+      const temp = document.createElement("div");
+      temp.innerHTML = renderAssistantMsgHtml(msg, isCurrentlyStreaming, isLastAssistant);
+      const newEl = temp.firstElementChild;
+      if (newEl && el.parentNode) {
+        el.parentNode.replaceChild(newEl, el);
+        return true;
+      }
+    }
+    return false;
+  }
+
   // 5. ACTIVE CHAT THREAD VIEW
   function renderThreadChat(thread) {
     const messages = thread.messages || [];
@@ -3260,266 +3532,10 @@
                 }
 
                 // Assistant Message
-                const rawText = msg.content || "";
                 const isCurrentlyStreaming =
                   isStreaming && index === messages.length - 1;
 
-                return `
-                  <div class="flex gap-3.5 items-start assistant-msg-row" id="msg-row-${msg.id}">
-                    <img src="${LUMI_LOGO}" alt="Lumi" class="mt-0.5 size-6 shrink-0 object-contain select-none" />
-                    
-                    <div class="min-w-0 flex-1">
-                      ${
-                        msg.scrapedUrl
-                          ? `<div class="mb-2">
-                              <a href="${escapeHtml(msg.scrapedUrl.url)}" target="_blank" rel="noopener" class="url-scrape-badge">
-                                ${ICONS.globe} <span>Scraped: ${escapeHtml(msg.scrapedUrl.title)}</span>
-                              </a>
-                            </div>`
-                          : ""
-                      }
-
-                      <!-- Real-Time Web Search Source Badges (if search query) -->
-                      ${
-                        msg.searchResults && msg.searchResults.length > 0
-                          ? `
-                        <div class="mb-3">
-                          <div class="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold mb-1.5">
-                            ${ICONS.globe} <span>Live Web Sources (${msg.searchResults.length}):</span>
-                          </div>
-                          <div class="flex flex-wrap gap-2">
-                            ${msg.searchResults
-                              .map(
-                                (s) => `
-                              <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="search-source-card" title="${escapeHtml(s.snippet)}">
-                                <span class="font-medium">${escapeHtml(s.title)}</span>
-                                <span class="text-[10px] text-muted-foreground font-mono">↗</span>
-                              </a>`
-                              )
-                              .join("")}
-                          </div>
-                        </div>`
-                          : ""
-                      }
-
-                      <div class="markdown-body text-[15px] leading-relaxed text-foreground" id="msg-body-${msg.id}">
-                        ${
-                          isCurrentlyStreaming && !rawText
-                            ? `<div class="thinking-badge-container">
-                                <span class="thinking-spinner"></span>
-                                <span>Thinking…</span>
-                                <span class="thinking-dots">
-                                  <span class="thinking-dot"></span>
-                                  <span class="thinking-dot"></span>
-                                  <span class="thinking-dot"></span>
-                                </span>
-                              </div>`
-                            : renderMarkdown(rawText)
-                        }
-                        ${isCurrentlyStreaming && rawText ? `<span class="streaming-cursor"></span>` : ""}
-                      </div>
-
-                      <!-- Ultra-Clean Studio Image Generator Card -->
-                      ${
-                        msg.imageLoading
-                          ? `
-                        <div class="pro-gen-card pro-image-gen-card my-3">
-                          <div class="pro-gen-header">
-                            <div class="pro-gen-badge">
-                              <span class="pro-pulse-dot"></span>
-                              <span>${escapeHtml(msg.imageProvider || "Stability AI SD 3.5 Large")}</span>
-                            </div>
-                            <span class="pro-gen-timer" id="image-stage-${msg.id}">${escapeHtml(msg.generationStage || "Synthesizing")}</span>
-                          </div>
-                          <div class="pro-gen-body">
-                            <div class="pro-shimmer-sweep"></div>
-                            <div class="pro-spinner-ring"></div>
-                            <div class="pro-gen-title">Rendering 8K Masterpiece</div>
-                            <div class="pro-gen-prompt">"${escapeHtml(msg.imagePrompt || "")}"</div>
-                          </div>
-                          <div class="pro-progress-track">
-                            <div class="pro-progress-fill"></div>
-                          </div>
-                        </div>`
-                          : msg.imageUrl
-                          ? `
-                        <div class="ai-image-card my-3">
-                          <img src="${escapeHtml(msg.imageUrl)}" alt="${escapeHtml(msg.imagePrompt || "Generated Image")}" loading="lazy" class="cursor-pointer" data-action="zoom-image" data-src="${escapeHtml(msg.imageUrl)}" />
-                          <div class="ai-image-overlay">
-                            <span class="text-xs text-white/90 truncate max-w-[200px] font-medium drop-shadow">
-                              🎨 ${escapeHtml(msg.imagePrompt || "AI Generated Image")}
-                            </span>
-                            <div class="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer"
-                                data-action="download-image"
-                                data-url="${escapeHtml(msg.imageUrl)}"
-                                data-name="${escapeHtml(msg.imagePrompt || "image")}"
-                              >
-                                ${ICONS.download} <span>Download</span>
-                              </button>
-                              <button
-                                type="button"
-                                class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/20 hover:bg-white/30 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer"
-                                data-action="regen-image"
-                                data-prompt="${escapeHtml(msg.imagePrompt || "")}"
-                                title="Regenerate variation"
-                              >
-                                ${ICONS.refreshCw}
-                              </button>
-                            </div>
-                          </div>
-                        </div>`
-                          : ""
-                      }
-
-                      <!-- Ultra-Clean Studio Music Generator Card -->
-                      ${
-                        msg.musicLoading
-                          ? `
-                        <div class="pro-gen-card pro-music-gen-card my-3">
-                          <div class="pro-gen-header">
-                            <div class="pro-gen-badge music">
-                              <span class="pro-pulse-dot pink"></span>
-                              <span>Suno & Udio Neural Studio</span>
-                            </div>
-                            <span class="pro-gen-timer">Arranging score</span>
-                          </div>
-                          <div class="pro-gen-body">
-                            <div class="pro-shimmer-sweep"></div>
-                            <div class="pro-equalizer-bars">
-                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
-                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
-                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
-                              <span class="eq-bar"></span><span class="eq-bar"></span><span class="eq-bar"></span>
-                            </div>
-                            <div class="pro-gen-title">Composing Arrangement & Lyrics</div>
-                            <div class="pro-gen-prompt">"${escapeHtml(msg.musicPrompt || "")}"</div>
-                          </div>
-                          <div class="pro-progress-track">
-                            <div class="pro-progress-fill music"></div>
-                          </div>
-                        </div>`
-                          : msg.musicTrack
-                          ? `
-                        <div class="music-studio-card my-3">
-                          <div class="music-studio-header">
-                            <div class="music-studio-title">
-                              <span>🎵</span>
-                              <span>${escapeHtml(msg.musicTrack.title || "AI Musical Track")}</span>
-                            </div>
-                            <span class="music-tag-pill">${escapeHtml(msg.musicTrack.style || "Suno / Udio")}</span>
-                          </div>
-                          ${msg.musicTrack.audioUrl ? `
-                            <div class="mb-3">
-                              <audio controls src="${escapeHtml(msg.musicTrack.audioUrl)}" class="w-full rounded-lg"></audio>
-                            </div>
-                          ` : ''}
-                          <div class="music-lyrics-box">${escapeHtml(msg.musicTrack.composition || msg.musicTrack.lyrics || "")}</div>
-                          <div class="music-actions-row">
-                            <button type="button" class="inline-flex items-center gap-1.5 text-xs py-1.5 px-3 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 font-medium transition-colors cursor-pointer" data-action="copy-music" data-text="${escapeHtml(msg.musicTrack.composition || msg.musicTrack.lyrics || '')}">
-                              📋 Copy Score & Lyrics
-                            </button>
-                          </div>
-                        </div>`
-                          : ""
-                      }
-
-                      <!-- Ultra-Clean Studio Video Generator Card -->
-                      ${
-                        msg.videoLoading
-                          ? `
-                        <div class="pro-gen-card my-3" style="border-color: rgba(168, 85, 247, 0.45);">
-                          <div class="pro-gen-header">
-                            <div class="pro-gen-badge">
-                              <span class="pro-pulse-dot" style="background: #a855f7;"></span>
-                              <span>${escapeHtml(msg.videoProvider || "AI Video Studio")}</span>
-                            </div>
-                            <span class="pro-gen-timer" id="video-stage-${msg.id}">${escapeHtml(msg.generationStage || "Synthesizing Motion")}</span>
-                          </div>
-                          <div class="pro-gen-body">
-                            <div class="pro-shimmer-sweep"></div>
-                            <div class="pro-spinner-ring" style="border-top-color: #a855f7;"></div>
-                            <div class="pro-gen-title">Generating Cinematic AI Video</div>
-                            <div class="pro-gen-prompt">"${escapeHtml(msg.videoPrompt || "")}"</div>
-                          </div>
-                          <div class="pro-progress-track">
-                            <div class="pro-progress-fill" style="background: linear-gradient(90deg, #a855f7, #ec4899);"></div>
-                          </div>
-                        </div>`
-                          : msg.videoUrl
-                          ? `
-                        <div class="ai-video-card my-3">
-                          <video controls autoplay loop playsinline preload="auto" src="${escapeHtml(msg.videoUrl)}" class="cursor-pointer w-full rounded-2xl">
-                            Your browser does not support the video tag.
-                          </video>
-                          <div class="ai-video-overlay">
-                            <span class="ai-video-badge">
-                              🎬 ${escapeHtml(msg.videoProvider || "AI Video Engine")}
-                            </span>
-                            <div class="flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-black/60 hover:bg-black/80 text-white text-xs backdrop-blur font-medium transition-colors cursor-pointer border border-white/20"
-                                data-action="download-video"
-                                data-url="${escapeHtml(msg.videoUrl)}"
-                                data-name="${escapeHtml(msg.videoPrompt || "lumi-video")}"
-                              >
-                                ${ICONS.download} <span>Download MP4</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>`
-                          : ""
-                      }
-
-                      ${
-                        !isCurrentlyStreaming && (rawText || msg.imageUrl || msg.videoUrl)
-                          ? `
-                        <div class="mt-2.5 flex items-center flex-wrap gap-2">
-                          <button
-                            type="button"
-                            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
-                            data-action="copy-message"
-                            data-text="${escapeHtml(rawText)}"
-                            title="Copy reply"
-                          >
-                            ${ICONS.copy} <span>Copy</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs ${currentlySpeakingId === msg.id ? "text-primary bg-primary/10 font-semibold" : "text-muted-foreground hover:text-foreground hover:bg-accent"} transition-colors cursor-pointer"
-                            data-action="speak-message"
-                            data-id="${msg.id}"
-                            data-text="${escapeHtml(rawText)}"
-                            title="${currentlySpeakingId === msg.id ? "Stop voice" : "Read aloud"}"
-                          >
-                            ${currentlySpeakingId === msg.id ? ICONS.volumeMute : ICONS.volume}
-                            <span>${currentlySpeakingId === msg.id ? "Speaking..." : "Listen"}</span>
-                          </button>
-
-
-                          
-                          ${
-                            isLastAssistant
-                              ? `
-                            <button
-                              type="button"
-                              class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
-                              data-action="regenerate-message"
-                              title="Regenerate reply"
-                            >
-                              ${ICONS.refreshCw} <span>Regenerate</span>
-                            </button>`
-                              : ""
-                          }
-                        </div>`
-                          : ""
-                      }
-                    </div>
-                  </div>`;
+                return renderAssistantMsgHtml(msg, isCurrentlyStreaming, isLastAssistant);
               })
               .join("")}
 
@@ -4280,7 +4296,9 @@
       targetMsg.content = "";
       targetMsg.generationStage = "CONNECTING TO GOOGLE FLOW STUDIO";
       saveJson(STORAGE.CHATS, conversations);
-      render();
+      if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+        render();
+      }
       scrollToBottom();
 
       const stages = [
@@ -4367,7 +4385,9 @@
           targetMsg.content = `❌ Video generation failed on AI cluster. Please retry in a few moments.`;
           isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
-          render();
+          if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+            render();
+          }
           scrollToBottom();
           return;
         }
@@ -4378,7 +4398,9 @@
         isStreaming = false;
         saveJson(STORAGE.CHATS, conversations);
         AudioEffects.play("success");
-        render();
+        if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+          render();
+        }
         scrollToBottom();
       })();
     };
@@ -4395,7 +4417,9 @@
       targetMsg.content = "";
       targetMsg.generationStage = "SAMPLING LATENT SPACE";
       saveJson(STORAGE.CHATS, conversations);
-      render();
+      if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+        render();
+      }
       scrollToBottom();
 
       const stages = [
@@ -4479,7 +4503,9 @@
           targetMsg.content = `❌ Image generation failed on AI cluster. Please retry in a few moments.`;
           isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
-          render();
+          if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+            render();
+          }
           scrollToBottom();
           return;
         }
@@ -4488,24 +4514,28 @@
         preloader.onload = () => {
           clearInterval(stageTimer);
           targetMsg.imageUrl = targetUrl;
-          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large";
+          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large (Studio Quality)";
           targetMsg.imageLoading = false;
           targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
           isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
           AudioEffects.play("success");
-          render();
+          if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+            render();
+          }
           scrollToBottom();
         };
         preloader.onerror = () => {
           clearInterval(stageTimer);
           targetMsg.imageUrl = targetUrl;
-          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large";
+          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large (Studio Quality)";
           targetMsg.imageLoading = false;
           targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
           isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
-          render();
+          if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+            render();
+          }
           scrollToBottom();
         };
         preloader.src = targetUrl;
@@ -4518,7 +4548,9 @@
       targetMsg.musicLoading = true;
       targetMsg.content = "";
       saveJson(STORAGE.CHATS, conversations);
-      render();
+      if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+        render();
+      }
       scrollToBottom();
 
       const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -4579,7 +4611,9 @@
         }
         isStreaming = false;
         saveJson(STORAGE.CHATS, conversations);
-        render();
+        if (!updateAssistantMsgDOM(targetMsg, false, true)) {
+          render();
+        }
         scrollToBottom();
       })();
     };

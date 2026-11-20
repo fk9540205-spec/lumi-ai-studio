@@ -303,8 +303,9 @@ def _generate_google_flow_video(
     1. Generates authentic 8K master visual asset via authenticated Google Flow session (flow-content.google)
     2. Renders broadcast-grade 30fps H.264 MP4 with cinematic camera choreography
     """
+    is_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_ID"))
     flow_creds_available = (PROFILE_DIR and PROFILE_DIR.exists()) or (STORAGE_STATE_FILE and STORAGE_STATE_FILE.exists())
-    if not generate_image_google_flow or not flow_creds_available:
+    if not generate_image_google_flow or not flow_creds_available or is_railway:
         return None
 
     try:

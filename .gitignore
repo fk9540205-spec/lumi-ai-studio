@@ -13,3 +13,4 @@ server/cliproxy/*.tar.gz
 *.apk
 generated_media/
 *.png
+blender-main/
