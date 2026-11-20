@@ -6542,6 +6542,10 @@
     const root = getApp();
     if (!root) return;
 
+    const chatContainer = document.querySelector("#chat-messages-container");
+    const prevScrollTop = chatContainer ? chatContainer.scrollTop : null;
+    const wasNearBottom = chatContainer ? (chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 120) : true;
+
     const { path, query } = parseLocation();
 
     // Check if query param 'q' was provided (e.g., from landing or search)
@@ -6590,6 +6594,17 @@
       root.innerHTML += renderImageLightbox();
     }
     attachEventListeners();
+
+    if (prevScrollTop !== null) {
+      const newChatContainer = document.querySelector("#chat-messages-container");
+      if (newChatContainer) {
+        if (wasNearBottom) {
+          newChatContainer.scrollTop = newChatContainer.scrollHeight;
+        } else {
+          newChatContainer.scrollTop = prevScrollTop;
+        }
+      }
+    }
   }
 
   // --- Event Handling & DOM Wiring ---

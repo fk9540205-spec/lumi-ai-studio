@@ -18,6 +18,9 @@ import urllib.request
 import urllib.parse
 import re
 
+if os.path.dirname(__file__) not in sys.path:
+    sys.path.insert(0, os.path.dirname(__file__))
+
 MEDIA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "generated_media"))
 os.makedirs(MEDIA_DIR, exist_ok=True)
 
@@ -315,7 +318,11 @@ def generate_image(prompt: str, cookies: dict = None) -> dict:
 
     # 1. Google Flow (Imagen 3) — Authenticated Google Account with 994 credits
     try:
-        from google_flow_engine import generate_image_google_flow, PROFILE_DIR, STORAGE_STATE_FILE
+        try:
+            from server.google_flow_engine import generate_image_google_flow, PROFILE_DIR, STORAGE_STATE_FILE
+        except ImportError:
+            from google_flow_engine import generate_image_google_flow, PROFILE_DIR, STORAGE_STATE_FILE
+
         if (PROFILE_DIR and PROFILE_DIR.exists()) or (STORAGE_STATE_FILE and STORAGE_STATE_FILE.exists()):
             res = generate_image_google_flow(prompt)
             if res and res.get("url"):

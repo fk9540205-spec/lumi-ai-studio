@@ -78,8 +78,13 @@ async def _generate_flow_async(prompt: str, aspect_ratio_str: str = "SQUARE") ->
         raise FileNotFoundError(f"Google Flow credentials not found (checked {PROFILE_DIR} and {STORAGE_STATE_FILE})")
 
     async with async_playwright() as pw:
-        chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
-        executable_path = chrome_bin if os.path.exists(chrome_bin) else None
+        chrome_bin = os.environ.get("CHROME_BIN")
+        if not chrome_bin or not os.path.exists(chrome_bin):
+            for cand in ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable"]:
+                if os.path.exists(cand):
+                    chrome_bin = cand
+                    break
+        executable_path = chrome_bin if (chrome_bin and os.path.exists(chrome_bin)) else None
 
         browser_to_close = None
         if STORAGE_STATE_FILE.exists():

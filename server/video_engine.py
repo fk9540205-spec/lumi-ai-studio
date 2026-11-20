@@ -15,8 +15,14 @@ import time
 import math
 import shutil
 import hashlib
+import json
+import base64
+import urllib.request
 from pathlib import Path
 from typing import Dict, Any, Optional
+
+if os.path.dirname(__file__) not in sys.path:
+    sys.path.insert(0, os.path.dirname(__file__))
 
 import numpy as np
 from PIL import Image, ImageEnhance
@@ -185,32 +191,89 @@ def _generate_animatediff_video(prompt: str, motion_type: str = "zoom-in") -> Op
 
 def _generate_cinematic_studio_video(prompt: str, aspect: str = "16:9", duration: float = 4.0, cookies: Optional[dict] = None) -> Optional[str]:
     """
-    Generates an 8K photorealistic keyframe using Google Flow Imagen 3, then produces
+    Generates an 8K photorealistic keyframe using Google Flow Imagen 3 / Gemini, then produces
     a broadcast-quality 60fps MP4 video with cinematic camera choreography.
     """
-    if not generate_image:
+    local_img_path = None
+    cinematic_prompt = f"{prompt}, cinematic film still, masterpiece, 8k resolution, highly detailed, photorealistic, cinematic lighting"
+
+    # Step 1: Try unified image engine
+    if generate_image:
+        try:
+            img_res = generate_image(cinematic_prompt, cookies=cookies)
+            if isinstance(img_res, dict):
+                img_url = img_res.get("url")
+                if img_url:
+                    if img_url.startswith("data:image/"):
+                        header, b64_part = img_url.split(",", 1)
+                        img_bytes = base64.b64decode(b64_part)
+                        kf_file = _get_unique_video_path(prefix="keyframe", ext="jpg")
+                        kf_file.write_bytes(img_bytes)
+                        local_img_path = str(kf_file)
+                    elif img_url.startswith("/generated_media/"):
+                        img_filename = img_url.replace("/generated_media/", "")
+                        candidate = str(MEDIA_DIR / img_filename)
+                        if os.path.exists(candidate):
+                            local_img_path = candidate
+                    elif os.path.exists(img_url):
+                        local_img_path = img_url
+                    elif img_url.startswith("http"):
+                        kf_file = _get_unique_video_path(prefix="keyframe", ext="jpg")
+                        urllib.request.urlretrieve(img_url, str(kf_file))
+                        local_img_path = str(kf_file)
+        except Exception as e:
+            sys.stderr.write(f"Keyframe generation via generate_image failed: {e}\n")
+
+    # Step 2: Direct Gemini Antigravity / CLIProxyAPI fallback (guaranteed on Railway)
+    if not local_img_path or not os.path.exists(local_img_path):
+        try:
+            req = urllib.request.Request(
+                "http://127.0.0.1:8317/v1/chat/completions",
+                data=json.dumps({
+                    "model": "gemini-3.1-flash-image",
+                    "messages": [{"role": "user", "content": f"draw: {cinematic_prompt}"}],
+                    "stream": False
+                }).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer lumi-antigravity-local"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                raw_data = json.loads(resp.read().decode())
+            choices = raw_data.get("choices", [])
+            if choices:
+                msg = choices[0].get("message", {})
+                imgs = msg.get("images", [])
+                if imgs and isinstance(imgs, list) and len(imgs) > 0:
+                    img_u = imgs[0].get("image_url", {}).get("url", "")
+                    if img_u.startswith("data:image/"):
+                        header, b64_part = img_u.split(",", 1)
+                        img_bytes = base64.b64decode(b64_part)
+                        kf_file = _get_unique_video_path(prefix="keyframe", ext="jpg")
+                        kf_file.write_bytes(img_bytes)
+                        local_img_path = str(kf_file)
+                    elif img_u.startswith("http"):
+                        kf_file = _get_unique_video_path(prefix="keyframe", ext="jpg")
+                        urllib.request.urlretrieve(img_u, str(kf_file))
+                        local_img_path = str(kf_file)
+        except Exception as gem_err:
+            sys.stderr.write(f"Direct Gemini keyframe failed: {gem_err}\n")
+
+    if not local_img_path or not os.path.exists(local_img_path):
         return None
 
     try:
-        # Enhance prompt for cinematic photography
-        cinematic_prompt = f"{prompt}, cinematic film still, masterpiece, 8k resolution, highly detailed, photorealistic, cinematic lighting"
-        img_res = generate_image(cinematic_prompt, cookies=cookies)
-        
-        img_url = img_res.get("url") if isinstance(img_res, dict) else None
-        if not img_url:
-            return None
-
-        # Resolve local image path
-        if img_url.startswith("/generated_media/"):
-            img_filename = img_url.replace("/generated_media/", "")
-            local_img_path = str(MEDIA_DIR / img_filename)
-        elif os.path.exists(img_url):
-            local_img_path = img_url
-        else:
-            return None
-
-        if not os.path.exists(local_img_path):
-            return None
+        # Determine motion
+        motion = "zoom_in"
+        lower = prompt.lower()
+        if "pan right" in lower or "pan-right" in lower:
+            motion = "pan_right"
+        elif "pan left" in lower or "pan-left" in lower:
+            motion = "pan_left"
+        elif "zoom out" in lower or "zoom-out" in lower:
+            motion = "zoom_out"
 
         target_mp4 = _get_unique_video_path(prefix="lumi_cinema")
         _create_cinematic_motion_mp4(
@@ -218,14 +281,14 @@ def _generate_cinematic_studio_video(prompt: str, aspect: str = "16:9", duration
             str(target_mp4),
             duration=duration,
             fps=30,
-            motion="zoom_in",
+            motion=motion,
             aspect=aspect
         )
 
         if target_mp4.exists() and target_mp4.stat().st_size > 5000:
             return f"/generated_media/{target_mp4.name}"
     except Exception as e:
-        sys.stderr.write(f"Cinematic Studio video error: {e}\n")
+        sys.stderr.write(f"Cinematic Studio video render error: {e}\n")
     return None
 
 
@@ -255,11 +318,21 @@ def _generate_google_flow_video(
             return None
 
         # Resolve local image path
-        if img_url.startswith("/generated_media/"):
+        if img_url.startswith("data:image/"):
+            header, b64_part = img_url.split(",", 1)
+            img_bytes = base64.b64decode(b64_part)
+            kf_file = _get_unique_video_path(prefix="flow_kf", ext="jpg")
+            kf_file.write_bytes(img_bytes)
+            local_img_path = str(kf_file)
+        elif img_url.startswith("/generated_media/"):
             img_filename = img_url.replace("/generated_media/", "")
             local_img_path = str(MEDIA_DIR / img_filename)
         elif os.path.exists(img_url):
             local_img_path = img_url
+        elif img_url.startswith("http"):
+            kf_file = _get_unique_video_path(prefix="flow_kf", ext="jpg")
+            urllib.request.urlretrieve(img_url, str(kf_file))
+            local_img_path = str(kf_file)
         else:
             local_img_path = str(MEDIA_DIR / os.path.basename(img_url))
 
