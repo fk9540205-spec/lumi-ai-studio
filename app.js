@@ -2366,213 +2366,400 @@
       </div>`;
   }
 
-  function renderSettingsModal() {
-    if (!settingsModalOpen) return "";
-    return `
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" id="settings-modal-overlay">
-        <div class="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl text-foreground flex flex-col gap-4 animate-in fade-in zoom-in-95" onclick="event.stopPropagation()">
-          <!-- Header -->
-          <div class="flex items-center justify-between border-b border-border pb-3">
-            <div class="flex items-center gap-2">
-              <span class="text-base text-primary">${ICONS.settings}</span>
-              <h3 class="font-semibold text-sm">Settings</h3>
-            </div>
-            <button
-              type="button"
-              class="rounded-lg p-1 text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer transition-colors"
-              id="close-settings-modal-btn"
-              title="Close"
-            >
-              ✕
-            </button>
-          </div>
+  // 2. DEDICATED SETTINGS & STUDIO PREFERENCES PAGE
+  function renderSettingsPage() {
+    const memoryProfile = LumiAutonomousMind.getProfile();
+    const isBrotherly = memoryProfile.primaryTone === "brotherly_hinglish";
+    const totalMemories = memoryProfile.explicitMemories?.length || 0;
+    const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    const isNativeApp = LumiDevice.isNative();
 
-          <!-- Mode / Theme Options -->
-          <div class="flex flex-col gap-2">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Appearance / Theme</label>
-            <div class="grid grid-cols-3 gap-2">
+    return `
+      <div class="relative min-h-screen bg-background text-foreground">
+        <div class="aurora opacity-30"></div>
+
+        <!-- Sticky Header -->
+        <header class="sticky top-0 z-20 border-b border-border/60 bg-card/60 backdrop-blur-md">
+          <div class="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+            <div class="flex items-center gap-3">
+              <a href="#/chat" class="inline-flex size-9 items-center justify-center rounded-xl border border-border bg-card hover:bg-accent hover:text-foreground text-muted-foreground transition-all active:scale-95 cursor-pointer shadow-2xs" title="Back to Chat">
+                ${ICONS.arrowLeft}
+              </a>
+              <div>
+                <h1 class="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+                  <span>${ICONS.settings}</span>
+                  <span>Settings & Studio Preferences</span>
+                </h1>
+                <p class="text-xs text-muted-foreground">Customize appearance, media clusters, autonomous memory & storage</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-500">
+                <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Pro Studio Active</span>
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <main class="relative z-10 mx-auto max-w-4xl px-6 py-8 space-y-8 pb-16">
+          
+          <!-- 1. APPEARANCE & THEME -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <span>🎨</span> <span>Appearance & Theme</span>
+                </h2>
+                <p class="text-xs text-muted-foreground mt-0.5">Select your preferred visual style across all Lumi interfaces</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              <!-- Light Mode -->
               <button
                 type="button"
-                class="theme-toggle-btn flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border transition-all cursor-pointer ${
+                class="theme-toggle-btn group relative flex flex-col items-start p-4 rounded-2xl border transition-all text-left cursor-pointer ${
                   currentTheme === "light"
-                    ? "border-primary bg-primary/10 text-foreground font-semibold shadow-xs"
-                    : "border-border bg-secondary/30 hover:bg-secondary/60 text-muted-foreground"
+                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                    : "border-border bg-card hover:border-primary/40 hover:bg-accent/40"
                 }"
                 data-set-theme="light"
               >
-                <span class="text-lg">☀️</span>
-                <span class="text-xs font-medium">White Mode</span>
+                <div class="flex items-center justify-between w-full mb-3">
+                  <div class="size-10 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-xl">
+                    ☀️
+                  </div>
+                  ${currentTheme === "light" ? `<span class="size-2.5 rounded-full bg-primary ring-4 ring-primary/20"></span>` : ""}
+                </div>
+                <div class="font-semibold text-sm text-foreground">White Mode</div>
+                <p class="text-xs text-muted-foreground mt-1 leading-relaxed">Crisp paper-white backgrounds with high-contrast text and bright cards.</p>
               </button>
+
+              <!-- Dark Mode -->
               <button
                 type="button"
-                class="theme-toggle-btn flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border transition-all cursor-pointer ${
+                class="theme-toggle-btn group relative flex flex-col items-start p-4 rounded-2xl border transition-all text-left cursor-pointer ${
                   currentTheme === "dark"
-                    ? "border-primary bg-primary/10 text-foreground font-semibold shadow-xs"
-                    : "border-border bg-secondary/30 hover:bg-secondary/60 text-muted-foreground"
+                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                    : "border-border bg-card hover:border-primary/40 hover:bg-accent/40"
                 }"
                 data-set-theme="dark"
               >
-                <span class="text-lg">🌙</span>
-                <span class="text-xs font-medium">Dark Mode</span>
+                <div class="flex items-center justify-between w-full mb-3">
+                  <div class="size-10 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center text-xl">
+                    🌙
+                  </div>
+                  ${currentTheme === "dark" ? `<span class="size-2.5 rounded-full bg-primary ring-4 ring-primary/20"></span>` : ""}
+                </div>
+                <div class="font-semibold text-sm text-foreground">Dark Mode</div>
+                <p class="text-xs text-muted-foreground mt-1 leading-relaxed">Deep charcoal and OLED tones with warm neon glows to reduce eye strain.</p>
               </button>
+
+              <!-- Auto System -->
               <button
                 type="button"
-                class="theme-toggle-btn flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border transition-all cursor-pointer ${
+                class="theme-toggle-btn group relative flex flex-col items-start p-4 rounded-2xl border transition-all text-left cursor-pointer ${
                   currentTheme === "system"
-                    ? "border-primary bg-primary/10 text-foreground font-semibold shadow-xs"
-                    : "border-border bg-secondary/30 hover:bg-secondary/60 text-muted-foreground"
+                    ? "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30"
+                    : "border-border bg-card hover:border-primary/40 hover:bg-accent/40"
                 }"
                 data-set-theme="system"
               >
-                <span class="text-lg">💻</span>
-                <span class="text-xs font-medium">Auto System</span>
+                <div class="flex items-center justify-between w-full mb-3">
+                  <div class="size-10 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center text-xl">
+                    💻
+                  </div>
+                  ${currentTheme === "system" ? `<span class="size-2.5 rounded-full bg-primary ring-4 ring-primary/20"></span>` : ""}
+                </div>
+                <div class="font-semibold text-sm text-foreground">Auto System</div>
+                <p class="text-xs text-muted-foreground mt-1 leading-relaxed">Automatically matches your phone or computer's system theme preference.</p>
               </button>
             </div>
-          </div>
+          </section>
 
-          <!-- AI & Providers -->
-          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">AI & Models</label>
-            <a
-              href="#/providers"
-              class="flex items-center justify-between p-2.5 rounded-xl border border-border bg-secondary/20 hover:bg-secondary/50 transition-colors text-xs"
-              id="settings-goto-providers"
-            >
-              <div class="flex items-center gap-2.5">
-                <span class="text-base">⚡</span>
-                <div>
-                  <div class="font-medium text-foreground">AI Providers & API Keys</div>
-                  <div class="text-[10px] text-muted-foreground">Gemini Vision, OpenAI, Ollama, Groq</div>
-                </div>
+          <!-- 2. AUTONOMOUS MIND & MEMORY PROFILE -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <span>🧠</span> <span>Autonomous Mind & Memory Profile</span>
+                </h2>
+                <p class="text-xs text-muted-foreground mt-0.5">Continuous learning across all chats and models (Zero amnesia architecture)</p>
               </div>
-              <span class="text-muted-foreground text-xs font-bold">→</span>
-            </a>
-          </div>
-
-          <!-- Autonomous Mind & Cross-Model Memory -->
-          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
-            <div class="flex items-center justify-between">
-              <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                ${ICONS.brain} <span>Autonomous Mind & Memory</span>
-              </label>
-              <span class="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+              <span class="inline-flex items-center gap-1.5 text-xs text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full font-medium">
                 <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Active
               </span>
             </div>
-            <div class="p-2.5 rounded-xl bg-secondary/30 border border-border/50 text-[11px] space-y-1.5">
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Tone Adaptation:</span>
-                <span class="font-medium text-foreground">${LumiAutonomousMind.getProfile().primaryTone === "brotherly_hinglish" ? "Brotherly Hinglish (Bhai/Yr/Tu)" : "Adaptive Sincere"}</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-muted-foreground">Context Retention:</span>
-                <span class="font-medium text-emerald-500">Cross-Model & Cross-Thread (Zero Amnesia)</span>
-              </div>
-              <p class="text-[10px] text-muted-foreground leading-relaxed pt-1 border-t border-border/30">
-                Lumi automatically learns your conversational tone, rules, and facts from previous chats in the background. Changing models retains complete memory without any manual buttons.
-              </p>
-            </div>
-          </div>
 
-          <!-- Real Music & Image AI Credentials (Suno, Udio, Google, Bing) -->
-          <div class="flex flex-col gap-2 pt-2 border-t border-border">
-            <div class="flex items-center justify-between">
-              <label class="text-[11px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                <span>🎵 Music & 🎨 Image AI Credentials</span>
-              </label>
-              <span class="text-[10px] text-emerald-500 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
-                Zero Demo / 100% Real
+            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 rounded-xl border border-border/60 bg-secondary/20">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-foreground">Conversational Tone</span>
+                    <span class="text-xs font-medium text-primary px-2 py-0.5 rounded-md bg-primary/10">${isBrotherly ? "Brotherly Hinglish (Bhai/Yr/Tu)" : "Adaptive Sincere"}</span>
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-2 leading-relaxed">
+                    Lumi automatically detects and mirrors your natural communication language (Hindi / Hinglish / English) without robotic AI disclaimers.
+                  </p>
+                </div>
+
+                <div class="p-4 rounded-xl border border-border/60 bg-secondary/20">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-foreground">Cross-Model Memory</span>
+                    <span class="text-xs font-medium text-emerald-500 px-2 py-0.5 rounded-md bg-emerald-500/10">Active (${totalMemories} Learned Facts)</span>
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-2 leading-relaxed">
+                    Key project requirements, device states, and user preferences are persisted across model switches (Gemini, Claude, GPT-4o, DeepSeek).
+                  </p>
+                </div>
+              </div>
+
+              ${
+                totalMemories > 0
+                  ? `
+                <div class="pt-3 border-t border-border/60">
+                  <div class="text-xs font-semibold text-foreground mb-2">Stored Learned Preferences:</div>
+                  <div class="flex flex-wrap gap-1.5">
+                    ${memoryProfile.explicitMemories.slice(0, 10).map((mem, i) => `
+                      <span class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-secondary/50 border border-border/60 text-muted-foreground">
+                        <span>•</span>
+                        <span class="truncate max-w-[260px]">${escapeHtml(mem)}</span>
+                        <button type="button" class="text-muted-foreground hover:text-destructive cursor-pointer ml-1" data-delete-memory="${i}" title="Remove memory">✕</button>
+                      </span>
+                    `).join("")}
+                  </div>
+                </div>
+              ` : ""
+              }
+            </div>
+          </section>
+
+          <!-- 3. AI MEDIA STUDIO CREDENTIALS -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <span>🎬</span> <span>Video, 🎵 Music & 🎨 Image Clusters</span>
+                </h2>
+                <p class="text-xs text-muted-foreground mt-0.5">Real AI generation credentials for Google Flow, Suno, Udio, and DALL-E 3</p>
+              </div>
+              <span class="text-xs text-primary font-semibold">100% Real • Zero Mock</span>
+            </div>
+
+            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-5">
+              
+              <!-- Google Flow (Veo & Imagen 3) Status -->
+              <div class="p-4 rounded-xl border border-purple-500/30 bg-purple-500/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                  <div class="size-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl shrink-0">
+                    🎬
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <h3 class="font-bold text-sm text-foreground">Google Flow (Veo / Imagen 3 Studio)</h3>
+                      <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">Provider #1</span>
+                    </div>
+                    <p class="text-xs text-muted-foreground mt-0.5">
+                      Session linked: <span class="font-mono text-purple-300">jayuu3654@gmail.com</span> (PRO Tier • 1050 Credits)
+                    </p>
+                  </div>
+                </div>
+                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold shrink-0">
+                  <span class="size-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Connected & Ready</span>
+                </div>
+              </div>
+
+              <!-- Suno Cookie Input -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span class="text-pink-400">🎵</span> <span>Suno AI Session Cookie</span>
+                  </label>
+                  <span class="text-[11px] ${localStorage.getItem("lumi_suno_cookie") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
+                    ${localStorage.getItem("lumi_suno_cookie") ? "✅ Cookie Active" : "Optional (Adds Suno v3.5 Vocals)"}
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  id="settings-suno-cookie-input"
+                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-500 font-mono transition-all"
+                  placeholder="Paste suno.com session cookie (__client / __session) or token..."
+                  value="${escapeHtml(localStorage.getItem('lumi_suno_cookie') || '')}"
+                />
+                <p class="text-[11px] text-muted-foreground">Enables 320kbps full stereo song generation with realistic dual-singer vocals.</p>
+              </div>
+
+              <!-- Udio Token Input -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span class="text-purple-400">🎵</span> <span>Udio AI Auth Token</span>
+                  </label>
+                  <span class="text-[11px] ${localStorage.getItem("lumi_udio_token") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
+                    ${localStorage.getItem("lumi_udio_token") ? "✅ Token Active" : "Optional (Adds Udio Tracks)"}
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  id="settings-udio-token-input"
+                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 font-mono transition-all"
+                  placeholder="Paste udio.com sb-api-auth-token..."
+                  value="${escapeHtml(localStorage.getItem('lumi_udio_token') || '')}"
+                />
+              </div>
+
+              <!-- Google Labs Cookie -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span class="text-blue-400">🎨</span> <span>Google ImageFX & MusicLM Cookie</span>
+                  </label>
+                  <span class="text-[11px] ${localStorage.getItem("lumi_google_cookie") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
+                    ${localStorage.getItem("lumi_google_cookie") ? "✅ Cookie Active" : "Optional"}
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  id="settings-google-cookie-input"
+                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 font-mono transition-all"
+                  placeholder="Paste labs.google cookie (__Secure-1PSID / session)..."
+                  value="${escapeHtml(localStorage.getItem('lumi_google_cookie') || '')}"
+                />
+              </div>
+
+              <!-- Bing DALL-E 3 Cookie -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <span class="text-emerald-400">🎨</span> <span>Bing Image Creator (_U Cookie)</span>
+                  </label>
+                  <span class="text-[11px] ${localStorage.getItem("lumi_bing_cookie") ? "text-emerald-500 font-medium" : "text-muted-foreground"}">
+                    ${localStorage.getItem("lumi_bing_cookie") ? "✅ Cookie Active" : "Optional (Adds DALL-E 3)"}
+                  </span>
+                </div>
+                <input
+                  type="password"
+                  id="settings-bing-cookie-input"
+                  class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 font-mono transition-all"
+                  placeholder="Paste bing.com _U cookie..."
+                  value="${escapeHtml(localStorage.getItem('lumi_bing_cookie') || '')}"
+                />
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. AI PROVIDERS & CUSTOM ENDPOINTS -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <span>⚡</span> <span>AI Providers & Models</span>
+                </h2>
+                <p class="text-xs text-muted-foreground mt-0.5">Manage external LLM endpoints and API keys</p>
+              </div>
+            </div>
+
+            <a
+              href="#/providers"
+              class="group flex items-center justify-between p-5 rounded-2xl border border-border bg-card hover:border-primary/50 hover:bg-accent/30 transition-all shadow-xs cursor-pointer"
+            >
+              <div class="flex items-center gap-4">
+                <div class="size-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                  ⚡
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm text-foreground flex items-center gap-2">
+                    <span>Manage Custom AI Providers</span>
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-secondary text-muted-foreground">OpenAI • Gemini • Groq • Ollama</span>
+                  </h3>
+                  <p class="text-xs text-muted-foreground mt-0.5">Configure custom base URLs, custom model labels, and personal API keys.</p>
+                </div>
+              </div>
+              <span class="size-8 rounded-full border border-border flex items-center justify-center text-muted-foreground group-hover:text-foreground group-hover:border-primary transition-all">
+                →
               </span>
-            </div>
-            <p class="text-[10px] text-muted-foreground leading-relaxed">
-              Stability AI SD 3.5 Large is active out-of-the-box (Free 1024x1024, zero cookie needed). Add account cookies below to unlock direct Suno v3.5 vocals, Udio, Google ImageFX Imagen 3, and Bing DALL-E 3:
-            </p>
+            </a>
+          </section>
 
-            <div class="space-y-1">
-              <div class="flex items-center justify-between text-[11px]">
-                <span class="font-medium text-pink-400">🎵 Suno AI Session Cookie</span>
-                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_suno_cookie") ? "✅ Connected" : "Optional"}</span>
+          <!-- 5. CHAT DATA & STORAGE MANAGEMENT -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <span>💾</span> <span>Storage & Data Management</span>
+                </h2>
+                <p class="text-xs text-muted-foreground mt-0.5">Export backups or reset locally stored conversations</p>
               </div>
-              <input
-                type="password"
-                id="settings-suno-cookie-input"
-                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-pink-500 font-mono"
-                placeholder="suno.com session cookie (__client / __session) or JWT"
-                value="${escapeHtml(localStorage.getItem('lumi_suno_cookie') || '')}"
-              />
             </div>
 
-            <div class="space-y-1">
-              <div class="flex items-center justify-between text-[11px]">
-                <span class="font-medium text-purple-400">🎵 Udio AI Auth Token</span>
-                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_udio_token") ? "✅ Connected" : "Optional"}</span>
+            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-semibold text-foreground">Local Conversations</div>
+                  <div class="text-xs text-muted-foreground mt-0.5">${conversations.length} conversation threads stored locally in this browser / device</div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 text-xs py-2 px-4 rounded-xl border border-border bg-secondary/40 hover:bg-secondary text-foreground font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
+                    id="settings-export-chats-btn"
+                  >
+                    ${ICONS.export} <span>Export All JSON</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 text-xs py-2 px-4 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-destructive font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
+                    id="settings-clear-chats-btn"
+                  >
+                    ${ICONS.trash} <span>Clear All</span>
+                  </button>
+                </div>
               </div>
-              <input
-                type="password"
-                id="settings-udio-token-input"
-                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
-                placeholder="udio.com sb-api-auth-token"
-                value="${escapeHtml(localStorage.getItem('lumi_udio_token') || '')}"
-              />
             </div>
+          </section>
 
-            <div class="space-y-1">
-              <div class="flex items-center justify-between text-[11px]">
-                <span class="font-medium text-blue-400">🎨 Google Cookie (ImageFX Imagen 3 & MusicLM)</span>
-                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_google_cookie") ? "✅ Connected" : "Optional"}</span>
+          <!-- 6. SYSTEM & ENVIRONMENT DIAGNOSTICS -->
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h2 class="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <span>ℹ️</span> <span>System & Environment Diagnostics</span>
+                </h2>
               </div>
-              <input
-                type="password"
-                id="settings-google-cookie-input"
-                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                placeholder="labs.google cookie (__Secure-1PSID / session)"
-                value="${escapeHtml(localStorage.getItem('lumi_google_cookie') || '')}"
-              />
             </div>
 
-            <div class="space-y-1">
-              <div class="flex items-center justify-between text-[11px]">
-                <span class="font-medium text-emerald-400">🎨 Bing DALL-E 3 (_U Cookie)</span>
-                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_bing_cookie") ? "✅ Connected" : "Optional"}</span>
+            <div class="rounded-2xl border border-border bg-card p-5 shadow-xs text-xs space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-muted-foreground">Runtime Environment:</span>
+                <span class="font-mono text-foreground font-medium">${isNativeApp ? "Android Native App (OPPO CPH2617)" : "Web Browser (Linux)"}</span>
               </div>
-              <input
-                type="password"
-                id="settings-bing-cookie-input"
-                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
-                placeholder="bing.com _U authentication cookie"
-                value="${escapeHtml(localStorage.getItem('lumi_bing_cookie') || '')}"
-              />
+              <div class="flex items-center justify-between">
+                <span class="text-muted-foreground">Backend Cluster:</span>
+                <span class="font-mono text-purple-400 font-medium">https://lumi-backend-v4-production.up.railway.app</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-muted-foreground">Local Server:</span>
+                <span class="font-mono text-foreground font-medium">${isLocalHost ? "http://localhost:3456" : "Cloud Hosted"}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-muted-foreground">Lumi Studio Version:</span>
+                <span class="font-mono text-emerald-500 font-medium">v1.2 (Railway Production)</span>
+              </div>
             </div>
-          </div>
+          </section>
 
-          <!-- Chat Data Management -->
-          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
-            <label class="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Chat History</label>
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                class="flex-1 inline-flex items-center justify-center gap-1 text-xs py-2 px-2.5 rounded-xl border border-border bg-secondary/30 hover:bg-secondary text-foreground font-medium transition-colors cursor-pointer"
-                id="settings-export-chats-btn"
-              >
-                ${ICONS.export} <span>Export All</span>
-              </button>
-              <button
-                type="button"
-                class="flex-1 inline-flex items-center justify-center gap-1 text-xs py-2 px-2.5 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 text-destructive font-medium transition-colors cursor-pointer"
-                id="settings-clear-chats-btn"
-              >
-                ${ICONS.trash} <span>Clear Chats</span>
-              </button>
-            </div>
-          </div>
+        </main>
+      </div>
+    `;
+  }
 
-          <!-- Footer -->
-          <div class="pt-2 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>Lumi AI Studio v1.2</span>
-            <span class="text-emerald-500 font-medium">● Free Engine Active</span>
-          </div>
-        </div>
-      </div>`;
+  function renderSettingsModal() {
+    window.location.hash = "#/settings";
+    return "";
   }
 
   // 3. PROMPT COMPOSER & MODEL SELECTOR
@@ -6138,6 +6325,8 @@
       root.innerHTML = renderAuthPage();
     } else if (path === "/providers") {
       root.innerHTML = renderProvidersPage();
+    } else if (path === "/settings") {
+      root.innerHTML = renderSettingsPage();
     } else if (path.startsWith("/chat")) {
       const threadId = path.startsWith("/chat/") ? path.slice(6) : null;
       root.innerHTML = renderChatPage(threadId);
@@ -7046,9 +7235,9 @@
     // 15. Settings & Theme Handlers
     const openSettingsBtn = document.querySelector("#open-settings-btn");
     if (openSettingsBtn) {
-      openSettingsBtn.addEventListener("click", () => {
-        settingsModalOpen = true;
-        render();
+      openSettingsBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.location.hash = "#/settings";
       });
     }
 
@@ -7081,6 +7270,7 @@
 
     const sunoCookieInput = document.querySelector("#settings-suno-cookie-input");
     if (sunoCookieInput) {
+      sunoCookieInput.addEventListener("input", (e) => { localStorage.setItem("lumi_suno_cookie", e.target.value.trim()); });
       sunoCookieInput.addEventListener("change", (e) => {
         const val = e.target.value.trim();
         if (val) {
