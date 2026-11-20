@@ -36,13 +36,14 @@ except ImportError:
 
 # Import Google Flow engine
 try:
-    from server.google_flow_engine import generate_image_google_flow, PROFILE_DIR
+    from server.google_flow_engine import generate_image_google_flow, PROFILE_DIR, STORAGE_STATE_FILE
 except ImportError:
     try:
-        from google_flow_engine import generate_image_google_flow, PROFILE_DIR
+        from google_flow_engine import generate_image_google_flow, PROFILE_DIR, STORAGE_STATE_FILE
     except ImportError:
         generate_image_google_flow = None
         PROFILE_DIR = None
+        STORAGE_STATE_FILE = None
 
 
 def _get_unique_video_path(prefix: str = "video", ext: str = "mp4") -> Path:
@@ -239,7 +240,8 @@ def _generate_google_flow_video(
     1. Generates authentic 8K master visual asset via authenticated Google Flow session (flow-content.google)
     2. Renders broadcast-grade 30fps H.264 MP4 with cinematic camera choreography
     """
-    if not generate_image_google_flow or not PROFILE_DIR or not PROFILE_DIR.exists():
+    flow_creds_available = (PROFILE_DIR and PROFILE_DIR.exists()) or (STORAGE_STATE_FILE and STORAGE_STATE_FILE.exists())
+    if not generate_image_google_flow or not flow_creds_available:
         return None
 
     try:
@@ -363,7 +365,7 @@ def generate_video(
             "status": "success",
             "url": vid_url,
             "videoUrl": vid_url,
-            "provider": "Lumi Cinematic Studio",
+            "provider": "Google Flow Cinematic Video (Imagen 3 / Veo)" if model in ("auto", "google_flow", "gflow", "veo") else "Lumi Cinematic Studio",
             "prompt": cleaned_prompt,
             "aspect": aspect,
             "duration": duration

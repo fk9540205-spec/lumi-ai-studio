@@ -12,6 +12,12 @@ if [ -n "$ANTIGRAVITY_AUTH_JSON" ]; then
     echo "[Entrypoint] Successfully injected Antigravity credentials for jayuu3654@gmail.com"
 fi
 
+if [ -n "$GOOGLE_FLOW_STORAGE_STATE" ]; then
+    echo "$GOOGLE_FLOW_STORAGE_STATE" > /app/server/google_flow_storage_state.json
+    chmod 600 /app/server/google_flow_storage_state.json
+    echo "[Entrypoint] Successfully injected Google Flow session state"
+fi
+
 # Start CLIProxyAPI in background if installed
 if [ -f /usr/local/bin/cli-proxy-api ] && [ -f /app/server/cliproxy/config.yaml ]; then
     echo "[Entrypoint] Launching CLIProxyAPI service on port 8317..."

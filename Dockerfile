@@ -20,9 +20,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -sL https://github.com/router-for-me/CLIProxyAPI/releases/download/v8.0.78/CLIProxyAPI_8.0.78_linux_amd64.tar.gz | tar -xz -C /usr/local/bin/ cli-proxy-api \
     && chmod +x /usr/local/bin/cli-proxy-api
 
-# Set Chrome/Chromium environment variables for nodriver/selenium/g4f
+# Set Chrome/Chromium environment variables for nodriver/selenium/g4f/playwright
 ENV CHROME_BIN=/usr/bin/chromium
 ENV CHROMIUM_PATH=/usr/bin/chromium
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # Install Python dependencies
 COPY requirements.txt .
