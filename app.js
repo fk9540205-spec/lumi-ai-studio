@@ -2474,22 +2474,75 @@
             </div>
           </div>
 
-          <!-- Suno AI Real Music Audio Configuration -->
-          <div class="flex flex-col gap-1.5 pt-2 border-t border-border">
+          <!-- Real Music & Image AI Credentials (Suno, Udio, Google, Bing) -->
+          <div class="flex flex-col gap-2 pt-2 border-t border-border">
             <div class="flex items-center justify-between">
-              <label class="text-[11px] font-semibold uppercase tracking-wider text-pink-400">🎵 Suno Audio (Real MP3 Songs)</label>
-              <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_suno_cookie") ? "Connected" : "Optional"}</span>
+              <label class="text-[11px] font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                <span>🎵 Music & 🎨 Image AI Credentials</span>
+              </label>
+              <span class="text-[10px] text-emerald-500 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                Zero Demo / 100% Real
+              </span>
             </div>
-            <input
-              type="password"
-              id="settings-suno-cookie-input"
-              class="w-full text-xs px-3 py-2 rounded-xl border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-pink-500 font-mono"
-              placeholder="Paste Suno.com session cookie for real MP3"
-              value="${escapeHtml(localStorage.getItem('lumi_suno_cookie') || '')}"
-            />
             <p class="text-[10px] text-muted-foreground leading-relaxed">
-              Login to Suno.com ➔ DevTools (F12) ➔ Copy cookie to generate and stream real MP3 songs directly into your player.
+              Stability AI SD 3.5 Large is active out-of-the-box (Free 1024x1024, zero cookie needed). Add account cookies below to unlock direct Suno v3.5 vocals, Udio, Google ImageFX Imagen 3, and Bing DALL-E 3:
             </p>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-medium text-pink-400">🎵 Suno AI Session Cookie</span>
+                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_suno_cookie") ? "✅ Connected" : "Optional"}</span>
+              </div>
+              <input
+                type="password"
+                id="settings-suno-cookie-input"
+                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-pink-500 font-mono"
+                placeholder="suno.com session cookie (__client / __session) or JWT"
+                value="${escapeHtml(localStorage.getItem('lumi_suno_cookie') || '')}"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-medium text-purple-400">🎵 Udio AI Auth Token</span>
+                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_udio_token") ? "✅ Connected" : "Optional"}</span>
+              </div>
+              <input
+                type="password"
+                id="settings-udio-token-input"
+                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                placeholder="udio.com sb-api-auth-token"
+                value="${escapeHtml(localStorage.getItem('lumi_udio_token') || '')}"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-medium text-blue-400">🎨 Google Cookie (ImageFX Imagen 3 & MusicLM)</span>
+                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_google_cookie") ? "✅ Connected" : "Optional"}</span>
+              </div>
+              <input
+                type="password"
+                id="settings-google-cookie-input"
+                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                placeholder="labs.google cookie (__Secure-1PSID / session)"
+                value="${escapeHtml(localStorage.getItem('lumi_google_cookie') || '')}"
+              />
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-medium text-emerald-400">🎨 Bing DALL-E 3 (_U Cookie)</span>
+                <span class="text-[10px] text-muted-foreground">${localStorage.getItem("lumi_bing_cookie") ? "✅ Connected" : "Optional"}</span>
+              </div>
+              <input
+                type="password"
+                id="settings-bing-cookie-input"
+                class="w-full text-xs px-3 py-1.5 rounded-lg border border-border bg-secondary/30 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                placeholder="bing.com _U authentication cookie"
+                value="${escapeHtml(localStorage.getItem('lumi_bing_cookie') || '')}"
+              />
+            </div>
           </div>
 
           <!-- Chat Data Management -->
@@ -2853,7 +2906,7 @@
                           <div class="pro-gen-header">
                             <div class="pro-gen-badge">
                               <span class="pro-pulse-dot"></span>
-                              <span>FLUX.1 Studio Engine</span>
+                              <span>${escapeHtml(msg.imageProvider || "Stability AI SD 3.5 Large")}</span>
                             </div>
                             <span class="pro-gen-timer">${escapeHtml(msg.generationStage || "Synthesizing")}</span>
                           </div>
@@ -3795,6 +3848,7 @@
 
       (async () => {
         let targetUrl = "";
+        let targetProvider = "";
         for (const ep of candidateEndpoints) {
           try {
             const imgCtrl = new AbortController();
@@ -3802,14 +3856,19 @@
             const imgResp = await fetch(ep, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ prompt: enhancedPrompt, model: "flux" }),
+              body: JSON.stringify({
+                prompt: enhancedPrompt,
+                model: "sd-3.5-large",
+                googleCookie: localStorage.getItem("lumi_google_cookie") || "",
+                bingCookie: localStorage.getItem("lumi_bing_cookie") || ""
+              }),
               signal: imgCtrl.signal
             });
             clearTimeout(imgTid);
             if (imgResp.ok) {
               const imgData = await imgResp.json();
               if (imgData.url) {
-                targetUrl = imgData.url;
+                targetUrl = imgData.url; targetProvider = imgData.provider || "";
                 break;
               }
             }
@@ -3831,6 +3890,7 @@
         preloader.onload = () => {
           clearInterval(stageTimer);
           targetMsg.imageUrl = targetUrl;
+          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large";
           targetMsg.imageLoading = false;
           targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
           isStreaming = false;
@@ -3842,6 +3902,7 @@
         preloader.onerror = () => {
           clearInterval(stageTimer);
           targetMsg.imageUrl = targetUrl;
+          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large";
           targetMsg.imageLoading = false;
           targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
           isStreaming = false;
@@ -3890,7 +3951,10 @@
               body: JSON.stringify({
                 prompt: songPrompt,
                 style: style,
-                cookie: localStorage.getItem("lumi_suno_cookie") || ""
+                cookie: localStorage.getItem("lumi_suno_cookie") || "",
+                sunoCookie: localStorage.getItem("lumi_suno_cookie") || "",
+                udioToken: localStorage.getItem("lumi_udio_token") || "",
+                googleCookie: localStorage.getItem("lumi_google_cookie") || ""
               }),
               signal: mCtrl.signal
             });
@@ -6823,6 +6887,48 @@
         } else {
           localStorage.removeItem("lumi_suno_cookie");
           showToast("Suno cookie cleared.");
+        }
+      });
+    }
+
+    const udioTokenInput = document.querySelector("#settings-udio-token-input");
+    if (udioTokenInput) {
+      udioTokenInput.addEventListener("change", (e) => {
+        const val = e.target.value.trim();
+        if (val) {
+          localStorage.setItem("lumi_udio_token", val);
+          showToast("🎵 Udio token saved!");
+        } else {
+          localStorage.removeItem("lumi_udio_token");
+          showToast("Udio token cleared.");
+        }
+      });
+    }
+
+    const googleCookieInput = document.querySelector("#settings-google-cookie-input");
+    if (googleCookieInput) {
+      googleCookieInput.addEventListener("change", (e) => {
+        const val = e.target.value.trim();
+        if (val) {
+          localStorage.setItem("lumi_google_cookie", val);
+          showToast("🎨 Google ImageFX & MusicLM cookie saved!");
+        } else {
+          localStorage.removeItem("lumi_google_cookie");
+          showToast("Google cookie cleared.");
+        }
+      });
+    }
+
+    const bingCookieInput = document.querySelector("#settings-bing-cookie-input");
+    if (bingCookieInput) {
+      bingCookieInput.addEventListener("change", (e) => {
+        const val = e.target.value.trim();
+        if (val) {
+          localStorage.setItem("lumi_bing_cookie", val);
+          showToast("🎨 Bing DALL-E 3 cookie saved!");
+        } else {
+          localStorage.removeItem("lumi_bing_cookie");
+          showToast("Bing cookie cleared.");
         }
       });
     }

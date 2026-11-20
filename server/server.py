@@ -60,6 +60,21 @@ MAX_BODY = 25 * 1024 * 1024  # 25MB for PDFs, images & multi-doc attachments
 
 # Root directory of web assets (parent of server/)
 WORKSPACE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if WORKSPACE_ROOT not in sys.path:
+    sys.path.insert(0, WORKSPACE_ROOT)
+
+try:
+    from server.image_engine import generate_image
+    from server.music_engine import generate_music
+except Exception as _engines_err:
+    try:
+        import image_engine
+        import music_engine
+        generate_image = image_engine.generate_image
+        generate_music = music_engine.generate_music
+    except Exception:
+        generate_image = None
+        generate_music = None
 
 # ---------------------------------------------------------------------------
 # Antigravity Core Proxy Engine (Google Auth & Claude 4.6)
@@ -375,8 +390,21 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._error(400, "Invalid JSON")
             return
         prompt = data.get("prompt", "a beautiful digital art")
+        cookies = {
+            "google": data.get("googleCookie") or data.get("google_cookie") or os.environ.get("GOOGLE_COOKIE", ""),
+            "bing": data.get("bingCookie") or data.get("bing_cookie") or os.environ.get("BING_COOKIE", "")
+        }
 
-        # 1. High-definition Gemini 3.1 Flash Image via local Google Antigravity proxy
+        # 1. Unified Real Multi-Provider Image Engine (Google ImageFX Imagen 3, Bing DALL-E 3, Stability AI SD 3.5 Large)
+        if generate_image:
+            try:
+                res = generate_image(prompt, cookies=cookies)
+                self._json_response(res)
+                return
+            except Exception as e:
+                sys.stderr.write(f"Image engine error: {e}\n")
+
+        # 2. Local Google Gemini proxy fallback if available
         try:
             cpa_req = urllib.request.Request(
                 "http://127.0.0.1:8317/v1/chat/completions",
@@ -400,54 +428,12 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     if imgs and isinstance(imgs, list) and len(imgs) > 0:
                         img_url = imgs[0].get("image_url", {}).get("url")
                         if img_url:
-                            self._json_response({"url": img_url, "provider": "gemini-3.1-flash-image"})
+                            self._json_response({"url": img_url, "provider": "gemini-3.1-flash-image", "prompt": prompt})
                             return
         except Exception as err:
             sys.stderr.write(f"Gemini image generation attempt failed: {err}\n")
 
-        # 2. Studio-Grade Black Forest Labs FLUX.1 directly via Gradio API (Zero third-party proxy, 100% Real 1024x1024 WebP)
-        for space in ["black-forest-labs-flux-1-schnell", "black-forest-labs-flux-1-dev"]:
-            try:
-                call_url = f"https://{space}.hf.space/gradio_api/call/infer"
-                payload = {
-                    "data": [
-                        prompt,
-                        0,
-                        True,
-                        1024,
-                        1024,
-                        4 if "schnell" in space else 28
-                    ]
-                }
-                req = urllib.request.Request(
-                    call_url,
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
-                )
-                with urllib.request.urlopen(req, timeout=15) as r:
-                    res = json.loads(r.read().decode())
-                    event_id = res.get("event_id")
-                    if event_id:
-                        res_url = f"https://{space}.hf.space/gradio_api/call/infer/{event_id}"
-                        req2 = urllib.request.Request(res_url, headers={"User-Agent": "Mozilla/5.0"})
-                        with urllib.request.urlopen(req2, timeout=45) as r2:
-                            lines = r2.read().decode().splitlines()
-                            for line in lines:
-                                if line.startswith("data:"):
-                                    data_part = line[5:].strip()
-                                    parsed = json.loads(data_part)
-                                    if isinstance(parsed, list) and len(parsed) > 0:
-                                        img_obj = parsed[0]
-                                        if isinstance(img_obj, dict) and img_obj.get("url"):
-                                            self._json_response({
-                                                "url": img_obj.get("url"),
-                                                "provider": space
-                                            })
-                                            return
-            except Exception as e:
-                sys.stderr.write(f"Direct FLUX generation error on {space}: {e}\n")
-
-        self._error(500, "Image generation error")
+        self._error(500, "Image generation error on all upstreams")
 
     def _handle_music_generate(self):
         body = self._read_body()
@@ -461,87 +447,25 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
         prompt = data.get("prompt", "")
         style = data.get("style", "Bollywood / Pop")
-        title = data.get("title", "Lumi AI Track")
-        instrumental = data.get("instrumental", False)
-        suno_cookie = data.get("cookie") or os.environ.get("SUNO_COOKIE")
+        title = data.get("title", "Lumi Track")
+        cookies = {
+            "suno": data.get("cookie") or data.get("sunoCookie") or data.get("suno_cookie") or os.environ.get("SUNO_COOKIE", ""),
+            "udio": data.get("udioToken") or data.get("udio_token") or os.environ.get("UDIO_TOKEN", ""),
+            "google": data.get("googleCookie") or data.get("google_cookie") or os.environ.get("GOOGLE_COOKIE", "")
+        }
 
-        # 1. Reverse-Engineered Suno API (if cookie provided)
-        if suno_cookie:
+        # Real Multi-Provider Music Engine (Suno v3.5, Udio, Google MusicLM)
+        if generate_music:
             try:
-                suno_headers = {
-                    "Authorization": f"Bearer {suno_cookie}",
-                    "Content-Type": "application/json",
-                    "User-Agent": "Mozilla/5.0"
-                }
-                payload = {
-                    "prompt": prompt,
-                    "tags": style,
-                    "title": title,
-                    "make_instrumental": instrumental,
-                    "wait_audio": False
-                }
-                s_req = urllib.request.Request(
-                    "https://studio-api.suno.ai/api/generate/v2/",
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers=suno_headers,
-                    method="POST"
-                )
-                with urllib.request.urlopen(s_req, timeout=30) as s_resp:
-                    res = json.loads(s_resp.read().decode())
-                    clips = res.get("clips") or []
-                    audio_url = ""
-                    clip_lyrics = ""
-                    if clips and len(clips) > 0:
-                        clip = clips[0]
-                        audio_url = clip.get("audio_url") or f"https://cdn1.suno.ai/{clip.get('id')}.mp3"
-                        clip_lyrics = clip.get("metadata", {}).get("prompt", "") or clip.get("title", "")
-                    self._json_response({
-                        "status": "success",
-                        "provider": "suno",
-                        "title": title,
-                        "style": style,
-                        "audioUrl": audio_url,
-                        "composition": clip_lyrics or prompt,
-                        "data": res
-                    })
-                    return
-            except Exception as e:
-                sys.stderr.write(f"Suno upstream failed: {e}\n")
-
-        # 2. Intelligent Composition & Lyrics Flow via Gemini 3 / Claude
-        try:
-            cpa_req = urllib.request.Request(
-                "http://127.0.0.1:8317/v1/chat/completions",
-                data=json.dumps({
-                    "model": "gemini-3-flash",
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are a master music producer and composer. Write a complete song composition with: Title, Style/Genre, BPM, Chords Progression, [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Outro] and production notes."
-                        },
-                        {"role": "user", "content": f"Create a full musical composition in {style} style about: {prompt}"}
-                    ],
-                    "stream": False
-                }).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer lumi-antigravity-local"
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(cpa_req, timeout=60) as cpa_resp:
-                res_data = json.loads(cpa_resp.read().decode())
-                lyrics = res_data["choices"][0]["message"]["content"]
-                self._json_response({
-                    "status": "success",
-                    "provider": "lumi-suno-composer",
-                    "title": title,
-                    "style": style,
-                    "composition": lyrics
-                })
+                res = generate_music(prompt, style=style, title=title, cookies=cookies)
+                self._json_response(res)
                 return
-        except Exception as e:
-            self._error(500, f"Music generation error: {e}")
+            except Exception as e:
+                sys.stderr.write(f"Music engine error: {e}\n")
+                self._error(500, f"Music engine error: {e}")
+                return
+
+        self._error(500, "Music engine not initialized")
 
     def _handle_music_lyrics(self):
         body = self._read_body()
