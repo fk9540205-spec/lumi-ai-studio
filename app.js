@@ -2835,7 +2835,7 @@
 
                 if (isUser) {
                   return `
-                    <div class="animate-rise-in user-msg-row" id="msg-row-${msg.id}">
+                    <div class="user-msg-row" id="msg-row-${msg.id}">
                       ${
                         msg.attachedFiles && msg.attachedFiles.length > 0
                           ? `<div class="flex flex-wrap justify-end gap-1.5 mb-1">
@@ -2853,7 +2853,7 @@
                   isStreaming && index === messages.length - 1;
 
                 return `
-                  <div class="animate-rise-in flex gap-3.5 items-start" id="msg-row-${msg.id}">
+                  <div class="flex gap-3.5 items-start assistant-msg-row" id="msg-row-${msg.id}">
                     <img src="${LUMI_LOGO}" alt="Lumi" class="mt-0.5 size-6 shrink-0 object-contain select-none" />
                     
                     <div class="min-w-0 flex-1">
@@ -2917,7 +2917,7 @@
                               <span class="pro-pulse-dot"></span>
                               <span>${escapeHtml(msg.imageProvider || "Stability AI SD 3.5 Large")}</span>
                             </div>
-                            <span class="pro-gen-timer">${escapeHtml(msg.generationStage || "Synthesizing")}</span>
+                            <span class="pro-gen-timer" id="image-stage-${msg.id}">${escapeHtml(msg.generationStage || "Synthesizing")}</span>
                           </div>
                           <div class="pro-gen-body">
                             <div class="pro-shimmer-sweep"></div>
@@ -3024,7 +3024,7 @@
                               <span class="pro-pulse-dot" style="background: #a855f7;"></span>
                               <span>${escapeHtml(msg.videoProvider || "AI Video Studio")}</span>
                             </div>
-                            <span class="pro-gen-timer">${escapeHtml(msg.generationStage || "Synthesizing Motion")}</span>
+                            <span class="pro-gen-timer" id="video-stage-${msg.id}">${escapeHtml(msg.generationStage || "Synthesizing Motion")}</span>
                           </div>
                           <div class="pro-gen-body">
                             <div class="pro-shimmer-sweep"></div>
@@ -3885,7 +3885,10 @@
         }
         stageIdx = (stageIdx + 1) % stages.length;
         targetMsg.generationStage = stages[stageIdx];
-        render();
+        const stageEl = document.querySelector(`#video-stage-${targetMsg.id}`);
+        if (stageEl) {
+          stageEl.textContent = stages[stageIdx];
+        }
       }, 1500);
 
       const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -3997,7 +4000,10 @@
         }
         stageIdx = (stageIdx + 1) % stages.length;
         targetMsg.generationStage = stages[stageIdx];
-        render();
+        const stageEl = document.querySelector(`#image-stage-${targetMsg.id}`);
+        if (stageEl) {
+          stageEl.textContent = stages[stageIdx];
+        }
       }, 1000);
 
       const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -6095,23 +6101,17 @@
     }
   }
 
-  let scrollScheduled = false;
   function scrollToBottom(force = false) {
-    if (scrollScheduled && !force) return;
-    scrollScheduled = true;
-    requestAnimationFrame(() => {
-      scrollScheduled = false;
-      const container = document.querySelector("#chat-messages-container");
-      if (!container) return;
+    const container = document.querySelector("#chat-messages-container");
+    if (!container) return;
 
-      const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-      // If user has intentionally scrolled up to read (more than 120px away from bottom), don't hijack their scroll!
-      if (!force && distanceFromBottom > 120) {
-        return;
-      }
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    // If user has intentionally scrolled up to read (more than 120px away from bottom), don't hijack their scroll!
+    if (!force && distanceFromBottom > 120) {
+      return;
+    }
 
-      container.scrollTop = container.scrollHeight;
-    });
+    container.scrollTop = container.scrollHeight;
   }
 
   // --- Main Render Dispatcher ---

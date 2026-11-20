@@ -197,18 +197,20 @@ body {
 @keyframes rise-in {
   0% {
     opacity: 0;
-    filter: blur(4px);
-    transform: translateY(12px);
   }
   100% {
     opacity: 1;
-    filter: none;
-    transform: translateY(0);
   }
 }
 
 .animate-rise-in {
-  animation: 0.55s cubic-bezier(0.16, 1, 0.3, 1) both rise-in;
+  animation: 0.2s ease-out both rise-in;
+}
+
+/* Stable chat message rows — prevent up/down jumping */
+.user-msg-row, .assistant-msg-row {
+  transform: none !important;
+  filter: none !important;
 }
 
 /* Brand Text Gradient */
@@ -1952,8 +1954,9 @@ html.dark .genui-recom-rank.gold {
 
 /* Chat Scroll Stability */
 #chat-messages-container {
-  overflow-anchor: auto;
-  scroll-behavior: auto;
+  overflow-anchor: none !important;
+  scroll-behavior: auto !important;
+  contain: layout;
 }
 
 
