@@ -1524,16 +1524,27 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             has_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
 
             # If ElevenLabs API key is provided, route directly to real ElevenLabs
-            eleven_key = os.environ.get("ELEVENLABS_API_KEY") or data.get("elevenlabs_api_key") or data.get("eleven_key")
+            eleven_key = os.environ.get("ELEVENLABS_API_KEY") or data.get("elevenlabs_api_key") or data.get("eleven_key") or "sk_a61c01bfdc33853091e2f7439494a00d98ac0e3872f54072"
             eleven_voice_map = {
-                "rachel": "21m00Tcm4TlvDq8ikWAM",
-                "adam": "pNInz6obpgDQGcFmaJgB",
-                "nicole": "piTKgcLEGmPE4e6mEKli",
+                "jessica": "cgSgspJ2msm6clMCkdW9",
+                "lily": "pFZP5JQG7iQjIQuC4Bku",
+                "bella": "hpp4J3VqNfWAUOO0d1Us",
+                "matilda": "XrExE9yKIg1WjnnlVkGX",
+                "sarah": "EXAVITQu4vr4xnSDxMaL",
+                "laura": "FGY2WhTYpPnrIDTdsKH5",
+                "alice": "Xb7hH8MSUJpSbSDYk0k2",
                 "charlie": "IKne3meq5aSn9XLyUdCD",
                 "george": "JBFqnCBsd6RMkjVDRZzb",
-                "bella": "EXAVITQu4vr4xnSDxMaL",
-                "nova": "21m00Tcm4TlvDq8ikWAM",
-                "onyx": "pNInz6obpgDQGcFmaJgB",
+                "callum": "N2lVS1w4EtoT3dr4eOWO",
+                "brian": "nPczCjzI2devNBz1zQrb",
+                "adam": "pNInz6obpgDQGcFmaJgB",
+                "roger": "CwhRBWXzGAHq8TQ4Fs17",
+                "eric": "cjVigY5qzO86Huf0OWal",
+                "chris": "iP95p4xoKVk53GoZ742B",
+                "bill": "pqHfZKP75CvOlQylNhV4",
+                "rachel": "cgSgspJ2msm6clMCkdW9",
+                "nova": "cgSgspJ2msm6clMCkdW9",
+                "nicole": "cgSgspJ2msm6clMCkdW9",
             }
             if eleven_key and raw_voice.lower() in eleven_voice_map:
                 try:
@@ -1546,8 +1557,9 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                             "text": clean_text,
                             "model_id": "eleven_multilingual_v2",
                             "voice_settings": {
-                                "stability": 0.5,
-                                "similarity_boost": 0.75
+                                "stability": 0.45,
+                                "similarity_boost": 0.85,
+                                "style": 0.2
                             }
                         }).encode("utf-8"),
                         headers={
@@ -1557,7 +1569,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         },
                         method="POST"
                     )
-                    with urllib.request.urlopen(req, timeout=10) as resp:
+                    with urllib.request.urlopen(req, timeout=12) as resp:
                         if resp.status == 200:
                             el_bytes = resp.read()
                             if len(el_bytes) > 200:
@@ -1573,6 +1585,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
             # Voice mapping: each voice has its own authentic neural model, pitch, and cadence
             voice_config = {
+                "jessica": ("en-US-AvaMultilingualNeural", "+8Hz", "+5%"),
+                "lily": ("en-US-EmmaMultilingualNeural", "+2Hz", "-2%"),
                 "nova": ("en-US-AvaMultilingualNeural", "+4Hz", "+5%"),
                 "shimmer": ("en-US-EmmaMultilingualNeural", "+8Hz", "+6%"),
                 "swara": ("hi-IN-SwaraNeural", "+0Hz", "+0%"),

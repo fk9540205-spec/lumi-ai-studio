@@ -5622,22 +5622,22 @@
   // Exact match to frame_339.png from official user video + AI Voice Selector
   // ==========================================================================
   const LIVE_VOICES = [
-    { id: "nova", name: "Nova", provider: "OpenAI", desc: "Warm, natural conversational tone" },
+    { id: "jessica", name: "Jessica (Sweet & Playful)", provider: "ElevenLabs", desc: "Super sweet, cute, playful and most charming female voice" },
+    { id: "lily", name: "Lily (Velvety & Soothing)", provider: "ElevenLabs", desc: "Velvety, soft, gentle and soothing comforting female voice" },
+    { id: "bella", name: "Bella (Bright & Warm)", provider: "ElevenLabs", desc: "Expressive, bright and engaging female voice" },
+    { id: "charlie", name: "Charlie (Confident & Friendly)", provider: "ElevenLabs", desc: "Deep, lively and energetic conversational male voice" },
+    { id: "george", name: "George (British Storyteller)", provider: "ElevenLabs", desc: "Warm, captivating and mature storytelling British male voice" },
+    { id: "brian", name: "Brian (Deep & Resonant)", provider: "ElevenLabs", desc: "Deep, comforting and classy social tone" },
+    { id: "adam", name: "Adam (Dominant & Firm)", provider: "ElevenLabs", desc: "Deep, articulate storytelling male voice" },
     { id: "swara", name: "Swara", provider: "IndicF5", desc: "Natural native Hindi & Hinglish female voice" },
     { id: "madhur", name: "Madhur", provider: "IndicF5", desc: "Natural warm Hindi & Hinglish male voice" },
     { id: "kavya", name: "Kavya", provider: "Indic Neural", desc: "Sweet, expressive young Hindi female voice" },
     { id: "prabhat", name: "Prabhat", provider: "Indic Neural", desc: "Deep, authoritative Hindi storyteller voice" },
-    { id: "rachel", name: "Rachel", provider: "ElevenLabs", desc: "Calm, realistic everyday conversational voice" },
-    { id: "adam", name: "Adam", provider: "ElevenLabs", desc: "Deep, articulate storytelling male voice" },
-    { id: "nicole", name: "Nicole", provider: "ElevenLabs", desc: "Whisper-soft, gentle and warm female voice" },
-    { id: "george", name: "George", provider: "ElevenLabs", desc: "Sophisticated, warm storytelling British voice" },
-    { id: "bella", name: "Bella", provider: "ElevenLabs", desc: "Emotional, cheerful and expressive tone" },
-    { id: "onyx", name: "Onyx", provider: "OpenAI", desc: "Deep, warm and grounded male voice" },
-    { id: "alloy", name: "Alloy", provider: "OpenAI", desc: "Dynamic and expressive balanced voice" },
-    { id: "shimmer", name: "Shimmer", provider: "OpenAI", desc: "Clear, cheerful and melodic tone" },
-    { id: "ananya", name: "Ananya", provider: "Indic Neural", desc: "Modern, fluent Indian English female voice" },
     { id: "aarav", name: "Aarav", provider: "Indic Neural", desc: "Energetic, youthful Hindi male voice" },
-    { id: "neerja", name: "Neerja", provider: "Indic Neural", desc: "Expressive Indian accent English voice" }
+    { id: "ananya", name: "Ananya", provider: "Indic Neural", desc: "Modern, fluent Indian English female voice" },
+    { id: "nova", name: "Nova", provider: "OpenAI", desc: "Warm, natural conversational tone" },
+    { id: "onyx", name: "Onyx", provider: "OpenAI", desc: "Deep, warm and grounded male voice" },
+    { id: "alloy", name: "Alloy", provider: "OpenAI", desc: "Dynamic and expressive balanced voice" }
   ];
 
   const LumiVoiceCall = {
@@ -5645,7 +5645,7 @@
     state: "idle", // "idle" | "listening" | "thinking" | "speaking"
     isMuted: false,
     currentLang: "hi-IN",
-    selectedVoice: localStorage.getItem("lumi_live_voice") || "nova",
+    selectedVoice: localStorage.getItem("lumi_live_voice") || "jessica",
     previewAudio: null,
     currentlyPlayingSampleId: null,
     restartTimer: null,
@@ -5803,7 +5803,7 @@
       // Temporarily stop microphone so speech recognizer doesn't capture preview clicks
       this.stopListening();
 
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
 
       list.innerHTML = LIVE_VOICES.map((v) => {
         const isSelected = v.id === activeVoice;
@@ -5989,7 +5989,7 @@
       this.speechQueue = [];
       this.isPlayingSpeech = false;
       this.state = "listening";
-      this.selectedVoice = localStorage.getItem("lumi_live_voice") || "nova";
+      this.selectedVoice = localStorage.getItem("lumi_live_voice") || "jessica";
 
       // Silence Android OS SpeechRecognizer chimes completely!
       if (window.AndroidAudio && typeof window.AndroidAudio.silenceSystemSounds === "function") {
@@ -6398,7 +6398,7 @@
       const clean = sentence.replace(/\*\*/g, "").replace(/[`#_*~]/g, "").trim();
       if (!clean) return;
 
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
       this.prefetchTTS(clean, activeVoice);
       this.speechQueue.push(clean);
       if (!this.isPlayingSpeech) {
@@ -6425,7 +6425,7 @@
 
       const text = this.speechQueue.shift();
       const hasHindi = /[\u0900-\u097F]/.test(text);
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
 
       // If next items exist in queue, pre-fetch their audio now
       if (this.speechQueue.length > 0) {
@@ -6526,7 +6526,7 @@
     fallbackSpeak(text, hasHindi, activeVoice) {
       if (!this.isOpen) return;
       const lang = hasHindi ? "hi-IN" : "en-US";
-      const voiceId = activeVoice || this.selectedVoice || localStorage.getItem("lumi_live_voice") || "nova";
+      const voiceId = activeVoice || this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
 
       // Synchronize subtitle display with speech
       this.updateUI("speaking", text);
