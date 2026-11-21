@@ -605,6 +605,12 @@
 2. ABSOLUTE HONESTY: Always be 100% truthful about tools, models, and limitations. Never invent fake provider names or disguise fallback models.
 3. ZERO CLUTTER: Keep things clean, elegant, and working seamlessly in the background.\n`;
 
+      directive += `[Response Length & Completeness]:
+- ADAPTIVE & COMPLETE: Do NOT artificially truncate, summarize, or tease responses.
+- When the user asks for a story, poem, detailed explanation, tutorial, or narrative (e.g. 'kahani sunao', 'badi kahani', 'explain karo', 'detail me batao'), ALWAYS provide the FULL, complete, engaging, and rich story/explanation from start to finish with full paragraphs. Never give just 1 sentence or a partial teaser.
+- When the user asks a quick factual or casual question, keep it crisp and conversational.
+- Match the user's intent: give the full depth and length they requested.\n`;
+
       if (customInstructions && customInstructions.trim()) {
         directive += `[User Custom Instructions]:\n${customInstructions.trim()}\n`;
       }
@@ -6159,7 +6165,7 @@
       const messages = [
         {
           role: "system",
-          content: `You are Lumi on a real-time live phone call with your brother/friend. Speak naturally, warmly, and instantly.\nRules:\n1. ULTRA SHORT: Exactly 1 single concise conversational sentence (under 14 words). Answer immediately. Never use bullet points, numbered lists, asterisks (**), or markdown.\n2. LANGUAGE & TONE: ${langDirective}`
+          content: `You are Lumi on a real-time live phone call with your brother/friend. Speak naturally, warmly, and authentically.\nRules:\n1. NATURAL ADAPTIVE LENGTH: If the user asks for a story, poem, or detailed explanation (e.g. 'kahani sunao', 'badi kahani', 'explain karo', 'batao'), tell the full, complete story or explanation naturally from beginning to end. If the user asks a quick casual question, keep it brief and conversational. Never cut yourself short to just one sentence when asked for a story or explanation.\n2. SPOKEN AUDIO: Do NOT use markdown symbols (no asterisks **, no bullet points -, no hashes #). Speak in clean, flowing spoken sentences so speech synthesis sounds completely natural.\n3. LANGUAGE & TONE: ${langDirective}`
         }
       ];
 
@@ -6188,7 +6194,7 @@
         for (const ep of chatEndpoints) {
           try {
             const ctrl = new AbortController();
-            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 10000 : 7000;
+            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 25000 : 20000;
             const timer = setTimeout(() => ctrl.abort(), timeoutMs);
             const r = await fetch(ep, {
               method: "POST",
@@ -6198,7 +6204,7 @@
                 model: "gemini-3-flash",
                 messages: messages,
                 stream: true,
-                max_tokens: 60
+                max_tokens: 2048
               })
             });
             clearTimeout(timer);
