@@ -409,7 +409,7 @@ def generate_video(
                 "status": "success",
                 "url": vid_url,
                 "videoUrl": vid_url,
-                "provider": "Google Flow (Veo 3.1 Studio)",
+                "provider": "ByteDance AnimateDiff-Lightning",
                 "prompt": cleaned_prompt,
                 "aspect": aspect,
                 "duration": 2.0
@@ -425,7 +425,7 @@ def generate_video(
                 "url": flow_res["url"],
                 "videoUrl": flow_res["url"],
                 "remoteUrl": flow_res.get("remoteUrl"),
-                "provider": flow_res.get("provider", "Google Flow (Veo 3.1 Studio)"),
+                "provider": flow_res.get("provider", "Google Flow (Veo Studio)"),
                 "prompt": cleaned_prompt,
                 "aspect": aspect,
                 "duration": duration
@@ -439,7 +439,7 @@ def generate_video(
             "status": "success",
             "url": vid_url,
             "videoUrl": vid_url,
-            "provider": "Google Flow (Veo 3.1 Studio)",
+            "provider": "Lumi Cinematic Studio (Motion Camera)",
             "prompt": cleaned_prompt,
             "aspect": aspect,
             "duration": duration

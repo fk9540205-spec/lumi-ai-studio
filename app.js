@@ -4067,10 +4067,39 @@
     }
   }
 
+  // Helper to ensure send button and composer are always restored
+  function restoreComposerButtons() {
+    isStreaming = false;
+    const stopBtn = document.querySelector("#stop-generation-btn");
+    const submitBtn = document.querySelector("#submit-prompt-btn");
+    const voiceBtn = document.querySelector("#voice-call-trigger-btn");
+    const ta = document.querySelector("#composer-textarea");
+    if (stopBtn) {
+      stopBtn.classList.add("hidden");
+      stopBtn.classList.remove("inline-flex");
+    }
+    if (submitBtn) {
+      submitBtn.classList.remove("hidden");
+      submitBtn.classList.add("inline-flex");
+      submitBtn.disabled = false;
+    }
+    if (voiceBtn) {
+      voiceBtn.classList.remove("hidden");
+      voiceBtn.classList.add("inline-flex");
+    }
+    if (ta) {
+      ta.disabled = false;
+    }
+  }
+
   // --- Send Message & Live Streaming Execution ---
   async function sendMessage(text) {
     const prompt = text.trim();
-    if (!prompt || isStreaming) return;
+    if (!prompt) return;
+    if (isStreaming && !streamAbortController) {
+      restoreComposerButtons();
+    }
+    if (isStreaming) return;
     stopSpeechSynthesis();
 
     let { path } = parseLocation();
@@ -4225,7 +4254,7 @@
         : "🔦 Flashlight toggle command execute kar di gayi hai.";
       saveJson(STORAGE.CHATS, conversations);
       AudioEffects.play("success");
-      isStreaming = false;
+      restoreComposerButtons();
       render();
       scrollToBottom();
       return;
@@ -4238,7 +4267,7 @@
       assistantMsg.content = "🔦 **Flashlight OFF kar di hai!** Phone ka torch ab band hai.";
       saveJson(STORAGE.CHATS, conversations);
       AudioEffects.play("click");
-      isStreaming = false;
+      restoreComposerButtons();
       render();
       scrollToBottom();
       return;
@@ -4256,7 +4285,7 @@
       }
       saveJson(STORAGE.CHATS, conversations);
       AudioEffects.play("success");
-      isStreaming = false;
+      restoreComposerButtons();
       render();
       scrollToBottom();
       return;
@@ -4268,7 +4297,7 @@
       assistantMsg.content = "📳 **Phone vibrate kar diya hai!** Haptic pulse triggered.";
       saveJson(STORAGE.CHATS, conversations);
       AudioEffects.play("click");
-      isStreaming = false;
+      restoreComposerButtons();
       render();
       scrollToBottom();
       return;
@@ -4383,24 +4412,24 @@
 
         if (!targetUrl) {
           targetMsg.content = `❌ Video generation failed on AI cluster. Please retry in a few moments.`;
-          isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
           if (!updateAssistantMsgDOM(targetMsg, false, true)) {
             render();
           }
+          restoreComposerButtons();
           scrollToBottom();
           return;
         }
 
         targetMsg.videoUrl = targetUrl;
-        targetMsg.videoProvider = targetProvider || "Google Flow (Veo / Imagen 3 Studio)";
-        targetMsg.content = `🎬 **Google Flow AI Video Generated** for: *"**${escapeHtml(videoPrompt)}**"*`;
-        isStreaming = false;
+        targetMsg.videoProvider = targetProvider || "Lumi AI Cinematic Studio";
+        targetMsg.content = `🎬 **AI Video Generated** for: *"**${escapeHtml(videoPrompt)}**"*`;
         saveJson(STORAGE.CHATS, conversations);
         AudioEffects.play("success");
         if (!updateAssistantMsgDOM(targetMsg, false, true)) {
           render();
         }
+        restoreComposerButtons();
         scrollToBottom();
       })();
     };
@@ -4501,11 +4530,11 @@
           clearInterval(stageTimer);
           targetMsg.imageLoading = false;
           targetMsg.content = `❌ Image generation failed on AI cluster. Please retry in a few moments.`;
-          isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
           if (!updateAssistantMsgDOM(targetMsg, false, true)) {
             render();
           }
+          restoreComposerButtons();
           scrollToBottom();
           return;
         }
@@ -4514,28 +4543,28 @@
         preloader.onload = () => {
           clearInterval(stageTimer);
           targetMsg.imageUrl = targetUrl;
-          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large (Studio Quality)";
+          targetMsg.imageProvider = targetProvider || "Lumi AI Image Studio";
           targetMsg.imageLoading = false;
           targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
-          isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
           AudioEffects.play("success");
           if (!updateAssistantMsgDOM(targetMsg, false, true)) {
             render();
           }
+          restoreComposerButtons();
           scrollToBottom();
         };
         preloader.onerror = () => {
           clearInterval(stageTimer);
           targetMsg.imageUrl = targetUrl;
-          targetMsg.imageProvider = targetProvider || "Stability AI SD 3.5 Large (Studio Quality)";
+          targetMsg.imageProvider = targetProvider || "Lumi AI Image Studio";
           targetMsg.imageLoading = false;
           targetMsg.content = `✨ **High-Definition Image Generated** for: *"**${escapeHtml(imagePrompt)}**"*`;
-          isStreaming = false;
           saveJson(STORAGE.CHATS, conversations);
           if (!updateAssistantMsgDOM(targetMsg, false, true)) {
             render();
           }
+          restoreComposerButtons();
           scrollToBottom();
         };
         preloader.src = targetUrl;
@@ -4609,11 +4638,11 @@
         } else {
           targetMsg.content = `❌ Song generation error. Please check your network and try again.`;
         }
-        isStreaming = false;
         saveJson(STORAGE.CHATS, conversations);
         if (!updateAssistantMsgDOM(targetMsg, false, true)) {
           render();
         }
+        restoreComposerButtons();
         scrollToBottom();
       })();
     };
@@ -5139,23 +5168,7 @@
           </button>`;
       }
 
-      const stopBtn = document.querySelector("#stop-generation-btn");
-      const submitBtn = document.querySelector("#submit-prompt-btn");
-      const voiceBtn = document.querySelector("#voice-call-trigger-btn");
-      const ta = document.querySelector("#composer-textarea");
-      if (stopBtn) {
-        stopBtn.classList.add("hidden");
-        stopBtn.classList.remove("inline-flex");
-      }
-      if (submitBtn) {
-        submitBtn.classList.remove("hidden");
-        submitBtn.classList.add("inline-flex");
-      }
-      if (voiceBtn) {
-        voiceBtn.classList.remove("hidden");
-        voiceBtn.classList.add("inline-flex");
-      }
-
+      restoreComposerButtons();
       scrollToBottom(true);
     }
   }
@@ -6681,12 +6694,22 @@
       });
     }
 
-    // 2. Chat Form Submit
+    // 2. Chat Form Submit & Direct Send Button Click
     const form = document.querySelector("#chat-composer-form");
     if (form) {
       form.addEventListener("submit", (e) => {
         e.preventDefault();
         const input = form.querySelector("textarea[name='message']");
+        const val = input ? input.value.trim() : "";
+        if (val) sendMessage(val);
+      });
+    }
+
+    const submitBtnEl = document.querySelector("#submit-prompt-btn");
+    if (submitBtnEl) {
+      submitBtnEl.addEventListener("click", (e) => {
+        e.preventDefault();
+        const input = document.querySelector("#composer-textarea");
         const val = input ? input.value.trim() : "";
         if (val) sendMessage(val);
       });
@@ -6699,6 +6722,7 @@
         if (streamAbortController) {
           streamAbortController.abort();
         }
+        restoreComposerButtons();
       });
     }
 
