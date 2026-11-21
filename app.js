@@ -210,11 +210,11 @@
   let providers = loadJson(STORAGE.PROVIDERS, []);
   let selectedModel = loadJson(STORAGE.MODEL, {
     provider_id: null,
-    model: "llama-3.3-70b",
+    model: "gemini-3-flash",
   });
-  // Auto-upgrade to ultra-fast Llama 3.3 70B if user had slow/thinking gpt-4o-mini
-  if (!selectedModel.provider_id && (selectedModel.model === "gpt-4o-mini" || selectedModel.model === "qwen-2.5-coder-32b")) {
-    selectedModel.model = "llama-3.3-70b";
+  // Auto-upgrade to ultra-fast real-time Google Antigravity Gemini 3 Flash
+  if (!selectedModel.provider_id && (selectedModel.model === "gpt-4o-mini" || selectedModel.model === "qwen-2.5-coder-32b" || selectedModel.model === "llama-3.3-70b")) {
+    selectedModel.model = "gemini-3-flash";
     saveJson(STORAGE.MODEL, selectedModel);
   }
   let currentUser = loadJson(STORAGE.USER, {
@@ -5795,6 +5795,7 @@
     selectVoice(voiceId) {
       this.selectedVoice = voiceId;
       localStorage.setItem("lumi_live_voice", voiceId);
+      this.ttsCache.clear();
       const voice = LIVE_VOICES.find((v) => v.id === voiceId);
       showToast(`Voice set to: ${voice ? voice.name : voiceId}`);
       this.openVoiceMenu(); // re-render checkmark in-place
@@ -5842,7 +5843,24 @@
         const audio = new Audio(sampleUrl);
         this.previewAudio = audio;
         audio.onended = () => this.stopSamplePlayback();
-        audio.onerror = () => {
+        audio.onerror = async () => {
+          try {
+            const r = await fetch("https://lumi-backend-v4-production.up.railway.app/api/tts", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ input: "Namaste, mai Lumi hu. Kahiye, mai aapki kya madad kar sakti hu?", voice: voiceId })
+            });
+            if (r.ok) {
+              const b = await r.blob();
+              const u = URL.createObjectURL(b);
+              const a = new Audio(u);
+              this.previewAudio = a;
+              a.onended = () => { URL.revokeObjectURL(u); this.stopSamplePlayback(); };
+              a.onerror = () => { URL.revokeObjectURL(u); this.stopSamplePlayback(); };
+              a.play();
+              return;
+            }
+          } catch {}
           if (window.AndroidAudio && typeof window.AndroidAudio.playUrl === "function") {
             window.__lumiOnAudioDone = () => this.stopSamplePlayback();
             window.AndroidAudio.playUrl(`assets/voices/${voiceId}.mp3`);
@@ -6019,28 +6037,23 @@
 
           let interim = "";
           let final = "";
-          for (let i = event.resultIndex; i < event.results.length; i++) {
+          for (let i = 0; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) final += transcript;
+            if (event.results[i].isFinal) final += transcript + " ";
             else interim += transcript;
           }
 
-          const currentText = (final || interim).trim();
+          const currentText = (final + interim).trim();
           if (currentText) {
             this.pendingTranscript = currentText;
             this.updateAuroraState("listening");
             this.updateUI("listening", currentText);
 
             clearTimeout(this.silenceTimer);
-            if (final.trim()) {
-              this.silenceTimer = setTimeout(() => {
-                this.submitUserSpeech();
-              }, 220);
-            } else {
-              this.silenceTimer = setTimeout(() => {
-                this.submitUserSpeech();
-              }, 650);
-            }
+            // Give user natural breathing room (1.2 seconds) to finish their entire sentence
+            this.silenceTimer = setTimeout(() => {
+              this.submitUserSpeech();
+            }, 1200);
           }
         };
 
@@ -6163,23 +6176,26 @@
 
       try {
         const chatEndpoints = [
-          "http://127.0.0.1:3456/api/free/chat",
           "https://lumi-backend-v4-production.up.railway.app/api/free/chat",
+          "http://127.0.0.1:3456/api/free/chat",
           "http://10.188.22.242:3456/api/free/chat"
         ];
+        if (window.location.origin && window.location.origin.startsWith("http")) {
+          chatEndpoints.unshift(`${window.location.origin}/api/free/chat`);
+        }
 
         let resp = null;
         for (const ep of chatEndpoints) {
           try {
             const ctrl = new AbortController();
-            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 12000 : 9000;
+            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 10000 : 7000;
             const timer = setTimeout(() => ctrl.abort(), timeoutMs);
             const r = await fetch(ep, {
               method: "POST",
               signal: ctrl.signal,
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                model: "llama-3.3-70b",
+                model: "gemini-3-flash",
                 messages: messages,
                 stream: true,
                 max_tokens: 60
@@ -6287,9 +6303,13 @@
     async prefetchTTS(text, activeVoice) {
       if (!text || this.ttsCache.has(text)) return;
       const ttsEndpoints = [
+        "https://lumi-backend-v4-production.up.railway.app/api/tts",
         "http://127.0.0.1:3456/api/tts",
         "http://10.188.22.242:3456/api/tts"
       ];
+      if (window.location.origin && window.location.origin.startsWith("http")) {
+        ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
+      }
       for (const ep of ttsEndpoints) {
         try {
           const ctrl = new AbortController();
@@ -6368,9 +6388,13 @@
       let audioBlob = this.ttsCache.get(text) || null;
       if (!audioBlob) {
         const ttsEndpoints = [
+          "https://lumi-backend-v4-production.up.railway.app/api/tts",
           "http://127.0.0.1:3456/api/tts",
           "http://10.188.22.242:3456/api/tts"
         ];
+        if (window.location.origin && window.location.origin.startsWith("http")) {
+          ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
+        }
 
         for (const ep of ttsEndpoints) {
           try {
