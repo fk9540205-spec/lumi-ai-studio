@@ -5227,6 +5227,61 @@
   window.sendMessage = sendMessage;
 
   // --- Voice, Code Runner & Project Helpers ---
+  function mergeSpeechOverlap(a, b) {
+    if (!a) return b || "";
+    if (!b) return a || "";
+    a = a.trim();
+    b = b.trim();
+    if (b.startsWith(a)) return b;
+    if (a.endsWith(b)) return a;
+
+    const wordsA = a.split(/\s+/);
+    const wordsB = b.split(/\s+/);
+
+    const maxOverlap = Math.min(wordsA.length, wordsB.length);
+    for (let l = maxOverlap; l > 0; l--) {
+      const endA = wordsA.slice(-l).join(" ");
+      const startB = wordsB.slice(0, l).join(" ");
+      if (endA.toLowerCase() === startB.toLowerCase()) {
+        return wordsA.concat(wordsB.slice(l)).join(" ");
+      }
+    }
+    return a + " " + b;
+  }
+
+  function cleanTranscriptFromResults(results) {
+    if (!results || results.length === 0) return "";
+    let finalizedParts = [];
+    let latestInterim = "";
+
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i];
+      if (!item || !item[0] || !item[0].transcript) continue;
+      const text = (item[0].transcript || "").trim();
+      if (!text) continue;
+
+      if (item.isFinal) {
+        if (finalizedParts.length > 0) {
+          const merged = mergeSpeechOverlap(finalizedParts[finalizedParts.length - 1], text);
+          finalizedParts[finalizedParts.length - 1] = merged;
+        } else {
+          finalizedParts.push(text);
+        }
+      } else {
+        // In Android WebView, interim results accumulate sequentially across frames.
+        // Always take only the latest interim hypothesis, NEVER sum them!
+        latestInterim = text;
+      }
+    }
+
+    const fullFinal = finalizedParts.join(" ").trim();
+    if (latestInterim) {
+      if (!fullFinal) return latestInterim;
+      return mergeSpeechOverlap(fullFinal, latestInterim);
+    }
+    return fullFinal;
+  }
+
   function toggleSpeechRecognition() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) {
@@ -5257,12 +5312,9 @@
         render();
       };
       recognitionInstance.onresult = (event) => {
-        let transcript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
+        const transcript = cleanTranscriptFromResults(event.results);
         const textarea = document.querySelector("#composer-textarea");
-        if (textarea) {
+        if (textarea && transcript) {
           textarea.value = transcript;
           textarea.style.height = "auto";
           textarea.style.height = Math.min(textarea.scrollHeight, 192) + "px";
@@ -6041,15 +6093,7 @@
           // If AI is currently speaking, disregard mic to prevent acoustic feedback loop
           if (this.state === "speaking" || this.isPlayingSpeech || this.isGeneratingResponse) return;
 
-          let interim = "";
-          let final = "";
-          for (let i = 0; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) final += transcript + " ";
-            else interim += transcript;
-          }
-
-          const currentText = (final + interim).trim();
+          const currentText = cleanTranscriptFromResults(event.results);
           if (currentText) {
             this.pendingTranscript = currentText;
             this.updateAuroraState("listening");
