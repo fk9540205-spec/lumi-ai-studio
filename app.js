@@ -465,17 +465,26 @@
 
     getProfile() {
       return loadJson(this.PROFILE_KEY, {
-        primaryTone: "natural",
-        pronoun: "natural",
-        toneStyle: "Direct, articulate, and completely natural to the user's language and style without any forced polite scripts or artificial constraints.",
+        primaryTone: "brotherly_hinglish",
+        pronoun: "tu",
+        toneStyle: "Natural, candid, loyal brotherly Hinglish. Speak like a close, smart friend/brother using words like 'bhai', 'yr', 'tu', 'chal', 'dekh', 'tension mat le'. Be straight to the point, honest, sharp, and helpful.",
         learnedRules: [
           "100% REAL WORKING IMPLEMENTATIONS: Strictly reject fake demos, fake mockups, or placeholder code. Provide complete, working, production-grade solutions.",
           "ZERO CLUTTER & NO USELESS BUTTONS: Keep things working under the hood in the background. Don't add unnecessary buttons or manual steps when it can be done automatically.",
-          "DIRECT & SINCERE: Be straightforward, candid, and deliver results immediately without generic corporate disclaimers or repetitive boilerplate."
+          "DIRECT & SINCERE: Be straightforward, candid, and deliver results immediately without generic corporate disclaimers or repetitive boilerplate.",
+          "ABSOLUTE HONESTY: Always be 100% truthful about tools, models, and limitations. Never invent fake provider names."
         ],
         analyzedMessagesCount: 0,
         lastAnalyzedAt: Date.now()
       });
+    },
+
+    updateProfile(patch) {
+      if (!patch || typeof patch !== "object") return;
+      const profile = this.getProfile();
+      Object.assign(profile, patch);
+      saveJson(this.PROFILE_KEY, profile);
+      return profile;
     },
 
     analyzeAndSync(conversationsList) {
@@ -516,7 +525,7 @@
         }
 
         // Determine Tone dynamically from past user chat patterns
-        if (informalBrotherlyScore >= 2 || (hinglishScore >= 4 && informalBrotherlyScore >= 1)) {
+        if (informalBrotherlyScore >= 2 || (hinglishScore >= 4 && informalBrotherlyScore >= 1) || profile.primaryTone === "brotherly_hinglish") {
           profile.primaryTone = "brotherly_hinglish";
           profile.pronoun = "tu";
           profile.toneStyle = "Natural, candid, loyal brotherly Hinglish. Speak like a close, smart friend/brother using words like 'bhai', 'yr', 'tu', 'chal', 'dekh', 'tension mat le'. Be straight to the point, honest, sharp, and helpful.";
@@ -534,7 +543,8 @@
         profile.learnedRules = [
           "100% REAL WORKING IMPLEMENTATIONS: Strictly reject fake demos, fake mockups, or placeholder code. Provide complete, working, production-grade solutions.",
           "ZERO CLUTTER & NO USELESS BUTTONS: Keep things working under the hood in the background. Don't add unnecessary buttons or manual steps when it can be done automatically.",
-          "DIRECT & SINCERE: Be straightforward, candid, and deliver results immediately without generic corporate disclaimers or repetitive boilerplate."
+          "DIRECT & SINCERE: Be straightforward, candid, and deliver results immediately without generic corporate disclaimers or repetitive boilerplate.",
+          "ABSOLUTE HONESTY: Always be 100% truthful about tools, models, and limitations. Never invent fake provider names."
         ];
 
         // 3. Autonomous Fact & Context Extraction
@@ -548,6 +558,14 @@
           const memMatch = text.match(/^(?:yaad rakhna|remember that|yaad rakh)\s*(?:ki\s+|that\s+)?(.*)/i);
           if (memMatch && memMatch[1] && memMatch[1].trim().length > 2) {
             this.saveMemory(memMatch[1].trim());
+          }
+          // Project or stack mentions
+          const projMatch = text.match(/\b(?:main\s+([A-Za-z0-9_\-]+)\s+(?:pe|par)\s+kaam\s+kar\s+raha\s+hoon|i\s+am\s+working\s+on\s+([A-Za-z0-9_\-]+))\b/i);
+          if (projMatch) {
+            const projName = projMatch[1] || projMatch[2];
+            if (projName && projName.length > 2) {
+              this.saveMemory(`User is working on project: ${projName}`);
+            }
           }
         }
 
@@ -563,15 +581,42 @@
     },
 
     getSystemDirective() {
+      const profile = this.getProfile();
+      const isBrotherly = profile.primaryTone === "brotherly_hinglish" || !profile.primaryTone;
+      const customInstructions = localStorage.getItem("lumi_custom_instructions") || "";
       const memories = this.getManualMemories();
+
+      let directive = `\n\n--- LUMI CORE OPERATING DIRECTIVE ---\n`;
+      directive += `[Role & Identity]: You are Lumi — an elite, fiercely loyal, deeply intelligent personal AI brother and companion.\n`;
+
+      if (isBrotherly) {
+        directive += `[Language & Communication Style]:
+- Primary Language: Natural, fluent, colloquial Hinglish (Roman script).
+- Tone: Speak like a close, smart brother/friend using words naturally: 'bhai', 'yr', 'tu', 'tera', 'mera', 'apna', 'chal', 'dekh', 'tension mat le'.
+- Sincerity & Honesty: Be 100% candid, direct, and straightforward. Zero corporate sugarcoating.
+- Strictly NO robotic boilerplate: NEVER say 'As an AI language model', 'Certainly! I'd be delighted to assist you', 'I hope this helps! Feel free to ask more questions'. Start immediately with the answer or action.\n`;
+      } else {
+        directive += `[Language & Communication Style]:
+- Tone: Direct, concise, articulate, and adaptive to the user's input language. Be completely candid and helpful.\n`;
+      }
+
+      directive += `[Engineering & Execution Rules]:
+1. 100% REAL WORKING IMPLEMENTATIONS: Strictly reject fake demos, fake mockups, or placeholder code. Provide complete, working, production-grade solutions.
+2. ABSOLUTE HONESTY: Always be 100% truthful about tools, models, and limitations. Never invent fake provider names or disguise fallback models.
+3. ZERO CLUTTER: Keep things clean, elegant, and working seamlessly in the background.\n`;
+
+      if (customInstructions && customInstructions.trim()) {
+        directive += `[User Custom Instructions]:\n${customInstructions.trim()}\n`;
+      }
+
       if (memories && memories.length > 0) {
-        let directive = `\n\n[Remembered User Context]:\n`;
+        directive += `[Remembered User Context & Facts]:\n`;
         for (const m of memories) {
           directive += `  * ${m}\n`;
         }
-        return directive;
       }
-      return "";
+
+      return directive;
     }
   };
 
@@ -6093,15 +6138,15 @@
 
       let langDirective = "The user spoke English. Reply in natural, friendly English.";
       if (hasDevanagari) {
-        langDirective = "STRICT: The user spoke Hindi (Devanagari). YOU MUST REPLY IN PURE HINDI (DEVANAGARI SCRIPT ONLY). Example: 'नमस्ते! मैं बहुत बढ़िया हूँ, आप बताइए कैसा चल रहा है?'. Never use English words.";
+        langDirective = "STRICT: The user spoke Hindi (Devanagari). YOU MUST REPLY IN PURE HINDI (DEVANAGARI SCRIPT ONLY). Example: 'नमस्ते भाई! मैं बहुत बढ़िया हूँ, आप बताइए कैसा चल रहा है?'. Never use English words.";
       } else if (isHinglish) {
-        langDirective = "STRICT: The user spoke Hinglish (Roman/Latin script). YOU MUST REPLY IN FRIENDLY CASUAL HINGLISH (ROMAN SCRIPT ONLY). Example: 'Sab theek hai bhai! Tu bata sab kaisa chal raha hai?'. Never reply in English.";
+        langDirective = "STRICT: The user spoke Hinglish (Roman/Latin script). YOU MUST REPLY IN NATURAL BROTHERLY HINGLISH (ROMAN SCRIPT ONLY). Speak like a close brother/friend using words like 'bhai', 'yr', 'tu'. Example: 'Sab theek hai bhai! Tu bata kya haal chaal?'. Never reply in formal English.";
       }
 
       const messages = [
         {
           role: "system",
-          content: `You are Lumi on a real-time live phone call. Speak naturally, warmly, and instantly.\nRules:\n1. ULTRA SHORT: Exactly 1 single concise conversational sentence (under 12 words). Answer immediately. Never use bullet points, numbered lists, asterisks (**), or markdown.\n2. LANGUAGE: ${langDirective}`
+          content: `You are Lumi on a real-time live phone call with your brother/friend. Speak naturally, warmly, and instantly.\nRules:\n1. ULTRA SHORT: Exactly 1 single concise conversational sentence (under 14 words). Answer immediately. Never use bullet points, numbered lists, asterisks (**), or markdown.\n2. LANGUAGE & TONE: ${langDirective}`
         }
       ];
 

@@ -427,7 +427,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     "status": "success",
                     "url": vid_url,
                     "videoUrl": vid_url,
-                    "provider": "Google Flow Cinematic Video (Imagen 3 / Veo)",
+                    "provider": "Lumi Cinematic Studio (Motion Camera)",
                     "prompt": prompt,
                     "aspect": aspect,
                     "duration": duration
