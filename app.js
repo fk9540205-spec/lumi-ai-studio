@@ -818,7 +818,214 @@
     return safe;
   }
 
-    // --- ChatGPT-Style Dynamic Generative UI (GenUI) Component State Store ---
+      // --- ChatGPT-Style Intelligent Dynamic UI Decision Engine ---
+  const GenUIDecisionEngine = {
+    analyze(userPrompt) {
+      if (!userPrompt || typeof userPrompt !== "string") {
+        return { needUI: false, reason: "empty_prompt" };
+      }
+
+      const p = userPrompt.trim().toLowerCase();
+
+      // 0. NEGATIVE FILTERS: When ordinary text is strictly better than a visual interface
+      // Casual greetings, short chit-chat, storytelling, poetry, simple factual definitions, code debugging
+      const isGreeting = /^(hi|hello|hey|hola|namaste|pranam|good\s+(morning|afternoon|evening)|kya\s+haal|kaise\s+ho|bhai|bro|sup)\b/i.test(p);
+      const isStoryOrPoem = /\b(kahani|story|poem|kavita|shayari|joke|chutkula|sunao|tell me a story|write a poem)\b/i.test(p);
+      const isCodeOnly = /\b(write\s+code|python\s+function|sql\s+query|regex|fix\s+this\s+bug|code\s+likho|script\s+banao)\b/i.test(p);
+
+      if ((isGreeting || isStoryOrPoem || isCodeOnly) && !p.includes("options") && !p.includes("quiz") && !p.includes("checklist") && !p.includes("form") && !p.includes("choose") && !p.includes("customize") && !p.includes("toppings")) {
+        return { needUI: false, reason: "prose_preferred" };
+      }
+
+      // 1. QUIZ / TRIVIA / KNOWLEDGE TEST
+      if (/\b(quiz|trivia|test\s+my|test\s+me|sawal\s+pucho|question\s+pucho|mcq|knowledge\s+check)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "quiz",
+          instruction: `[GENUI DECISION: The user wants a quiz / trivia check. In addition to your conversational text, you MUST output an interactive quiz block:
+\`\`\`ui
+{
+  "type": "quiz",
+  "title": "Knowledge Check",
+  "question": "...",
+  "options": [
+    {"text": "Option A", "isCorrect": false},
+    {"text": "Option B", "isCorrect": true, "explanation": "Why B is correct"}
+  ],
+  "explanation": "Summary explanation"
+}
+\`\`\`]`
+        };
+      }
+
+      // 2. POLL / COMMUNITY VOTE
+      if (/\b(poll|voting|vote|kya\s+lagta\s+hai|opinions|survey)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "poll",
+          instruction: `[GENUI DECISION: The user wants an interactive poll / vote. In addition to your conversational text, you MUST output an interactive poll block:
+\`\`\`ui
+{
+  "type": "poll",
+  "title": "Community Vote",
+  "question": "...",
+  "options": [
+    {"text": "Option 1", "votes": 42},
+    {"text": "Option 2", "votes": 28}
+  ]
+}
+\`\`\`]`
+        };
+      }
+
+      // 3. CHECKLIST / AUDIT / PRE-FLIGHT / TO-DO
+      if (/\b(checklist|todo|to-do|tasks|steps\s+to|audit|pre-flight|launch\s+check|taiari|preparation|kya\s+kya\s+chahiye|requirements)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "checklist",
+          instruction: `[GENUI DECISION: The user is asking for a checklist, audit, or action tasks. In addition to your conversational text, you MUST output an interactive checklist block:
+\`\`\`ui
+{
+  "type": "checklist",
+  "title": "Action Checklist",
+  "items": [
+    {"id": "1", "text": "Task 1", "checked": true},
+    {"id": "2", "text": "Task 2", "checked": false}
+  ]
+}
+\`\`\`]`
+        };
+      }
+
+      // 4. INGREDIENTS / PIZZA / CUSTOMIZER / ITEM GRID
+      if (/\b(pizza|toppings?|ingredients?|customiz(e|ation)|build\s+your\s+own|diet\s+plan|meal\s+items|grocery\s+list)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "grid_select",
+          instruction: `[GENUI DECISION: The user is customizing or selecting items/ingredients. In addition to your conversational text, you MUST output an interactive grid_select block:
+\`\`\`ui
+{
+  "type": "grid_select",
+  "title": "Customize Options",
+  "allowQuantity": true,
+  "items": [
+    {"id": "item1", "name": "Item 1", "icon": "🍕", "price": "+₹50", "selected": true},
+    {"id": "item2", "name": "Item 2", "icon": "🍄", "price": "+₹30"}
+  ]
+}
+\`\`\`]`
+        };
+      }
+
+      // 5. INTERACTIVE FORM / BOOKING / REGISTRATION
+      if (/\b(form|book(ing)?|appointment|register|schedule|consultation|inquiry|apply|details\s+bharo)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "form",
+          instruction: `[GENUI DECISION: The user is asking to book, register, or provide input. In addition to your conversational text, you MUST output an interactive form block:
+\`\`\`ui
+{
+  "type": "form",
+  "title": "Interactive Form",
+  "submitLabel": "Submit Details",
+  "fields": [
+    {"id": "name", "label": "Full Name", "type": "text", "required": true},
+    {"id": "service", "label": "Service Category", "type": "select", "options": ["Option A", "Option B"]}
+  ]
+}
+\`\`\`]`
+        };
+      }
+
+      // 6. SLIDER / BUDGET ADJUSTMENT / RANGE
+      if (/\b(budget|amount|slider|range|investment\s+amount|sip\s+calculator|calculate\s+returns)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "slider",
+          instruction: `[GENUI DECISION: The user is asking about an adjustable amount or budget. In addition to your conversational text, you MUST output an interactive slider block:
+\`\`\`ui
+{
+  "type": "slider",
+  "title": "Adjust Amount",
+  "min": 500,
+  "max": 50000,
+  "step": 500,
+  "default": 5000,
+  "unit": "₹",
+  "actionLabel": "Confirm Amount"
+}
+\`\`\`]`
+        };
+      }
+
+      // 7. TIMELINE / ROADMAP / PHASES
+      if (/\b(roadmap|timeline|phases?|milestones?|schedule|learning\s+path|week\s+by\s+week)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "timeline",
+          instruction: `[GENUI DECISION: The user is asking for a roadmap or multi-phase timeline. In addition to your conversational text, you MUST output an interactive timeline block:
+\`\`\`ui
+{
+  "type": "timeline",
+  "title": "Roadmap & Milestones",
+  "steps": [
+    {"number": 1, "title": "Phase 1", "description": "Details", "status": "completed", "time": "Week 1"},
+    {"number": 2, "title": "Phase 2", "description": "Details", "status": "current", "time": "Week 2"}
+  ]
+}
+\`\`\`]`
+        };
+      }
+
+      // 8. COMPARISON / VS / DIFFERENCE / TABLE
+      if (/\b(compare|comparison|versus|\bvs\b|difference\s+between|pros\s+and\s+cons|table|kaunsa\s+achha\s+hai)\b/i.test(p)) {
+        return {
+          needUI: true,
+          componentType: "comparison",
+          instruction: `[GENUI DECISION: The user is comparing items. In addition to your conversational text, you MUST output an interactive comparison block:
+\`\`\`ui
+{
+  "type": "comparison",
+  "title": "Head-to-Head Comparison",
+  "itemA": {"title": "Option A"},
+  "itemB": {"title": "Option B", "winner": true},
+  "features": [
+    {"feature": "Key Aspect", "valA": "Val A", "valB": "Val B", "winner": "B"}
+  ],
+  "verdict": "Clear winner recommendation"
+}
+\`\`\`]`
+        };
+      }
+
+      // 9. CHOICES / OPTIONS / RECOMMENDATIONS / SELECTIONS (General)
+      if (/\b(suggest|suggestion|recommend(ations?)?|options?|best|top|choose|pick|kaunsa|konsa|kya\s+lu|konsi|selection|alternatives?|kharidna|phones?|laptops?)\b/i.test(p)) {
+        const isMulti = /\b(all|multiple|kuch|few|sab)\b/i.test(p);
+        return {
+          needUI: true,
+          componentType: "selection_cards",
+          mode: isMulti ? "multi" : "single",
+          instruction: `[GENUI DECISION: The user wants recommendations or options to choose from. In addition to your conversational response, you MUST output an interactive selection_cards block:
+\`\`\`ui
+{
+  "type": "selection_cards",
+  "title": "Top Recommended Options",
+  "mode": "${isMulti ? 'multi' : 'single'}",
+  "items": [
+    {"id": "1", "title": "Option 1", "subtitle": "Best for X", "badge": "Top Pick", "icon": "⭐"},
+    {"id": "2", "title": "Option 2", "subtitle": "Best for Y", "icon": "⚡"}
+  ]
+}
+\`\`\`]`
+        };
+      }
+
+      return { needUI: false, reason: "prose_sufficient" };
+    }
+  };
+  window.GenUIDecisionEngine = GenUIDecisionEngine;
+
+  // --- ChatGPT-Style Dynamic Generative UI (GenUI) Component State Store ---
   const GenUIState = {
     STORAGE_KEY: "lumi_genui_component_state",
 
@@ -957,8 +1164,46 @@
       }
     },
 
-    renderBlock(block) {
-      if (!block || typeof block !== "object") return "";
+        normalizeBlock(b) {
+      if (!b || typeof b !== "object") return b;
+      const copy = { ...b };
+      let type = (copy.type || copy.component || "").toLowerCase().replace(/_card$/, "");
+
+      if (type === "widget" && copy.component) {
+        type = copy.component.toLowerCase().replace(/_card$/, "");
+      }
+      if (type === "choice_group" || type === "choices" || type === "options_group" || type === "card_group") {
+        type = "selection_cards";
+      }
+      copy.type = type;
+
+      // Normalize items / options / choices
+      if (!copy.items && Array.isArray(copy.options)) {
+        copy.items = copy.options;
+      }
+      if (!copy.items && Array.isArray(copy.choices)) {
+        copy.items = copy.choices;
+      }
+
+      // Normalize items internal attributes
+      if (Array.isArray(copy.items)) {
+        copy.items = copy.items.map((it, idx) => {
+          if (typeof it !== "object" || !it) return { id: String(idx), title: String(it) };
+          return {
+            ...it,
+            id: String(it.id !== undefined ? it.id : (it.value !== undefined ? it.value : idx)),
+            title: it.title || it.label || it.name || "Option",
+            subtitle: it.subtitle || it.desc || it.description || "",
+            icon: it.icon || "✨"
+          };
+        });
+      }
+
+      return copy;
+    },
+    renderBlock(rawBlock) {
+      if (!rawBlock || typeof rawBlock !== "object") return "";
+      const block = this.normalizeBlock(rawBlock);
       const type = (block.type || "").toLowerCase().replace(/_card$/, "");
 
       switch (type) {
@@ -5698,9 +5943,15 @@
       // 0. Learn & update autonomous tone profile and memories from user chat history
       LumiAutonomousMind.analyzeAndSync(conversations);
 
-      // 1. Build Autonomous System Prompt (Persona + Autonomous Tone & Memory + Formatting)
+      // 0.1 Intelligent GenUI Decision Engine (Analyzes intent to dynamically trigger interactive UI where needed)
+      const genUiDecision = GenUIDecisionEngine.analyze(prompt);
+
+      // 1. Build Autonomous System Prompt (Persona + Autonomous Tone & Memory + Formatting + Dynamic GenUI Directive)
       const basePersona = PERSONA_PROMPTS[activePersona] || PERSONA_PROMPTS.general;
-      const systemPrompt = basePersona + LumiAutonomousMind.getSystemDirective() + "\n" + GENUI_SYSTEM_INSTRUCTION;
+      let systemPrompt = basePersona + LumiAutonomousMind.getSystemDirective() + "\n" + GENUI_SYSTEM_INSTRUCTION;
+      if (genUiDecision && genUiDecision.needUI && genUiDecision.instruction) {
+        systemPrompt += "\n\n" + genUiDecision.instruction;
+      }
 
       // 2. Build Thread History (Short-term context + Full multi-turn conversation)
       const chatHistory = [
