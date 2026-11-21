@@ -1523,17 +1523,73 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             clean_text = re.sub(r'[*_`#~]', '', text).strip()
             has_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
 
+            # If ElevenLabs API key is provided, route directly to real ElevenLabs
+            eleven_key = os.environ.get("ELEVENLABS_API_KEY") or data.get("elevenlabs_api_key") or data.get("eleven_key")
+            eleven_voice_map = {
+                "rachel": "21m00Tcm4TlvDq8ikWAM",
+                "adam": "pNInz6obpgDQGcFmaJgB",
+                "nicole": "piTKgcLEGmPE4e6mEKli",
+                "charlie": "IKne3meq5aSn9XLyUdCD",
+                "george": "JBFqnCBsd6RMkjVDRZzb",
+                "bella": "EXAVITQu4vr4xnSDxMaL",
+                "nova": "21m00Tcm4TlvDq8ikWAM",
+                "onyx": "pNInz6obpgDQGcFmaJgB",
+            }
+            if eleven_key and raw_voice.lower() in eleven_voice_map:
+                try:
+                    import urllib.request
+                    vid = eleven_voice_map[raw_voice.lower()]
+                    el_url = f"https://api.elevenlabs.io/v1/text-to-speech/{vid}?output_format=mp3_44100_128"
+                    req = urllib.request.Request(
+                        el_url,
+                        data=json.dumps({
+                            "text": clean_text,
+                            "model_id": "eleven_multilingual_v2",
+                            "voice_settings": {
+                                "stability": 0.5,
+                                "similarity_boost": 0.75
+                            }
+                        }).encode("utf-8"),
+                        headers={
+                            "xi-api-key": eleven_key,
+                            "Content-Type": "application/json",
+                            "Accept": "audio/mpeg"
+                        },
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        if resp.status == 200:
+                            el_bytes = resp.read()
+                            if len(el_bytes) > 200:
+                                self.send_response(200)
+                                self.send_header("Content-Type", "audio/mpeg")
+                                self.send_header("Content-Length", str(len(el_bytes)))
+                                self.send_header("Access-Control-Allow-Origin", "*")
+                                self.end_headers()
+                                self.wfile.write(el_bytes)
+                                return
+                except Exception as ex:
+                    sys.stderr.write(f"ElevenLabs live generation error: {ex}, falling back to neural voice\n")
+
             # Voice mapping: each voice has its own authentic neural model, pitch, and cadence
             voice_config = {
                 "nova": ("en-US-AvaMultilingualNeural", "+4Hz", "+5%"),
                 "shimmer": ("en-US-EmmaMultilingualNeural", "+8Hz", "+6%"),
                 "swara": ("hi-IN-SwaraNeural", "+0Hz", "+0%"),
+                "madhur": ("hi-IN-MadhurNeural", "-4Hz", "+0%"),
+                "kavya": ("hi-IN-SwaraNeural", "+4Hz", "+3%"),
+                "prabhat": ("hi-IN-MadhurNeural", "-8Hz", "-3%"),
+                "aarav": ("hi-IN-MadhurNeural", "+0Hz", "+4%"),
+                "ananya": ("en-IN-NeerjaExpressiveNeural", "+2Hz", "+2%"),
                 "rachel": ("en-US-EmmaMultilingualNeural", "+2Hz", "+1%"),
+                "adam": ("en-AU-WilliamMultilingualNeural", "-6Hz", "-2%"),
+                "nicole": ("en-US-AvaMultilingualNeural", "+6Hz", "+4%"),
+                "charlie": ("en-AU-WilliamMultilingualNeural", "-2Hz", "+0%"),
+                "george": ("en-GB-RyanNeural", "-4Hz", "-2%"),
+                "bella": ("en-US-JennyNeural", "+4Hz", "+2%"),
                 "neerja": ("en-IN-NeerjaExpressiveNeural", "+0Hz", "+0%"),
                 "alloy": ("en-US-AndrewMultilingualNeural", "-2Hz", "+2%"),
                 "onyx": ("en-US-BrianMultilingualNeural", "-10Hz", "-4%"),
-                "madhur": ("hi-IN-MadhurNeural", "-4Hz", "+0%"),
-                "adam": ("en-AU-WilliamMultilingualNeural", "-6Hz", "-2%"),
             }
 
             v_cfg = voice_config.get(raw_voice.lower())

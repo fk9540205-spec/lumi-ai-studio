@@ -5623,13 +5623,20 @@
   // ==========================================================================
   const LIVE_VOICES = [
     { id: "nova", name: "Nova", provider: "OpenAI", desc: "Warm, natural conversational tone" },
-    { id: "alloy", name: "Alloy", provider: "OpenAI", desc: "Dynamic and expressive balanced voice" },
-    { id: "shimmer", name: "Shimmer", provider: "OpenAI", desc: "Clear, cheerful and melodic tone" },
-    { id: "onyx", name: "Onyx", provider: "OpenAI", desc: "Deep, warm and grounded male voice" },
     { id: "swara", name: "Swara", provider: "IndicF5", desc: "Natural native Hindi & Hinglish female voice" },
     { id: "madhur", name: "Madhur", provider: "IndicF5", desc: "Natural warm Hindi & Hinglish male voice" },
+    { id: "kavya", name: "Kavya", provider: "Indic Neural", desc: "Sweet, expressive young Hindi female voice" },
+    { id: "prabhat", name: "Prabhat", provider: "Indic Neural", desc: "Deep, authoritative Hindi storyteller voice" },
     { id: "rachel", name: "Rachel", provider: "ElevenLabs", desc: "Calm, realistic everyday conversational voice" },
     { id: "adam", name: "Adam", provider: "ElevenLabs", desc: "Deep, articulate storytelling male voice" },
+    { id: "nicole", name: "Nicole", provider: "ElevenLabs", desc: "Whisper-soft, gentle and warm female voice" },
+    { id: "george", name: "George", provider: "ElevenLabs", desc: "Sophisticated, warm storytelling British voice" },
+    { id: "bella", name: "Bella", provider: "ElevenLabs", desc: "Emotional, cheerful and expressive tone" },
+    { id: "onyx", name: "Onyx", provider: "OpenAI", desc: "Deep, warm and grounded male voice" },
+    { id: "alloy", name: "Alloy", provider: "OpenAI", desc: "Dynamic and expressive balanced voice" },
+    { id: "shimmer", name: "Shimmer", provider: "OpenAI", desc: "Clear, cheerful and melodic tone" },
+    { id: "ananya", name: "Ananya", provider: "Indic Neural", desc: "Modern, fluent Indian English female voice" },
+    { id: "aarav", name: "Aarav", provider: "Indic Neural", desc: "Energetic, youthful Hindi male voice" },
     { id: "neerja", name: "Neerja", provider: "Indic Neural", desc: "Expressive Indian accent English voice" }
   ];
 
@@ -5906,7 +5913,11 @@
             const r = await fetch("https://lumi-backend-v4-production.up.railway.app/api/tts", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ input: "Namaste, mai Lumi hu. Kahiye, mai aapki kya madad kar sakti hu?", voice: voiceId })
+              body: JSON.stringify({
+                input: "Namaste, mai Lumi hu. Kahiye, mai aapki kya madad kar sakti hu?",
+                voice: voiceId,
+                elevenlabs_api_key: localStorage.getItem("lumi_elevenlabs_key") || ""
+              })
             });
             if (r.ok) {
               const b = await r.blob();
@@ -6360,6 +6371,7 @@
       if (window.location.origin && window.location.origin.startsWith("http")) {
         ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
       }
+      const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
       for (const ep of ttsEndpoints) {
         try {
           const ctrl = new AbortController();
@@ -6367,7 +6379,7 @@
           const r = await fetch(ep, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: text, voice: activeVoice }),
+            body: JSON.stringify({ input: text, voice: activeVoice, elevenlabs_api_key: elKey }),
             signal: ctrl.signal
           });
           clearTimeout(timer);
@@ -6446,6 +6458,7 @@
           ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
         }
 
+        const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
         for (const ep of ttsEndpoints) {
           try {
             const ctrl = new AbortController();
@@ -6453,7 +6466,7 @@
             const r = await fetch(ep, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ input: text, voice: activeVoice }),
+              body: JSON.stringify({ input: text, voice: activeVoice, elevenlabs_api_key: elKey }),
               signal: ctrl.signal
             });
             clearTimeout(timer);
