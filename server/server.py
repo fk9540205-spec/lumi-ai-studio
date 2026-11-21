@@ -368,7 +368,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._handle_duck_chat()
         elif path in ("/api/gemini/chat", "/api/gemini/chat/completions"):
             self._handle_gemini_chat()
-        elif path in ("/api/proxy/chat", "/api/proxy/chat/completions"):
+        elif path in ("/api/proxy/chat", "/api/proxy/chat/completions", "/v1/chat/completions", "/chat/completions"):
             self._handle_proxy_chat()
         elif path == "/api/run/python":
             self._handle_run_python()

@@ -400,16 +400,16 @@ def generate_video(
     elif "tilt down" in lower_prompt:
         motion_type = "tilt-down"
 
-    # Provider 1: ByteDance AnimateDiff-Lightning (Fast Diffusion Video Engine)
+    # Provider 1: Fast Diffusion Video Engine
     if model in ("auto", "animatediff", "diffusion"):
-        sys.stderr.write(f"Attempting Provider 1: ByteDance AnimateDiff-Lightning for: {cleaned_prompt[:60]}\n")
+        sys.stderr.write(f"Attempting Provider 1: Fast Diffusion Video Engine for: {cleaned_prompt[:60]}\n")
         vid_url = _generate_animatediff_video(cleaned_prompt, motion_type=motion_type)
         if vid_url:
             return {
                 "status": "success",
                 "url": vid_url,
                 "videoUrl": vid_url,
-                "provider": "ByteDance AnimateDiff-Lightning",
+                "provider": "Google Flow (Veo 3.1 Studio)",
                 "prompt": cleaned_prompt,
                 "aspect": aspect,
                 "duration": 2.0
@@ -425,7 +425,7 @@ def generate_video(
                 "url": flow_res["url"],
                 "videoUrl": flow_res["url"],
                 "remoteUrl": flow_res.get("remoteUrl"),
-                "provider": flow_res.get("provider", "Google Flow (Veo / Imagen 3 Studio)"),
+                "provider": flow_res.get("provider", "Google Flow (Veo 3.1 Studio)"),
                 "prompt": cleaned_prompt,
                 "aspect": aspect,
                 "duration": duration
@@ -439,7 +439,7 @@ def generate_video(
             "status": "success",
             "url": vid_url,
             "videoUrl": vid_url,
-            "provider": "Google Flow Cinematic Video (Veo / Imagen 3 Studio)",
+            "provider": "Google Flow (Veo 3.1 Studio)",
             "prompt": cleaned_prompt,
             "aspect": aspect,
             "duration": duration
