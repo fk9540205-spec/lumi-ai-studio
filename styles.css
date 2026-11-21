@@ -3028,3 +3028,599 @@ html.dark .genui-recom-rank.gold {
 .lumi-settings-search-bar input::placeholder {
   color: #757575;
 }
+
+
+/* ==========================================================================
+   CHATGPT-STYLE DYNAMIC GENERATIVE UI (GenUI) STYLES
+   Minimalist, polished interactive components with native light & dark themes
+   ========================================================================== */
+
+/* 1. SELECTION CARDS (Single & Multi-Select) */
+.genui-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.genui-select-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  background: var(--accent);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.genui-select-card:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: var(--card);
+  transform: translateY(-1px);
+}
+
+.genui-select-card.selected {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 1px #6366f1, 0 4px 12px -2px rgba(99, 102, 241, 0.25);
+}
+
+html.dark .genui-select-card.selected {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.genui-radio-indicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.genui-radio-indicator.active {
+  border-color: #6366f1;
+}
+
+.genui-radio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6366f1;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.genui-radio-indicator.active .genui-radio-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.genui-check-indicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  color: #ffffff;
+}
+
+.genui-check-indicator.active {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+
+/* 2. INGREDIENTS & ITEM SELECTION GRID */
+.genui-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.genui-grid-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.85rem 0.6rem;
+  border-radius: 0.85rem;
+  background: var(--accent);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.genui-grid-item:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  transform: translateY(-2px);
+}
+
+.genui-grid-item.selected {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 1px #6366f1, 0 4px 12px -2px rgba(99, 102, 241, 0.2);
+}
+
+html.dark .genui-grid-item.selected {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.genui-grid-item-icon {
+  font-size: 1.85rem;
+  margin-bottom: 0.35rem;
+  line-height: 1;
+}
+
+.genui-grid-item-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.25;
+}
+
+.genui-grid-check-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.genui-grid-item.selected .genui-grid-check-badge {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.genui-qty-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 0.15rem 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.genui-qty-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: var(--foreground);
+  font-weight: bold;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.genui-qty-btn:hover {
+  background: var(--muted);
+}
+
+.genui-qty-val {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  min-width: 14px;
+  text-align: center;
+  color: var(--foreground);
+}
+
+/* 3. INTERACTIVE FORMS */
+.genui-form-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.genui-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.genui-form-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.genui-form-input,
+.genui-form-select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.genui-form-input:focus,
+.genui-form-select:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.genui-form-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.35rem 0;
+}
+
+.genui-slider-input {
+  flex: 1;
+  accent-color: #6366f1;
+  cursor: pointer;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
+.genui-slider-bubble {
+  padding: 0.25rem 0.55rem;
+  border-radius: 0.45rem;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--foreground);
+  min-width: 52px;
+  text-align: center;
+}
+
+/* Toggle Switch */
+.genui-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.genui-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.genui-switch-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border);
+  transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 34px;
+}
+
+.genui-switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.genui-switch input:checked + .genui-switch-slider {
+  background-color: #6366f1;
+}
+
+.genui-switch input:checked + .genui-switch-slider:before {
+  transform: translateX(20px);
+}
+
+/* 4. CHECKLISTS */
+.genui-checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.genui-check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.65rem;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.genui-check-item:hover {
+  background: var(--card);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.genui-check-item.completed {
+  opacity: 0.72;
+}
+
+.genui-check-item.completed .genui-check-text {
+  text-decoration: line-through;
+  color: var(--muted-foreground);
+}
+
+.genui-checkbox-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 2px solid var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.genui-checkbox-box.checked {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+.genui-check-text {
+  font-size: 0.85rem;
+  color: var(--foreground);
+  line-height: 1.35;
+}
+
+/* 5. INTERACTIVE QUIZZES */
+.genui-quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.genui-quiz-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.genui-quiz-card:not(.quiz-revealed) .genui-quiz-opt:hover {
+  border-color: #6366f1;
+  background: var(--card);
+  transform: translateX(2px);
+}
+
+.genui-quiz-opt-letter {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+  flex-shrink: 0;
+}
+
+.genui-quiz-opt.correct {
+  border-color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+}
+
+.genui-quiz-opt.correct .genui-quiz-opt-letter {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.genui-quiz-opt.wrong {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+
+.genui-quiz-opt.wrong .genui-quiz-opt-letter {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+.genui-quiz-status-icon {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.genui-quiz-opt.correct .genui-quiz-status-icon {
+  color: #10b981;
+}
+
+.genui-quiz-opt.wrong .genui-quiz-status-icon {
+  color: #ef4444;
+}
+
+/* 6. INTERACTIVE POLLS */
+.genui-poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.genui-poll-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.genui-poll-card:not(.poll-voted) .genui-poll-opt:hover {
+  border-color: #6366f1;
+}
+
+.genui-poll-opt.voted {
+  border-color: #6366f1;
+}
+
+.genui-poll-bg-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(99, 102, 241, 0.18);
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+html.dark .genui-poll-bg-fill {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+/* 7. TIMELINE & STEP FLOW */
+.genui-timeline-list {
+  position: relative;
+  padding-left: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.genui-timeline-list::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 11px;
+  width: 2px;
+  background: var(--border);
+}
+
+.genui-timeline-item {
+  position: relative;
+}
+
+.genui-timeline-node {
+  position: absolute;
+  left: -1.75rem;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.genui-timeline-item.completed .genui-timeline-node {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.genui-timeline-item.current .genui-timeline-node {
+  border-color: #6366f1;
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+}
+
+/* 8. CLEAN FORMATTED TABLE */
+.genui-table-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.genui-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+.genui-table th {
+  padding: 0.75rem 1rem;
+  background: var(--accent);
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.genui-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  line-height: 1.4;
+}
+
+.genui-table tr:last-child td {
+  border-bottom: none;
+}
+
+.genui-table tbody tr:hover {
+  background: var(--accent);
+}

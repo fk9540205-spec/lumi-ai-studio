@@ -818,6 +818,44 @@
     return safe;
   }
 
+    // --- ChatGPT-Style Dynamic Generative UI (GenUI) Component State Store ---
+  const GenUIState = {
+    STORAGE_KEY: "lumi_genui_component_state",
+
+    getAll() {
+      try {
+        return JSON.parse(localStorage.getItem(this.STORAGE_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    },
+
+    get(id, fallback = null) {
+      if (!id) return fallback;
+      const all = this.getAll();
+      return all[id] !== undefined ? all[id] : fallback;
+    },
+
+    set(id, state) {
+      if (!id) return;
+      const all = this.getAll();
+      all[id] = state;
+      try {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(all));
+      } catch (e) {
+        console.warn("GenUIState save error:", e);
+      }
+    },
+
+    update(id, updater) {
+      const cur = this.get(id, {});
+      const next = typeof updater === "function" ? updater(cur) : { ...cur, ...updater };
+      this.set(id, next);
+      return next;
+    }
+  };
+  window.GenUIState = GenUIState;
+
   // --- ChatGPT-Style Generative UI (GenUI) Engine & Component System ---
   const GenUIRenderer = {
     isRecognizedType(type) {
@@ -848,7 +886,31 @@
         "expandable",
         "image",
         "media",
-        "rich_message"
+        "rich_message",
+        "selection_cards",
+        "cards",
+        "card_selection",
+        "selection",
+        "grid_select",
+        "ingredients",
+        "item_grid",
+        "items_grid",
+        "form",
+        "input_form",
+        "slider",
+        "slider_card",
+        "checklist",
+        "todo",
+        "tasks",
+        "quiz",
+        "poll",
+        "voting",
+        "timeline",
+        "steps",
+        "roadmap",
+        "table",
+        "progress",
+        "progress_card"
       ].includes(clean);
     },
 
@@ -866,6 +928,12 @@
         return isNaN(n) ? fallback : n * multiplier;
       }
       return fallback;
+    },
+
+    getComponentId(block, prefix = "genui") {
+      if (block.id && typeof block.id === "string") return block.id;
+      const raw = (block.type || prefix) + "_" + (block.title || block.question || Math.random().toString(36).slice(2, 8));
+      return raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 32);
     },
 
     render(payload) {
@@ -894,6 +962,40 @@
       const type = (block.type || "").toLowerCase().replace(/_card$/, "");
 
       switch (type) {
+        case "selection_cards":
+        case "cards":
+        case "card_selection":
+        case "selection":
+          return this.renderSelectionCards(block);
+        case "grid_select":
+        case "ingredients":
+        case "item_grid":
+        case "items_grid":
+          return this.renderGridSelect(block);
+        case "form":
+        case "input_form":
+          return this.renderForm(block);
+        case "slider":
+        case "slider_card":
+          return this.renderSliderCard(block);
+        case "checklist":
+        case "todo":
+        case "tasks":
+          return this.renderChecklist(block);
+        case "quiz":
+          return this.renderQuiz(block);
+        case "poll":
+        case "voting":
+          return this.renderPoll(block);
+        case "timeline":
+        case "steps":
+        case "roadmap":
+          return this.renderTimeline(block);
+        case "table":
+          return this.renderTable(block);
+        case "progress":
+        case "progress_card":
+          return this.renderProgress(block);
         case "product":
           return this.renderProductCard(block);
         case "info":
@@ -934,6 +1036,560 @@
       }
     },
 
+    // 1. SELECTION CARDS (Single-select & Multi-select Cards)
+    renderSelectionCards(b) {
+      const compId = this.getComponentId(b, "sel");
+      const mode = (b.mode || "single").toLowerCase();
+      const title = escapeHtml(b.title || "Select an Option");
+      const subtitle = b.subtitle ? `<div class="genui-card-subtitle">${escapeHtml(b.subtitle)}</div>` : "";
+      const items = Array.isArray(b.items) ? b.items : [];
+
+      const savedState = GenUIState.get(compId, {
+        selected: mode === "single" ? (b.defaultSelected || null) : (b.defaultSelected || [])
+      });
+
+      const cardsHtml = items.map((it, idx) => {
+        const itemId = String(it.id || idx);
+        const itemTitle = escapeHtml(it.title || it.name || "Option");
+        const itemSub = it.subtitle ? `<div class="text-xs text-muted-foreground mt-0.5">${escapeHtml(it.subtitle)}</div>` : "";
+        const badge = it.badge ? `<span class="genui-badge primary text-[10px] ml-auto">${escapeHtml(it.badge)}</span>` : "";
+        const price = it.price ? `<span class="text-xs font-bold text-foreground ml-auto">${escapeHtml(it.price)}</span>` : "";
+        const icon = it.icon ? `<span class="text-xl mr-2.5 flex-shrink-0">${escapeHtml(it.icon)}</span>` : "";
+        const desc = it.description ? `<p class="text-xs text-muted-foreground mt-1.5 leading-relaxed">${renderInlineFormatting(escapeHtml(it.description))}</p>` : "";
+
+        const isSelected = mode === "single"
+          ? (savedState.selected === itemId)
+          : (Array.isArray(savedState.selected) && savedState.selected.includes(itemId));
+
+        const indicator = mode === "multi"
+          ? `<div class="genui-check-indicator ${isSelected ? 'active' : ''}"><svg viewBox="0 0 24 24" class="size-3.5 fill-none stroke-current" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>`
+          : `<div class="genui-radio-indicator ${isSelected ? 'active' : ''}"><div class="genui-radio-dot"></div></div>`;
+
+        return `
+          <div class="genui-select-card ${isSelected ? 'selected' : ''}"
+               data-genui-select-card="${escapeHtml(itemId)}"
+               data-comp-id="${compId}"
+               data-mode="${mode}"
+               data-title="${itemTitle}"
+               ${it.autoSubmit ? 'data-auto-submit="true"' : ''}>
+            <div class="flex items-start justify-between w-full">
+              <div class="flex items-center">
+                ${icon}
+                <div>
+                  <div class="font-semibold text-sm text-foreground">${itemTitle}</div>
+                  ${itemSub}
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5">
+                ${price}
+                ${badge}
+                ${indicator}
+              </div>
+            </div>
+            ${desc}
+          </div>`;
+      }).join("");
+
+      const selectedCount = mode === "single"
+        ? (savedState.selected ? 1 : 0)
+        : (Array.isArray(savedState.selected) ? savedState.selected.length : 0);
+
+      const footerHtml = `
+        <div class="genui-card-footer mt-3.5 pt-3 border-t border-border/40 flex items-center justify-between">
+          <span class="text-xs text-muted-foreground font-medium genui-select-count" id="${compId}-count">
+            ${selectedCount > 0 ? `${selectedCount} selected` : 'None selected'}
+          </span>
+          <button type="button" class="genui-action-btn primary genui-submit-selection"
+                  data-comp-id="${compId}"
+                  data-mode="${mode}"
+                  data-template="${escapeHtml(b.submitPrompt || (b.title ? `Regarding ${b.title}, I selected:` : 'I selected:'))}">
+            ${escapeHtml(b.submitLabel || (mode === "multi" ? "Confirm Choices" : "Select & Continue"))} →
+          </button>
+        </div>`;
+
+      return `
+        <div class="genui-card genui-selection-group" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">✨ ${title}</div>
+              ${subtitle}
+            </div>
+            <span class="genui-badge ${mode === 'multi' ? 'primary' : 'success'}">${mode === 'multi' ? 'Multi-select' : 'Single Choice'}</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-cards-grid">
+              ${cardsHtml}
+            </div>
+            ${footerHtml}
+          </div>
+        </div>`;
+    },
+
+    // 2. INGREDIENTS & ITEM SELECTION GRID
+    renderGridSelect(b) {
+      const compId = this.getComponentId(b, "grid");
+      const title = escapeHtml(b.title || "Custom Selection");
+      const subtitle = b.subtitle ? `<div class="genui-card-subtitle">${escapeHtml(b.subtitle)}</div>` : "";
+      const items = Array.isArray(b.items) ? b.items : [];
+      const allowQty = Boolean(b.allowQuantity || b.hasQuantity);
+
+      const savedState = GenUIState.get(compId, { items: {} });
+
+      const itemsHtml = items.map((it, idx) => {
+        const itemId = String(it.id || idx);
+        const itemName = escapeHtml(it.name || it.title || "Item");
+        const itemIcon = it.icon || "✨";
+        const itemPrice = it.price ? `<span class="text-[11px] text-muted-foreground font-medium">${escapeHtml(it.price)}</span>` : "";
+
+        const saved = savedState.items && savedState.items[itemId] !== undefined
+          ? savedState.items[itemId]
+          : { selected: Boolean(it.selected), qty: it.quantity || 1 };
+        const isSelected = Boolean(saved.selected);
+        const qty = saved.qty || 1;
+
+        const qtyControls = allowQty ? `
+          <div class="genui-qty-controls" onclick="event.stopPropagation()">
+            <button type="button" class="genui-qty-btn minus" data-comp-id="${compId}" data-item-id="${escapeHtml(itemId)}">−</button>
+            <span class="genui-qty-val" id="${compId}-qty-${escapeHtml(itemId)}">${qty}</span>
+            <button type="button" class="genui-qty-btn plus" data-comp-id="${compId}" data-item-id="${escapeHtml(itemId)}">+</button>
+          </div>` : "";
+
+        return `
+          <div class="genui-grid-item ${isSelected ? 'selected' : ''}"
+               data-genui-grid-item="${escapeHtml(itemId)}"
+               data-comp-id="${compId}"
+               data-name="${itemName}">
+            <div class="genui-grid-item-icon">${itemIcon}</div>
+            <div class="genui-grid-item-name">${itemName}</div>
+            ${itemPrice}
+            ${qtyControls}
+            <div class="genui-grid-check-badge">✓</div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-grid-select-card" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">🍽️ ${title}</div>
+              ${subtitle}
+            </div>
+            <span class="genui-badge primary">Customizer</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-items-grid">
+              ${itemsHtml}
+            </div>
+            <div class="mt-3.5 pt-3 border-t border-border/40 flex justify-end">
+              <button type="button" class="genui-action-btn primary w-full genui-grid-submit" data-comp-id="${compId}" data-title="${escapeHtml(b.title || 'Selected items')}">
+                ${escapeHtml(b.submitLabel || "Apply Selected Items")} →
+              </button>
+            </div>
+          </div>
+        </div>`;
+    },
+
+    // 3. INTERACTIVE FORMS (Inputs, Selects, Sliders, Toggles)
+    renderForm(b) {
+      const compId = this.getComponentId(b, "form");
+      const title = escapeHtml(b.title || "Interactive Form");
+      const subtitle = b.subtitle ? `<div class="genui-card-subtitle">${escapeHtml(b.subtitle)}</div>` : "";
+      const fields = Array.isArray(b.fields) ? b.fields : [];
+      const savedValues = GenUIState.get(compId, {});
+
+      const fieldsHtml = fields.map((f, idx) => {
+        const fid = f.id || f.name || `field_${idx}`;
+        const label = escapeHtml(f.label || f.name || "Field");
+        const ftype = (f.type || "text").toLowerCase();
+        const placeholder = escapeHtml(f.placeholder || "");
+        const savedVal = savedValues[fid];
+
+        let inputControl = "";
+        if (ftype === "select" || ftype === "dropdown") {
+          const opts = Array.isArray(f.options) ? f.options : [];
+          const currentVal = savedVal !== undefined ? savedVal : f.default;
+          inputControl = `
+            <select name="${fid}" class="genui-form-select">
+              ${opts.map(o => {
+                const optVal = typeof o === "object" ? o.value : o;
+                const optLabel = typeof o === "object" ? o.label : o;
+                const sel = String(currentVal) === String(optVal) ? "selected" : "";
+                return `<option value="${escapeHtml(String(optVal))}" ${sel}>${escapeHtml(String(optLabel))}</option>`;
+              }).join("")}
+            </select>`;
+        } else if (ftype === "slider" || ftype === "range") {
+          const min = f.min !== undefined ? f.min : 0;
+          const max = f.max !== undefined ? f.max : 100;
+          const step = f.step !== undefined ? f.step : 1;
+          const currentVal = savedVal !== undefined ? savedVal : (f.default !== undefined ? f.default : min);
+          const unit = f.unit || "";
+          inputControl = `
+            <div class="genui-form-slider-wrap">
+              <input type="range" name="${fid}" class="genui-slider-input" min="${min}" max="${max}" step="${step}" value="${currentVal}" data-unit="${escapeHtml(unit)}" />
+              <span class="genui-slider-bubble font-mono">${escapeHtml(unit)}${currentVal}</span>
+            </div>`;
+        } else if (ftype === "toggle" || ftype === "switch" || ftype === "checkbox") {
+          const isChecked = savedVal !== undefined ? Boolean(savedVal) : Boolean(f.default);
+          inputControl = `
+            <label class="genui-switch">
+              <input type="checkbox" name="${fid}" ${isChecked ? "checked" : ""} />
+              <span class="genui-switch-slider"></span>
+            </label>`;
+        } else {
+          const currentVal = savedVal !== undefined ? savedVal : (f.default || "");
+          inputControl = `<input type="${ftype === 'number' ? 'number' : ftype === 'email' ? 'email' : 'text'}" name="${fid}" class="genui-form-input" placeholder="${placeholder}" value="${escapeHtml(String(currentVal))}" ${f.required ? "required" : ""} />`;
+        }
+
+        return `
+          <div class="genui-form-field">
+            <label class="genui-form-label">
+              ${label} ${f.required ? '<span class="text-rose-500">*</span>' : ''}
+            </label>
+            ${inputControl}
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-form-card" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">📝 ${title}</div>
+              ${subtitle}
+            </div>
+            <span class="genui-badge primary">Interactive Form</span>
+          </div>
+          <div class="genui-card-body">
+            <form class="genui-form-wrap" id="${compId}-form" onsubmit="event.preventDefault();">
+              ${fieldsHtml}
+              <div class="mt-4 pt-3 border-t border-border/40">
+                <button type="button" class="genui-action-btn primary w-full genui-form-submit" data-comp-id="${compId}" data-title="${escapeHtml(b.title || 'Form')}">
+                  ${escapeHtml(b.submitLabel || "Submit Form")} →
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>`;
+    },
+
+    // 4. STANDALONE SLIDER CARD
+    renderSliderCard(b) {
+      const compId = this.getComponentId(b, "slider");
+      const title = escapeHtml(b.title || "Adjust Value");
+      const label = escapeHtml(b.label || "Value");
+      const min = b.min !== undefined ? b.min : 0;
+      const max = b.max !== undefined ? b.max : 100;
+      const step = b.step !== undefined ? b.step : 1;
+      const unit = b.unit || "";
+      const savedVal = GenUIState.get(compId, { value: b.default !== undefined ? b.default : min }).value;
+
+      return `
+        <div class="genui-card genui-slider-card" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div class="genui-card-title">🎚️ ${title}</div>
+            <span class="genui-badge primary font-mono" id="${compId}-badge">${escapeHtml(unit)}${savedVal}</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="text-xs text-muted-foreground mb-2">${label}</div>
+            <div class="genui-form-slider-wrap">
+              <input type="range" class="genui-slider-input" data-comp-id="${compId}" min="${min}" max="${max}" step="${step}" value="${savedVal}" data-unit="${escapeHtml(unit)}" />
+              <span class="genui-slider-bubble font-mono">${escapeHtml(unit)}${savedVal}</span>
+            </div>
+            <div class="flex justify-between text-[11px] text-muted-foreground font-mono mt-1">
+              <span>${escapeHtml(unit)}${min}</span>
+              <span>${escapeHtml(unit)}${max}</span>
+            </div>
+            <div class="mt-3.5 pt-3 border-t border-border/40">
+              <button type="button" class="genui-action-btn primary w-full genui-slider-submit" data-comp-id="${compId}" data-label="${label}" data-unit="${escapeHtml(unit)}">
+                ${escapeHtml(b.actionLabel || `Confirm ${unit}${savedVal}`)} →
+              </button>
+            </div>
+          </div>
+        </div>`;
+    },
+
+    // 5. INTERACTIVE CHECKLIST (Tasks & Audits with Progress)
+    renderChecklist(b) {
+      const compId = this.getComponentId(b, "check");
+      const title = escapeHtml(b.title || "Checklist");
+      const subtitle = b.subtitle ? `<div class="genui-card-subtitle">${escapeHtml(b.subtitle)}</div>` : "";
+      const items = Array.isArray(b.items) ? b.items : [];
+
+      const initialChecked = items
+        .map((it, idx) => (it.checked || it.completed ? String(it.id || idx) : null))
+        .filter(Boolean);
+      const savedState = GenUIState.get(compId, { checked: initialChecked });
+      const checkedSet = new Set(savedState.checked || []);
+
+      const total = items.length;
+      const checkedCount = items.filter((it, idx) => checkedSet.has(String(it.id || idx))).length;
+      const pct = total > 0 ? Math.round((checkedCount / total) * 100) : 0;
+
+      const itemsHtml = items.map((it, idx) => {
+        const itemId = String(it.id || idx);
+        const isChecked = checkedSet.has(itemId);
+        const text = renderInlineFormatting(escapeHtml(it.text || it.title || "Task"));
+        const tag = it.tag ? `<span class="genui-badge text-[10px] ml-auto">${escapeHtml(it.tag)}</span>` : "";
+
+        return `
+          <div class="genui-check-item ${isChecked ? 'completed' : ''}"
+               data-genui-check-item="${escapeHtml(itemId)}"
+               data-comp-id="${compId}">
+            <div class="genui-checkbox-box ${isChecked ? 'checked' : ''}">
+              <svg viewBox="0 0 24 24" class="size-3 fill-none stroke-current" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span class="genui-check-text flex-1">${text}</span>
+            ${tag}
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-checklist-card" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">✅ ${title}</div>
+              ${subtitle}
+            </div>
+            <span class="genui-badge ${pct === 100 ? 'success' : 'primary'}" id="${compId}-badge">${pct}% Done</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-progress-track mb-3">
+              <div class="genui-progress-bar" id="${compId}-bar" style="width: ${pct}%;"></div>
+            </div>
+            <div class="text-[11px] text-muted-foreground font-medium mb-2.5" id="${compId}-label">
+              ${checkedCount} of ${total} tasks completed
+            </div>
+            <div class="genui-checklist-items">
+              ${itemsHtml}
+            </div>
+            ${this.renderActionsRow(b.actions || (b.action ? [b.action] : []))}
+          </div>
+        </div>`;
+    },
+
+    // 6. INTERACTIVE QUIZ (Knowledge check with instant feedback)
+    renderQuiz(b) {
+      const compId = this.getComponentId(b, "quiz");
+      const title = escapeHtml(b.title || "Knowledge Check");
+      const question = escapeHtml(b.question || "Quiz Question");
+      const options = Array.isArray(b.options) ? b.options : [];
+      const savedState = GenUIState.get(compId, { answered: false, selectedIndex: null });
+
+      const optionsHtml = options.map((opt, idx) => {
+        const isSelected = savedState.answered && savedState.selectedIndex === idx;
+        const isCorrect = Boolean(opt.isCorrect);
+        let optClass = "";
+        if (savedState.answered) {
+          if (isCorrect) optClass = "correct";
+          else if (isSelected) optClass = "wrong";
+        }
+        return `
+          <div class="genui-quiz-opt ${optClass}"
+               data-genui-quiz-opt="${idx}"
+               data-comp-id="${compId}"
+               data-is-correct="${isCorrect}"
+               data-explanation="${escapeHtml(opt.explanation || b.explanation || '')}">
+            <div class="genui-quiz-opt-letter">${String.fromCharCode(65 + idx)}</div>
+            <div class="flex-1 font-medium text-sm text-foreground">${escapeHtml(opt.text || "")}</div>
+            <div class="genui-quiz-status-icon">
+              ${isCorrect ? '✓' : isSelected ? '✕' : ''}
+            </div>
+          </div>`;
+      }).join("");
+
+      const feedbackHtml = savedState.answered ? `
+        <div class="genui-quiz-feedback active animate-fade-in mt-3 p-3 rounded-xl bg-accent/60 border border-border">
+          <div class="font-semibold text-xs text-indigo-400 mb-1 flex items-center gap-1.5">
+            ${savedState.isCorrect ? '🎉 Correct Answer!' : '💡 Explanation'}
+          </div>
+          <p class="text-xs text-muted-foreground leading-relaxed">${renderInlineFormatting(escapeHtml(savedState.explanation || b.explanation || ""))}</p>
+          <button type="button" class="genui-action-btn mt-2.5 text-xs py-1 px-2.5" data-genui-prompt="Can you explain more about this quiz question: ${escapeHtml(b.question || '')}">
+            Discuss this with AI →
+          </button>
+        </div>` : `<div class="genui-quiz-feedback hidden" id="${compId}-feedback"></div>`;
+
+      return `
+        <div class="genui-card genui-quiz-card ${savedState.answered ? 'quiz-revealed' : ''}" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div class="genui-card-title">🧠 ${title}</div>
+            <span class="genui-badge primary">Quiz</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="font-semibold text-[15px] text-foreground mb-3 leading-snug">${question}</div>
+            <div class="genui-quiz-options">
+              ${optionsHtml}
+            </div>
+            ${feedbackHtml}
+          </div>
+        </div>`;
+    },
+
+    // 7. INTERACTIVE POLL (Community voting with percentage animation)
+    renderPoll(b) {
+      const compId = this.getComponentId(b, "poll");
+      const title = escapeHtml(b.title || "Community Poll");
+      const question = escapeHtml(b.question || "Poll Question");
+      const options = Array.isArray(b.options) ? b.options : [];
+      const savedState = GenUIState.get(compId, { voted: false, selectedIndex: null });
+
+      const totalVotes = options.reduce((sum, o) => sum + (Number(o.votes) || 1), 0) + (savedState.voted ? 1 : 0);
+
+      const optionsHtml = options.map((opt, idx) => {
+        const isVoted = savedState.voted && savedState.selectedIndex === idx;
+        let votes = Number(opt.votes) || 0;
+        if (isVoted) votes += 1;
+        const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+
+        return `
+          <div class="genui-poll-opt ${isVoted ? 'voted' : ''}"
+               data-genui-poll-opt="${idx}"
+               data-comp-id="${compId}"
+               data-text="${escapeHtml(opt.text || '')}">
+            <div class="genui-poll-bg-fill" style="width: ${savedState.voted ? pct : 0}%;"></div>
+            <div class="flex items-center justify-between w-full relative z-10">
+              <span class="font-medium text-sm text-foreground">${escapeHtml(opt.text || "")} ${isVoted ? '✓' : ''}</span>
+              ${savedState.voted ? `<span class="font-bold text-xs text-foreground font-mono">${pct}%</span>` : ''}
+            </div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-poll-card ${savedState.voted ? 'poll-voted' : ''}" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div class="genui-card-title">📊 ${title}</div>
+            <span class="genui-badge primary">Live Poll</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="font-semibold text-sm text-foreground mb-3">${question}</div>
+            <div class="genui-poll-options">
+              ${optionsHtml}
+            </div>
+            <div class="text-[11px] text-muted-foreground mt-2.5">
+              ${savedState.voted ? `Voted • ${totalVotes} total responses` : 'Tap an option to cast your vote'}
+            </div>
+          </div>
+        </div>`;
+    },
+
+    // 8. TIMELINE & STEP FLOW
+    renderTimeline(b) {
+      const compId = this.getComponentId(b, "timeline");
+      const title = escapeHtml(b.title || "Project Timeline");
+      const steps = Array.isArray(b.steps) ? b.steps : [];
+
+      const stepsHtml = steps.map((s, idx) => {
+        const num = s.number || (idx + 1);
+        const status = s.status || (idx === 0 ? "completed" : idx === 1 ? "current" : "upcoming");
+        const stitle = escapeHtml(s.title || `Stage ${num}`);
+        const desc = s.description ? `<p class="text-xs text-muted-foreground mt-1 leading-relaxed">${renderInlineFormatting(escapeHtml(s.description))}</p>` : "";
+        const time = s.time || s.duration ? `<span class="text-[11px] font-mono text-muted-foreground">${escapeHtml(s.time || s.duration)}</span>` : "";
+
+        return `
+          <div class="genui-timeline-item ${status}">
+            <div class="genui-timeline-node">
+              ${status === 'completed' ? '✓' : `<span class="text-[10px] font-bold">${num}</span>`}
+            </div>
+            <div class="genui-timeline-content">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-semibold text-sm text-foreground">${stitle}</span>
+                ${time}
+              </div>
+              ${desc}
+            </div>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-timeline-card" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div class="genui-card-title">🗺️ ${title}</div>
+            <span class="genui-badge primary">Roadmap</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-timeline-list">
+              ${stepsHtml}
+            </div>
+            ${this.renderActionsRow(b.actions)}
+          </div>
+        </div>`;
+    },
+
+    // 9. CLEAN FORMATTED TABLE
+    renderTable(b) {
+      const compId = this.getComponentId(b, "table");
+      const title = escapeHtml(b.title || "Data Table");
+      const subtitle = b.subtitle ? `<div class="genui-card-subtitle">${escapeHtml(b.subtitle)}</div>` : "";
+      const cols = Array.isArray(b.columns) ? b.columns : [];
+      const rows = Array.isArray(b.rows) ? b.rows : [];
+
+      const thead = cols.length ? `
+        <thead>
+          <tr>${cols.map(c => `<th>${escapeHtml(String(c))}</th>`).join("")}</tr>
+        </thead>` : "";
+
+      const tbody = rows.map(r => `
+        <tr>
+          ${(Array.isArray(r) ? r : Object.values(r)).map(cell => `<td>${renderInlineFormatting(escapeHtml(String(cell || '')))}</td>`).join("")}
+        </tr>
+      `).join("");
+
+      return `
+        <div class="genui-card genui-table-card" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">📋 ${title}</div>
+              ${subtitle}
+            </div>
+            <span class="genui-badge primary">Table</span>
+          </div>
+          <div class="genui-card-body p-0">
+            <div class="genui-table-scroll-wrap">
+              <table class="genui-table">
+                ${thead}
+                <tbody>${tbody}</tbody>
+              </table>
+            </div>
+            ${this.renderActionsRow(b.actions)}
+          </div>
+        </div>`;
+    },
+
+    // 10. PROGRESS CARD
+    renderProgress(b) {
+      const compId = this.getComponentId(b, "prog");
+      const title = escapeHtml(b.title || "Progress Status");
+      const pct = Math.max(0, Math.min(100, Number(b.percentage || b.progress || 0)));
+      const status = escapeHtml(b.status || `${pct}% Completed`);
+      const milestones = Array.isArray(b.milestones) ? b.milestones : [];
+
+      const msHtml = milestones.map(m => {
+        const isDone = Boolean(m.completed || m.done);
+        return `
+          <div class="flex items-center gap-2 text-xs py-1">
+            <span class="text-sm ${isDone ? 'text-emerald-500 font-bold' : 'text-muted-foreground'}">${isDone ? '✓' : '○'}</span>
+            <span class="${isDone ? 'text-foreground font-medium' : 'text-muted-foreground'}">${escapeHtml(m.label || m.title || "")}</span>
+          </div>`;
+      }).join("");
+
+      return `
+        <div class="genui-card genui-progress-card" id="${compId}-wrap">
+          <div class="genui-card-header">
+            <div>
+              <div class="genui-card-title">🎯 ${title}</div>
+              <div class="genui-card-subtitle">${status}</div>
+            </div>
+            <span class="genui-badge ${pct === 100 ? 'success' : 'primary'} font-mono">${pct}%</span>
+          </div>
+          <div class="genui-card-body">
+            <div class="genui-progress-track mb-3">
+              <div class="genui-progress-bar" style="width: ${pct}%;"></div>
+            </div>
+            ${msHtml ? `<div class="mt-2 pt-2 border-t border-border/40 space-y-0.5">${msHtml}</div>` : ""}
+            ${this.renderActionsRow(b.actions || (b.action ? [b.action] : []))}
+          </div>
+        </div>`;
+    },
+
+    // 11. PRODUCT CARD
     renderProductCard(b) {
       const title = escapeHtml(b.title || "Product");
       const subtitle = b.subtitle || b.category ? escapeHtml(b.subtitle || b.category) : "";
@@ -987,6 +1643,7 @@
         </div>`;
     },
 
+    // 12. INFO CARD
     renderInfoCard(b) {
       const title = escapeHtml(b.title || "Information");
       const icon = b.icon ? `<span class="text-lg mr-1.5">${escapeHtml(b.icon)}</span>` : "ℹ️ ";
@@ -1033,6 +1690,7 @@
         </div>`;
     },
 
+    // 13. WEATHER CARD
     renderWeatherCard(b) {
       const loc = escapeHtml(b.location || b.city || "Current Location");
       const temp = escapeHtml(b.temp || b.temperature || "--");
@@ -1078,6 +1736,7 @@
         </div>`;
     },
 
+    // 14. STATS CARD
     renderStatsCard(b) {
       const title = escapeHtml(b.title || "Key Metrics");
       const metrics = Array.isArray(b.metrics)
@@ -1125,6 +1784,7 @@
         </div>`;
     },
 
+    // 15. COMPARISON CARD
     renderComparisonCard(b) {
       const title = escapeHtml(b.title || "Comparison");
       const itemA = b.itemA || (b.items && b.items[0]) || { title: "Option A" };
@@ -1157,7 +1817,7 @@
 
       const verdictHtml = b.verdict ? `
         <div class="genui-verdict-box">
-          <div class="font-semibold text-xs text-indigo-400 mb-0.5 uppercase tracking-wide">🏆 Lumi Recommendation</div>
+          <div class="font-semibold text-xs text-indigo-400 mb-0.5 uppercase tracking-wide">🏆 Recommendation</div>
           <div>${renderInlineFormatting(escapeHtml(b.verdict))}</div>
         </div>` : "";
 
@@ -1191,6 +1851,7 @@
         </div>`;
     },
 
+    // 16. PROFILE CARD
     renderProfileCard(b) {
       const name = escapeHtml(b.name || "User Profile");
       const role = b.role || b.title ? escapeHtml(b.role || b.title) : "";
@@ -1221,6 +1882,7 @@
         </div>`;
     },
 
+    // 17. RECOMMENDATION CARD
     renderRecommendationCard(b) {
       const title = escapeHtml(b.title || "Top Recommendations");
       const items = Array.isArray(b.items)
@@ -1274,6 +1936,7 @@
         </div>`;
     },
 
+    // 18. CHART CARD
     renderChartCard(b) {
       const title = escapeHtml(b.title || "Data Visualization");
       const subtitle = b.subtitle ? `<div class="genui-card-subtitle">${escapeHtml(b.subtitle)}</div>` : "";
@@ -1435,16 +2098,18 @@
         </svg>`;
     },
 
+    // 19. ACTIONS CARD
     renderActionsCard(b) {
       const actions = Array.isArray(b.actions) ? b.actions : Array.isArray(b.buttons) ? b.buttons : Array.isArray(b.chips) ? b.chips : [];
       return `<div class="genui-card genui-actions-card p-3">${this.renderActionsRow(actions)}</div>`;
     },
 
+    // 20. ACCORDION CARD
     renderAccordionCard(b) {
       const title = escapeHtml(b.title || "FAQ / Expandable Sections");
       const items = Array.isArray(b.items) ? b.items : [];
 
-      const itemsHtml = items.map((it, idx) => {
+      const itemsHtml = items.map(it => {
         const itemTitle = escapeHtml(it.title || "Section");
         const content = renderInlineFormatting(escapeHtml(it.content || it.body || ""));
         const isOpen = it.defaultOpen ? "open" : "";
@@ -1469,6 +2134,7 @@
         </div>`;
     },
 
+    // 21. IMAGE CARD
     renderImageCard(b) {
       const title = escapeHtml(b.title || "Generated Media");
       const imgUrl = escapeHtml(b.image || b.imageUrl || "");
@@ -1487,6 +2153,7 @@
         </div>`;
     },
 
+    // 22. GENERIC CARD
     renderGenericCard(b) {
       const title = escapeHtml(b.title || "Summary");
       const desc = b.description || b.content ? `<p class="text-sm text-foreground/90 mt-1">${renderInlineFormatting(escapeHtml(b.description || b.content))}</p>` : "";
@@ -6912,6 +7579,25 @@
     // Close menus on outside click & GenUI interactive event delegation (Bind exactly once)
     if (!window.__lumiDocClickBound) {
       window.__lumiDocClickBound = true;
+    // Live GenUI Slider real-time bubble updating (Bind once)
+    if (!window.__lumiSliderBound) {
+      window.__lumiSliderBound = true;
+      document.addEventListener("input", (e) => {
+        const slider = e.target.closest(".genui-slider-input");
+        if (!slider) return;
+        const wrap = slider.parentElement;
+        const bubble = wrap ? wrap.querySelector(".genui-slider-bubble") : null;
+        const unit = slider.getAttribute("data-unit") || "";
+        if (bubble) bubble.textContent = unit + slider.value;
+
+        const compId = slider.getAttribute("data-comp-id");
+        if (compId) {
+          const badge = document.querySelector(`#${compId}-badge`);
+          if (badge) badge.textContent = unit + slider.value;
+          GenUIState.set(compId, { value: slider.value });
+        }
+      });
+    }
       document.addEventListener("click", (e) => {
         // 1. GenUI interactive quick prompt button clicks
         const promptBtn = e.target.closest("[data-genui-prompt]");
@@ -6930,6 +7616,308 @@
           if (item) {
             item.classList.toggle("open");
           }
+          return;
+        }
+
+        // 3. GenUI Selection Card Click
+        const selectCard = e.target.closest(".genui-select-card");
+        if (selectCard) {
+          const compId = selectCard.getAttribute("data-comp-id");
+          const itemId = selectCard.getAttribute("data-genui-select-card");
+          const mode = selectCard.getAttribute("data-mode") || "single";
+          const title = selectCard.getAttribute("data-title") || itemId;
+          const autoSubmit = selectCard.getAttribute("data-auto-submit") === "true";
+          const wrap = selectCard.closest(".genui-selection-group") || selectCard.parentElement;
+
+          if (mode === "single") {
+            wrap.querySelectorAll(".genui-select-card").forEach((c) => {
+              c.classList.remove("selected");
+              const ind = c.querySelector(".genui-radio-indicator");
+              if (ind) ind.classList.remove("active");
+            });
+            selectCard.classList.add("selected");
+            const ind = selectCard.querySelector(".genui-radio-indicator");
+            if (ind) ind.classList.add("active");
+
+            GenUIState.set(compId, { selected: itemId, title: title });
+
+            const countEl = document.querySelector(`#${compId}-count`);
+            if (countEl) countEl.textContent = "1 selected";
+
+            if (autoSubmit) {
+              sendMessage("I chose: " + title);
+            }
+          } else {
+            selectCard.classList.toggle("selected");
+            const ind = selectCard.querySelector(".genui-check-indicator");
+            if (ind) ind.classList.toggle("active", selectCard.classList.contains("selected"));
+
+            const allSelected = [...wrap.querySelectorAll(".genui-select-card.selected")];
+            const selIds = allSelected.map((c) => c.getAttribute("data-genui-select-card"));
+            const selTitles = allSelected.map((c) => c.getAttribute("data-title") || c.getAttribute("data-genui-select-card"));
+
+            GenUIState.set(compId, { selected: selIds, titles: selTitles });
+
+            const countEl = document.querySelector(`#${compId}-count`);
+            if (countEl) countEl.textContent = selIds.length > 0 ? `${selIds.length} selected` : "None selected";
+          }
+          return;
+        }
+
+        // 4. GenUI Selection Submit Button
+        const submitSelBtn = e.target.closest(".genui-submit-selection");
+        if (submitSelBtn) {
+          const compId = submitSelBtn.getAttribute("data-comp-id");
+          const mode = submitSelBtn.getAttribute("data-mode") || "single";
+          const template = submitSelBtn.getAttribute("data-template") || "I selected:";
+          const state = GenUIState.get(compId, {});
+
+          let chosen = [];
+          if (mode === "single") {
+            if (state.title || state.selected) chosen.push(state.title || state.selected);
+          } else {
+            if (Array.isArray(state.titles) && state.titles.length) chosen = state.titles;
+            else if (Array.isArray(state.selected) && state.selected.length) chosen = state.selected;
+          }
+
+          if (chosen.length === 0) {
+            showToast("Please choose an option first.");
+            return;
+          }
+
+          const prompt = `${template} ${chosen.join(", ")}`;
+          sendMessage(prompt);
+          return;
+        }
+
+        // 5. GenUI Grid Item Selection Click
+        const gridItem = e.target.closest(".genui-grid-item");
+        if (gridItem && !e.target.closest(".genui-qty-controls")) {
+          const compId = gridItem.getAttribute("data-comp-id");
+          const itemId = gridItem.getAttribute("data-genui-grid-item");
+          gridItem.classList.toggle("selected");
+          const isSel = gridItem.classList.contains("selected");
+
+          GenUIState.update(compId, (cur) => {
+            const items = cur.items || {};
+            const prev = items[itemId] || { qty: 1 };
+            items[itemId] = { selected: isSel, qty: prev.qty || 1 };
+            return { items };
+          });
+          return;
+        }
+
+        // 6. GenUI Grid Quantity Control Buttons (+ / -)
+        const qtyBtn = e.target.closest(".genui-qty-btn");
+        if (qtyBtn) {
+          e.stopPropagation();
+          const compId = qtyBtn.getAttribute("data-comp-id");
+          const itemId = qtyBtn.getAttribute("data-item-id");
+          const isPlus = qtyBtn.classList.contains("plus");
+          const valEl = document.querySelector(`#${compId}-qty-${itemId}`);
+          let currentQty = valEl ? parseInt(valEl.textContent, 10) || 1 : 1;
+
+          if (isPlus) currentQty += 1;
+          else currentQty = Math.max(1, currentQty - 1);
+
+          if (valEl) valEl.textContent = String(currentQty);
+
+          const itemCard = qtyBtn.closest(".genui-grid-item");
+          if (itemCard && !itemCard.classList.contains("selected")) {
+            itemCard.classList.add("selected");
+          }
+
+          GenUIState.update(compId, (cur) => {
+            const items = cur.items || {};
+            items[itemId] = { selected: true, qty: currentQty };
+            return { items };
+          });
+          return;
+        }
+
+        // 7. GenUI Grid Apply / Submit Button
+        const gridSubmitBtn = e.target.closest(".genui-grid-submit");
+        if (gridSubmitBtn) {
+          const compId = gridSubmitBtn.getAttribute("data-comp-id");
+          const wrap = document.querySelector(`#${compId}-wrap`) || gridSubmitBtn.closest(".genui-card");
+          const selCards = wrap ? [...wrap.querySelectorAll(".genui-grid-item.selected")] : [];
+
+          if (selCards.length === 0) {
+            showToast("Please select at least one item.");
+            return;
+          }
+
+          const summaryList = selCards.map((c) => {
+            const name = c.getAttribute("data-name") || "Item";
+            const itemId = c.getAttribute("data-genui-grid-item");
+            const valEl = document.querySelector(`#${compId}-qty-${itemId}`);
+            const qty = valEl ? parseInt(valEl.textContent, 10) || 1 : 1;
+            return qty > 1 ? `${name} (${qty}x)` : name;
+          });
+
+          const title = gridSubmitBtn.getAttribute("data-title") || "Selected items";
+          sendMessage(`${title}: ${summaryList.join(", ")}`);
+          return;
+        }
+
+        // 8. GenUI Interactive Checklist Item Click
+        const checkItem = e.target.closest(".genui-check-item");
+        if (checkItem) {
+          const compId = checkItem.getAttribute("data-comp-id");
+          const itemId = checkItem.getAttribute("data-genui-check-item");
+          checkItem.classList.toggle("completed");
+          const box = checkItem.querySelector(".genui-checkbox-box");
+          if (box) box.classList.toggle("checked", checkItem.classList.contains("completed"));
+
+          const wrap = checkItem.closest(".genui-checklist-card");
+          if (wrap) {
+            const allItems = [...wrap.querySelectorAll(".genui-check-item")];
+            const completedItems = [...wrap.querySelectorAll(".genui-check-item.completed")];
+            const completedIds = completedItems.map((i) => i.getAttribute("data-genui-check-item"));
+
+            GenUIState.set(compId, { checked: completedIds });
+
+            const total = allItems.length;
+            const done = completedItems.length;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+            const bar = document.querySelector(`#${compId}-bar`);
+            if (bar) bar.style.width = pct + "%";
+            const badge = document.querySelector(`#${compId}-badge`);
+            if (badge) {
+              badge.textContent = `${pct}% Done`;
+              badge.className = `genui-badge ${pct === 100 ? "success" : "primary"}`;
+            }
+            const label = document.querySelector(`#${compId}-label`);
+            if (label) label.textContent = `${done} of ${total} tasks completed`;
+          }
+          return;
+        }
+
+        // 9. GenUI Interactive Quiz Option Click
+        const quizOpt = e.target.closest(".genui-quiz-opt");
+        if (quizOpt) {
+          const card = quizOpt.closest(".genui-quiz-card");
+          if (!card || card.classList.contains("quiz-revealed")) return;
+
+          card.classList.add("quiz-revealed");
+          const compId = quizOpt.getAttribute("data-comp-id");
+          const optIdx = parseInt(quizOpt.getAttribute("data-genui-quiz-opt"), 10);
+          const isCorrect = quizOpt.getAttribute("data-is-correct") === "true";
+          const explanation = quizOpt.getAttribute("data-explanation") || "";
+
+          if (isCorrect) {
+            quizOpt.classList.add("correct");
+          } else {
+            quizOpt.classList.add("wrong");
+            card.querySelectorAll(".genui-quiz-opt").forEach((opt) => {
+              if (opt.getAttribute("data-is-correct") === "true") {
+                opt.classList.add("correct");
+              }
+            });
+          }
+
+          const feedbackEl = document.querySelector(`#${compId}-feedback`);
+          if (feedbackEl) {
+            feedbackEl.className = "genui-quiz-feedback active animate-fade-in mt-3 p-3 rounded-xl bg-accent/60 border border-border";
+            feedbackEl.innerHTML = `
+              <div class="font-semibold text-xs text-indigo-400 mb-1 flex items-center gap-1.5">
+                ${isCorrect ? "🎉 Correct Answer!" : "💡 Explanation"}
+              </div>
+              <p class="text-xs text-muted-foreground leading-relaxed">${renderInlineFormatting(escapeHtml(explanation))}</p>
+              <button type="button" class="genui-action-btn mt-2.5 text-xs py-1 px-2.5" data-genui-prompt="Can you explain more about this quiz question?">
+                Discuss this with AI →
+              </button>`;
+          }
+
+          GenUIState.set(compId, { answered: true, selectedIndex: optIdx, isCorrect: isCorrect, explanation: explanation });
+          return;
+        }
+
+        // 10. GenUI Interactive Poll Option Click
+        const pollOpt = e.target.closest(".genui-poll-opt");
+        if (pollOpt) {
+          const card = pollOpt.closest(".genui-poll-card");
+          if (!card || card.classList.contains("poll-voted")) return;
+
+          card.classList.add("poll-voted");
+          const compId = pollOpt.getAttribute("data-comp-id");
+          const optIdx = parseInt(pollOpt.getAttribute("data-genui-poll-opt"), 10);
+          pollOpt.classList.add("voted");
+
+          GenUIState.set(compId, { voted: true, selectedIndex: optIdx });
+
+          const allOpts = [...card.querySelectorAll(".genui-poll-opt")];
+          const totalVotes = allOpts.length + 1;
+          allOpts.forEach((opt, idx) => {
+            const isUserChoice = idx === optIdx;
+            const pct = isUserChoice ? Math.round((2 / totalVotes) * 100) : Math.round((1 / totalVotes) * 100);
+            const fill = opt.querySelector(".genui-poll-bg-fill");
+            if (fill) fill.style.width = pct + "%";
+            let badge = opt.querySelector(".font-mono");
+            if (!badge) {
+              const span = document.createElement("span");
+              span.className = "font-bold text-xs text-foreground font-mono";
+              opt.querySelector(".flex").appendChild(span);
+              badge = span;
+            }
+            badge.textContent = pct + "%";
+          });
+          return;
+        }
+
+        // 11. GenUI Form Submit Button
+        const formSubmitBtn = e.target.closest(".genui-form-submit");
+        if (formSubmitBtn) {
+          const compId = formSubmitBtn.getAttribute("data-comp-id");
+          const form = document.querySelector(`#${compId}-form`);
+          if (!form) return;
+
+          const elements = form.querySelectorAll("input, select, textarea");
+          const data = {};
+          let isValid = true;
+
+          elements.forEach((el) => {
+            if (!el.name) return;
+            if (el.type === "checkbox") {
+              data[el.name] = el.checked ? "Yes" : "No";
+            } else {
+              const val = el.value.trim();
+              if (el.required && !val) {
+                el.classList.add("border-rose-500");
+                isValid = false;
+              } else {
+                el.classList.remove("border-rose-500");
+              }
+              data[el.name] = val;
+            }
+          });
+
+          if (!isValid) {
+            showToast("Please fill in all required fields.");
+            return;
+          }
+
+          GenUIState.set(compId, { submitted: true, data: data });
+
+          const formTitle = formSubmitBtn.getAttribute("data-title") || "Form";
+          const formatted = Object.entries(data)
+            .map(([k, v]) => `- ${k}: ${v}`)
+            .join("\n");
+          sendMessage(`Form Submitted (${formTitle}):\n${formatted}`);
+          return;
+        }
+
+        // 12. GenUI Slider Submit Button
+        const sliderSubmitBtn = e.target.closest(".genui-slider-submit");
+        if (sliderSubmitBtn) {
+          const compId = sliderSubmitBtn.getAttribute("data-comp-id");
+          const wrap = document.querySelector(`#${compId}-wrap`);
+          const slider = wrap ? wrap.querySelector(".genui-slider-input") : null;
+          const label = sliderSubmitBtn.getAttribute("data-label") || "Selected value";
+          const unit = sliderSubmitBtn.getAttribute("data-unit") || "";
+          const val = slider ? slider.value : "";
+          sendMessage(`${label}: ${unit}${val}`);
           return;
         }
 
