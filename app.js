@@ -218,8 +218,8 @@
     saveJson(STORAGE.MODEL, selectedModel);
   }
   let currentUser = loadJson(STORAGE.USER, {
-    email: "creator@lovable.app",
-    name: "Lumi Creator",
+    email: "guest@lumi.ai",
+    name: "Lumi User",
   });
 
   let searchQuery = "";
@@ -10248,6 +10248,20 @@
     });
 
     initSeedData();
+    if (window.AndroidAuth && typeof window.AndroidAuth.getCurrentUser === "function") {
+      try {
+        const nativeUserStr = window.AndroidAuth.getCurrentUser();
+        if (nativeUserStr) {
+          const nativeUser = JSON.parse(nativeUserStr);
+          if (nativeUser && nativeUser.email) {
+            currentUser = nativeUser;
+            saveJson(STORAGE.USER, currentUser);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed checking native Google User:", e);
+      }
+    }
     LumiAutonomousMind.analyzeAndSync(conversations);
     if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
       window.location.hash = "#/chat";
