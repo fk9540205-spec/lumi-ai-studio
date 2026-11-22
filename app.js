@@ -438,6 +438,85 @@
     }
   }
 
+  // --- Guest Quota & Tier Limitations ---
+  let upgradeModalState = null; // null | { reason: 'messages' | 'images' | 'video' }
+
+  function openUpgradeModal(reason = 'messages') {
+    upgradeModalState = { reason };
+    render();
+  }
+
+  function closeUpgradeModal() {
+    upgradeModalState = null;
+    render();
+  }
+
+  const LumiGuestQuota = {
+    STORAGE_KEY: "lumi_guest_usage_v1",
+    DAILY_LIMIT: 7,
+    IMAGE_LIMIT: 1,
+
+    getTodayString() {
+      return new Date().toISOString().slice(0, 10);
+    },
+
+    getUsage() {
+      const today = this.getTodayString();
+      const defaultUsage = { date: today, messages: 0, images: 0 };
+      try {
+        const raw = localStorage.getItem(this.STORAGE_KEY);
+        if (!raw) return defaultUsage;
+        const data = JSON.parse(raw);
+        if (data.date !== today) {
+          return defaultUsage;
+        }
+        return data;
+      } catch {
+        return defaultUsage;
+      }
+    },
+
+    saveUsage(usage) {
+      try {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(usage));
+      } catch {}
+    },
+
+    canSendMessage() {
+      if (isUserLoggedIn()) return true;
+      const usage = this.getUsage();
+      return (usage.messages || 0) < this.DAILY_LIMIT;
+    },
+
+    incrementMessage() {
+      if (isUserLoggedIn()) return;
+      const usage = this.getUsage();
+      usage.messages = (usage.messages || 0) + 1;
+      usage.date = this.getTodayString();
+      this.saveUsage(usage);
+    },
+
+    canGenerateImage() {
+      if (isUserLoggedIn()) return true;
+      const usage = this.getUsage();
+      return (usage.images || 0) < this.IMAGE_LIMIT;
+    },
+
+    incrementImage() {
+      if (isUserLoggedIn()) return;
+      const usage = this.getUsage();
+      usage.images = (usage.images || 0) + 1;
+      usage.date = this.getTodayString();
+      this.saveUsage(usage);
+    },
+
+    getRemainingMessages() {
+      if (isUserLoggedIn()) return Infinity;
+      const usage = this.getUsage();
+      return Math.max(0, this.DAILY_LIMIT - (usage.messages || 0));
+    }
+  };
+
   // --- Cloud Sync Engine (Firebase Realtime Database) ---
   let _cloudSyncDebounceTimer = null;
   function triggerCloudChatsSync() {
@@ -3596,6 +3675,74 @@
       </div>`;
   }
 
+  function renderUpgradeModal() {
+    if (!upgradeModalState) return "";
+    const reason = upgradeModalState.reason || "messages";
+    const remaining = LumiGuestQuota.getRemainingMessages();
+
+    let title = "Free Daily Limit Reached";
+    let desc = "You have used all 7 free guest messages for today. Sign in with Google in 1 tap for 100% Free Unlimited Access!";
+
+    if (reason === "images") {
+      title = "Unlock HD Image Studio";
+      desc = "Guests are limited to 1 trial image per day. Sign in with Google for Unlimited Image Studio, sketching drafts, and markup!";
+    } else if (reason === "video") {
+      title = "Unlock AI Video Studio";
+      desc = "High-definition AI cinematic video creation requires an account. Sign in with Google in 1 tap to start generating!";
+    }
+
+    return `
+      <div id="upgrade-modal-backdrop" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in" style="z-index:99999;">
+        <div class="relative w-full max-w-sm rounded-3xl border border-border/80 bg-card/95 p-6 shadow-2xl backdrop-blur-md animate-scale-in text-center" onclick="event.stopPropagation()">
+          <button type="button" id="close-upgrade-modal-btn" class="absolute top-4 right-4 size-8 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer text-sm">
+            ✕
+          </button>
+
+          <div class="mx-auto size-14 rounded-2xl bg-gradient-to-tr from-purple-500/20 via-pink-500/20 to-primary/30 p-2.5 flex items-center justify-center border border-border/80 shadow-md">
+            <img src="${LUMI_LOGO}" alt="Lumi" class="size-9 object-contain" />
+          </div>
+
+          <h2 class="mt-4 text-xl font-bold tracking-tight text-foreground">
+            ${escapeHtml(title)}
+          </h2>
+
+          <p class="mt-2 text-xs text-muted-foreground leading-relaxed">
+            ${escapeHtml(desc)}
+          </p>
+
+          <div class="mt-4 rounded-2xl border border-border/60 bg-accent/30 p-3.5 text-left space-y-2 text-xs text-foreground">
+            <div class="flex items-center gap-2">
+              <span class="text-primary font-bold">✔</span>
+              <span><strong>Unlimited</strong> AI Messages & Deep Reasoning</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-primary font-bold">✔</span>
+              <span>Full ChatGPT Mobile Image Studio Suite</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-primary font-bold">✔</span>
+              <span>Permanent Cloud Sync & Google Profile</span>
+            </div>
+          </div>
+
+          <div class="mt-5">
+            <button
+              type="button"
+              id="upgrade-google-btn"
+              class="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-border bg-card px-4 text-sm font-semibold text-foreground hover:bg-accent transition-all shadow-md active:scale-98 cursor-pointer"
+            >
+              ${ICONS.google} <span>Continue with Google</span>
+            </button>
+          </div>
+
+          <div class="mt-3 text-[11px] text-muted-foreground">
+            1-tap sign-in • 100% Free • No password required
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderHtmlModal() {
     if (!activeHtmlModal) return "";
     return `
@@ -4372,6 +4519,11 @@
   }
 
   function renderComposer(placeholder = "Ask Lumi anything…", isThread = false) {
+    const isGuest = !isUserLoggedIn();
+    const remainingMsgs = LumiGuestQuota.getRemainingMessages();
+    if (isGuest && remainingMsgs <= 0) {
+      placeholder = "Daily free limit reached (7/7). Tap to sign in with Google…";
+    }
     return `
       <div class="relative w-full rounded-3xl bg-card border border-border shadow-composer transition-shadow focus-within:ring-1 focus-within:ring-primary/20">
         <form id="chat-composer-form" class="w-full">
@@ -4402,6 +4554,16 @@
           <div class="composer-toolbar flex items-center justify-between gap-2 px-3 pb-3">
             <div class="composer-toolbar-left flex min-w-0 items-center gap-1.5 flex-1 py-0.5">
               ${renderModelPicker("composer")}
+              ${!isUserLoggedIn() ? `
+                <button
+                  type="button"
+                  id="guest-quota-badge"
+                  class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${LumiGuestQuota.getRemainingMessages() <= 0 ? 'border-rose-500/40 bg-rose-500/15 text-rose-400' : 'border-primary/30 bg-primary/10 text-primary'} hover:bg-primary/20 transition-all cursor-pointer shrink-0"
+                  title="Guest Mode: ${LumiGuestQuota.getRemainingMessages()}/7 messages left today. Click to sign in for unlimited."
+                >
+                  <span>⚡ ${LumiGuestQuota.getRemainingMessages()}/7 left</span>
+                </button>
+              ` : ''}
 
               <button
                 type="button"
@@ -5389,10 +5551,22 @@
   async function sendMessage(text) {
     const prompt = text.trim();
     if (!prompt) return;
+
+    // Daily Guest Mode Restriction (7 messages / day)
+    if (!LumiGuestQuota.canSendMessage()) {
+      openUpgradeModal("messages");
+      AudioEffects.play("error");
+      showToast("⚡ Daily free limit reached (7/7). Sign in with Google for unlimited!");
+      return;
+    }
+
     if (isStreaming && !streamAbortController) {
       restoreComposerButtons();
     }
     if (isStreaming) return;
+
+    // Increment guest usage
+    LumiGuestQuota.incrementMessage();
     stopSpeechSynthesis();
 
     let { path } = parseLocation();
@@ -5729,6 +5903,17 @@
 
     // Reusable Real-Time Generative Image Flow
     const triggerImageGeneration = (imagePrompt, targetMsg, aspect = "1:1") => {
+      // Guest Image Limit: 1 trial image per day
+      if (!LumiGuestQuota.canGenerateImage()) {
+        openUpgradeModal("images");
+        AudioEffects.play("error");
+        targetMsg.content = "🎨 **Daily Image Limit Reached for Guest Mode.**\n\nSign in with Google in 1 tap for unlimited high-definition image generations!";
+        targetMsg.imageLoading = false;
+        saveJson(STORAGE.CHATS, conversations);
+        render();
+        return;
+      }
+      LumiGuestQuota.incrementImage();
       let enhancedPrompt = imagePrompt;
       if (aspect === "16:9" && !enhancedPrompt.includes("16:9")) {
         enhancedPrompt += ", 16:9 widescreen landscape aspect ratio";
@@ -8087,6 +8272,9 @@
     if (settingsModalOpen) {
       root.innerHTML += renderSettingsModal();
     }
+    if (upgradeModalState) {
+      root.innerHTML += renderUpgradeModal();
+    }
     if (ChatGPTImageStudio.activeViewer && ChatGPTImageStudio.activeViewer.url) {
       root.innerHTML += ChatGPTImageStudio.renderFullscreenViewer();
     } else if (lightboxImageSrc) {
@@ -9376,6 +9564,45 @@
     const settingsLogoutBtn = document.querySelector("#settings-logout-btn");
     if (settingsLogoutBtn) {
       settingsLogoutBtn.addEventListener("click", handleSignOutAction);
+    }
+
+    // Upgrade Modal Handlers
+    const closeUpgradeBtn = document.querySelector("#close-upgrade-modal-btn");
+    if (closeUpgradeBtn) {
+      closeUpgradeBtn.addEventListener("click", closeUpgradeModal);
+    }
+    const upgradeBackdrop = document.querySelector("#upgrade-modal-backdrop");
+    if (upgradeBackdrop) {
+      upgradeBackdrop.addEventListener("click", closeUpgradeModal);
+    }
+    const guestQuotaBadge = document.querySelector("#guest-quota-badge");
+    if (guestQuotaBadge) {
+      guestQuotaBadge.addEventListener("click", () => openUpgradeModal("messages"));
+    }
+    const upgradeGoogleBtn = document.querySelector("#upgrade-google-btn");
+    if (upgradeGoogleBtn) {
+      upgradeGoogleBtn.addEventListener("click", () => {
+        closeUpgradeModal();
+        if (window.AndroidAuth && typeof window.AndroidAuth.signInWithGoogle === "function") {
+          showToast("Opening Google Sign-In...");
+          window.AndroidAuth.signInWithGoogle();
+        } else {
+          // Web fallback
+          currentUser = {
+            email: "jayuu3654@gmail.com",
+            name: "Jayu",
+            photoUrl: "https://lh3.googleusercontent.com/a/default-user",
+            provider: "google",
+            isLoggedIn: true
+          };
+          saveJson(STORAGE.USER, currentUser);
+          if (typeof LumiCloudSync !== "undefined") {
+            LumiCloudSync.syncUserData(currentUser);
+          }
+          showToast("✔ Welcome to Lumi, " + currentUser.name + "!");
+          render();
+        }
+      });
     }
 
     // 15. Settings & Theme Handlers
