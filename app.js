@@ -6291,6 +6291,7 @@
     /*
     let webContext = "";
     const isSearchExplicit = /^\/search\s+/i.test(prompt);
+    const isSearchExplicit = /^\/search\s+/i.test(prompt);
     const isWeatherQuery = /\b(weather|mausam|temperature|forecast|temp)\b/i.test(prompt);
 
     if (isWeatherQuery) {
@@ -6342,7 +6343,7 @@
         /^(search|google|dhoondo|khojo|find|who is|what is|when is|where is|latest|current|today'?s|news about|live score)\b/i.test(prompt.trim()) ||
         /\b(search\s*(?:karo|karke|kar)|google\s*(?:karo|karke|pe)?|dhoond\s*(?:kar|ke|karo)?|khoj\s*(?:kar|ke|karo)?|latest news|aaj ki|today|ipl score|score|news|who is|kaun hai|kya hai)\b/i.test(prompt);
 
-      if (hasSearchIntent) {
+      if (false && hasSearchIntent) {
         let cleanQuery = prompt
           .replace(/^\/search\s+/i, "")
           .replace(/^(?:please\s+|can\s+you\s+)?(?:search(?:\s+the\s+web|\s+online|\s+on\s+google)?|google\s*(?:karke|karo|pe|par)|dhoondo|khojo)(?:\s+(?:for|about|me))?\s+/i, "")
@@ -6501,6 +6502,7 @@
     */
 
     let webContext = "";
+    const isSearchExplicit = /^\/search\s+/i.test(prompt);
     // Live URL Scraper Detection
     const urlMatch = prompt.match(/https?:\/\/[^\s]+/i);
     let scrapedContext = "";

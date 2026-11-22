@@ -123,6 +123,18 @@ def _g4f_retry_delay(error):
     delay = float(match.group("seconds"))
     return delay + 0.1 if 0 <= delay <= 5 else None
 
+def _tool_call_query(tool_call: dict) -> str:
+    function = tool_call.get("function", {}) if isinstance(tool_call, dict) else {}
+    arguments = function.get("arguments", {}) if isinstance(function, dict) else {}
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments)
+        except json.JSONDecodeError:
+            arguments = {}
+    if isinstance(arguments, dict):
+        return str(arguments.get("query") or arguments.get("q") or "")
+    return ""
+
 # ---------------------------------------------------------------------------
 # Duck.ai configuration
 # ---------------------------------------------------------------------------
@@ -592,6 +604,26 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         target_model = raw_model or "gemini-2.5-flash"
 
         messages = data.get("messages", [])
+        tools = data.get("tools") or []
+        if not tools:
+            tools = [{
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": "Search the live web for current facts, news, prices, scores, weather, or URLs.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"query": {"type": "string", "description": "Exact web search query"}},
+                        "required": ["query"],
+                    },
+                },
+            }]
+        web_search_requested = any(
+            isinstance(tool, dict)
+            and tool.get("type") == "function"
+            and tool.get("function", {}).get("name") in ("web_search", "search_web")
+            for tool in tools
+        ) or bool(data.get("web_search"))
         stream = data.get("stream", True)
         image = data.get("image")
         max_tokens = int(data.get("max_tokens", 4096))
@@ -605,60 +637,27 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         if raw_model in antigravity_models or raw_model.startswith("antigravity-"):
             clean_m = raw_model.replace("antigravity-", "")
             try:
-                cpa_req = urllib.request.Request(
+                self._run_openai_tool_loop(
                     "http://127.0.0.1:8317/v1/chat/completions",
-                    data=json.dumps({"model": clean_m, "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
-                    headers={
+                    clean_m,
+                    messages,
+                    tools,
+                    data.get("tool_choice", "auto"),
+                    stream,
+                    max_tokens,
+                    {
                         "Content-Type": "application/json",
                         "Authorization": "Bearer lumi-antigravity-local",
                         "Accept": "text/event-stream" if stream else "application/json"
-                    },
-                    method="POST"
+                    }
                 )
-                cpa_resp = urllib.request.urlopen(cpa_req, timeout=45)
-                if stream:
-                    self._start_sse()
-                    for raw_line in cpa_resp:
-                        line = raw_line.decode(errors="replace")
-                        if line.startswith("data: ") and line.strip() != "data: [DONE]":
-                            try:
-                                chunk_json = json.loads(line[6:])
-                                choices = chunk_json.get("choices", [])
-                                if choices:
-                                    delta = choices[0].get("delta", {})
-                                    imgs = delta.get("images")
-                                    if imgs and isinstance(imgs, list) and len(imgs) > 0:
-                                        img_url = imgs[0].get("image_url", {}).get("url")
-                                        if img_url:
-                                            delta["content"] = f"\n\n![Generated Image]({img_url})\n\n"
-                                            line = "data: " + json.dumps(chunk_json) + "\n\n"
-                            except Exception:
-                                pass
-                            self._send_chunk(line.encode("utf-8"))
-                        elif line.strip() == "data: [DONE]":
-                            break
-                    self._send_chunk(b"data: [DONE]\n\n")
-                    self._end_chunks()
-                    return
-                else:
-                    raw_data = json.loads(cpa_resp.read().decode())
-                    choices = raw_data.get("choices", [])
-                    if choices:
-                        msg = choices[0].get("message", {})
-                        imgs = msg.get("images")
-                        if imgs and isinstance(imgs, list) and len(imgs) > 0:
-                            img_url = imgs[0].get("image_url", {}).get("url")
-                            if img_url and not msg.get("content"):
-                                msg["content"] = f"![Generated Image]({img_url})"
-                    self._json_response(raw_data)
-                    return
+                return
             except Exception as cpa_err:
                 sys.stderr.write(f"CLIProxyAPI upstream attempt failed, falling back: {cpa_err}\n")
 
         # Map to reliable working models
         if "gemini" in raw_model:
             target_model = "gemini-2.5-flash"
-        tools = data.get("tools") or []
         tool_choice = data.get("tool_choice", "auto")
         allowed_tool_names = {
             tool.get("function", {}).get("name")
@@ -710,32 +709,21 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
         # Fallback straight to Antigravity Gemini 3 Flash / Claude
         try:
-            cpa_req = urllib.request.Request(
+            self._run_openai_tool_loop(
                 ANTIGRAVITY_PROXY_URL,
-                data=json.dumps({"model": "gemini-3-flash", "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode("utf-8"),
-                headers={
+                "gemini-3-flash",
+                messages,
+                tools,
+                tool_choice,
+                stream,
+                max_tokens,
+                {
                     "Content-Type": "application/json",
                     "Authorization": "Bearer lumi-antigravity-local",
                     "Accept": "text/event-stream" if stream else "application/json"
-                },
-                method="POST"
+                }
             )
-            cpa_resp = urllib.request.urlopen(cpa_req, timeout=45)
-            if stream:
-                self._start_sse()
-                for raw_line in cpa_resp:
-                    line = raw_line.decode(errors="replace")
-                    if line.startswith("data: ") and line.strip() != "data: [DONE]":
-                        self._send_chunk(line.encode("utf-8"))
-                    elif line.strip() == "data: [DONE]":
-                        break
-                self._send_chunk(b"data: [DONE]\n\n")
-                self._end_chunks()
-                return
-            else:
-                raw_data = json.loads(cpa_resp.read().decode())
-                self._json_response(raw_data)
-                return
+            return
         except Exception as e:
             sys.stderr.write(f"Antigravity fallback failed: {e}\n")
 
@@ -821,6 +809,81 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             _health["g4f"] = {"status": "offline", "lastCheck": int(time.time()), "latency": 0, "error": str(e)}
             self._json_response({"provider": "g4f", "status": "offline", "error": str(e)}, 503)
 
+    def _run_g4f_tool_loop(self, model, provider_options, messages, tools, tool_choice,
+                           requested_model, stream):
+        working_messages = [dict(message) if isinstance(message, dict) else message for message in messages]
+        final_content = ""
+        tool_round = 0
+
+        while tool_round < 3:
+            response = _g4f_client.chat.completions.create(
+                model=model,
+                **provider_options,
+                messages=working_messages,
+                stream=False,
+                **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+            )
+            message = response.choices[0].message
+            final_content = message.content or ""
+            tool_calls = [
+                _serialize_g4f_tool_call(call)
+                for call in (getattr(message, "tool_calls", None) or [])
+            ]
+
+            if not tool_calls:
+                break
+
+            assistant_tool_message = {
+                "role": "assistant",
+                "content": final_content,
+                "tool_calls": tool_calls,
+            }
+            working_messages.append(assistant_tool_message)
+
+            executed_any = False
+            for tool_call in tool_calls:
+                function = tool_call.get("function", {}) if isinstance(tool_call, dict) else {}
+                name = function.get("name", "") if isinstance(function, dict) else ""
+                if name not in ("web_search", "search_web"):
+                    continue
+                query = _tool_call_query(tool_call)
+                if not query:
+                    continue
+                results = self._perform_live_search(query)
+                tool_content = json.dumps({
+                    "query": query,
+                    "results": results,
+                }, ensure_ascii=False)
+                working_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.get("id", ""),
+                    "content": tool_content,
+                })
+                executed_any = True
+
+            if not executed_any:
+                break
+            tool_round += 1
+
+        if stream:
+            self._start_sse()
+            if final_content:
+                chunk_payload = {
+                    "choices": [{"index": 0, "delta": {"content": final_content}, "finish_reason": None}],
+                    "provider": "g4f",
+                    "model": requested_model,
+                }
+                self._send_chunk(f"data: {json.dumps(chunk_payload, ensure_ascii=False)}\n\n".encode("utf-8"))
+            self._send_chunk(b"data: [DONE]\n\n")
+            self._end_chunks()
+            return
+
+        self._json_response({
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": final_content}, "finish_reason": "stop"}],
+            "provider": "g4f",
+            "model": requested_model,
+        })
+
     def _handle_g4f_chat(self):
         body = self._read_body()
         if body is None:
@@ -837,6 +900,12 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         stream = data.get("stream", True)
         tools = data.get("tools") or []
         tool_choice = data.get("tool_choice", "auto")
+        web_search_requested = any(
+            isinstance(tool, dict)
+            and tool.get("type") == "function"
+            and tool.get("function", {}).get("name") in ("web_search", "search_web")
+            for tool in tools
+        ) or bool(data.get("web_search"))
         selected_provider = None
 
         if model == "llm7-coder":
@@ -855,70 +924,16 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         # A. In-process G4F Client (Fastest & direct)
         if G4F_AVAILABLE and _g4f_client:
             try:
-                if stream:
-                    self._start_sse()
-                    for attempt in range(2):
-                        emitted_chunk = False
-                        try:
-                            response = _g4f_client.chat.completions.create(
-                                model=model,
-                                **provider_options,
-                                messages=messages,
-                                stream=True,
-                                **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
-                            )
-                            for chunk in response:
-                                content = ""
-                                tool_calls = []
-                                if hasattr(chunk, "choices") and chunk.choices:
-                                    delta = chunk.choices[0].delta
-                                    content = getattr(delta, "content", "") or ""
-                                    raw_tool_calls = getattr(delta, "tool_calls", None) or []
-                                    tool_calls = [_serialize_g4f_tool_call(call) for call in raw_tool_calls]
-                                if content or tool_calls:
-                                    chunk_payload = {
-                                        "choices": [{"index": 0, "delta": {**({"content": content} if content else {}), **({"tool_calls": tool_calls} if tool_calls else {})}, "finish_reason": None}],
-                                        "provider": "g4f",
-                                        "model": requested_model,
-                                    }
-                                    self._send_chunk(f"data: {json.dumps(chunk_payload)}\n\n".encode("utf-8"))
-                                    emitted_chunk = True
-                            break
-                        except Exception as e:
-                            retry_delay = _g4f_retry_delay(e)
-                            if selected_provider and attempt == 0 and not emitted_chunk and retry_delay is not None:
-                                time.sleep(retry_delay)
-                                continue
-                            raise
-                    self._send_chunk(b"data: [DONE]\n\n")
-                    self._end_chunks()
-                    return
-                else:
-                    for attempt in range(2):
-                        try:
-                            response = _g4f_client.chat.completions.create(
-                                model=model,
-                                **provider_options,
-                                messages=messages,
-                                stream=False,
-                                **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
-                            )
-                            break
-                        except Exception as e:
-                            retry_delay = _g4f_retry_delay(e)
-                            if selected_provider and attempt == 0 and retry_delay is not None:
-                                time.sleep(retry_delay)
-                                continue
-                            raise
-                    message = response.choices[0].message
-                    content = message.content or ""
-                    tool_calls = [_serialize_g4f_tool_call(call) for call in (getattr(message, "tool_calls", None) or [])]
-                    self._json_response({
-                        "choices": [{"index": 0, "message": {**{"role": "assistant", "content": content}, **({"tool_calls": tool_calls} if tool_calls else {})}, "finish_reason": "stop"}],
-                        "provider": "g4f",
-                        "model": requested_model,
-                    })
-                    return
+                self._run_g4f_tool_loop(
+                    model=model,
+                    provider_options=provider_options,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    requested_model=requested_model,
+                    stream=stream,
+                )
+                return
             except Exception as e:
                 # If in-process model failed, fallback to external G4F_URL or Free Hub
                 sys.stderr.write(f"In-process G4F failed, falling back: {e}\n")
@@ -982,6 +997,15 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         model = data.get("model", "gpt-4o-mini")
         messages = data.get("messages", [])
         stream = data.get("stream", True)
+
+        tools = data.get("tools") or []
+        web_search_requested = any(
+            isinstance(tool, dict)
+            and tool.get("type") == "function"
+            and tool.get("function", {}).get("name") in ("web_search", "search_web")
+            for tool in tools
+        ) or bool(data.get("web_search"))
+
 
         try:
             token = get_vqd_token()
@@ -1078,6 +1102,18 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         model = data.get("model", "gemini-2.0-flash")
         messages = data.get("messages", [])
         stream = data.get("stream", True)
+        tools = data.get("tools") or [{
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Search the live web for current facts, news, prices, scores, weather, or URLs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            },
+        }]
         cookies = data.get("cookies") or self.headers.get("x-gemini-cookies") or os.environ.get("GEMINI_COOKIES", "")
 
         # A. If local gemini-web-to-api or gemini-free-api proxy is running
@@ -1088,25 +1124,16 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             headers["Authorization"] = f"Bearer {cookies}"
 
         try:
-            req = urllib.request.Request(
+            self._run_openai_tool_loop(
                 f"{target_url}/chat/completions",
-                data=json.dumps({"model": model, "messages": messages, "stream": stream}).encode(),
-                headers=headers,
-                method="POST",
+                model,
+                messages,
+                tools,
+                data.get("tool_choice", "auto"),
+                stream,
+                int(data.get("max_tokens", 4096)),
+                headers,
             )
-            resp = urllib.request.urlopen(req, timeout=90)
-            if stream:
-                self._start_sse()
-                for raw_line in resp:
-                    line = raw_line.decode(errors="replace").strip()
-                    if line.startswith("data: "):
-                        self._send_chunk(f"{line}\n\n".encode())
-                        if line.strip() == "data: [DONE]":
-                            break
-                self._send_chunk(b"data: [DONE]\n\n")
-                self._end_chunks()
-            else:
-                self._json_response(json.loads(resp.read().decode()))
             return
         except Exception as _proxy_err:
             # Fallback to Free Hub Gemini model
@@ -1165,6 +1192,18 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         stream = data.get("stream", True)
         api_type = data.get("apiType", "OpenAI-compatible")
         max_tokens = int(data.get("max_tokens", 4096))
+        tools = data.get("tools") or [{
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Search the live web for current facts, news, prices, scores, weather, or URLs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                },
+            },
+        }]
 
         if not backend_url:
             self._error(400, "backendUrl is required")
@@ -1181,24 +1220,41 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         if stream:
             headers["Accept"] = "text/event-stream"
 
-        proxy_body = json.dumps({"model": model, "messages": messages, "stream": stream, "max_tokens": max_tokens}).encode()
         url = f"{backend_url}/chat/completions"
-        req = urllib.request.Request(url, data=proxy_body, headers=headers, method="POST")
-
         try:
-            resp = urllib.request.urlopen(req, timeout=120, context=_get_ssl_context())
-            if stream:
-                self._start_sse()
-                for raw_line in resp:
-                    line = raw_line.decode(errors="replace").strip()
-                    if line.startswith("data: "):
-                        self._send_chunk(f"{line}\n\n".encode())
-                        if line.strip() == "data: [DONE]":
-                            break
-                self._send_chunk(b"data: [DONE]\n\n")
-                self._end_chunks()
-            else:
-                self._json_response(json.loads(resp.read().decode()))
+            if api_type == "Anthropic Messages":
+                proxy_body = json.dumps({
+                    "model": model,
+                    "messages": messages,
+                    "stream": stream,
+                    "max_tokens": max_tokens,
+                }).encode()
+                req = urllib.request.Request(url, data=proxy_body, headers=headers, method="POST")
+                resp = urllib.request.urlopen(req, timeout=120, context=_get_ssl_context())
+                if stream:
+                    self._start_sse()
+                    for raw_line in resp:
+                        line = raw_line.decode(errors="replace").strip()
+                        if line.startswith("data: "):
+                            self._send_chunk(f"{line}\n\n".encode())
+                            if line.strip() == "data: [DONE]":
+                                break
+                    self._send_chunk(b"data: [DONE]\n\n")
+                    self._end_chunks()
+                else:
+                    self._json_response(json.loads(resp.read().decode()))
+                return
+
+            self._run_openai_tool_loop(
+                url,
+                model,
+                messages,
+                tools,
+                data.get("tool_choice", "auto"),
+                stream,
+                max_tokens,
+                headers,
+            )
         except Exception as e:
             self._error(502, f"Proxy request failed: {e}")
 
@@ -1219,6 +1275,208 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
     # -----------------------------------------------------------------------
     # Real-Time Web Search (Multi-source: DuckDuckGo + Wikipedia)
     # -----------------------------------------------------------------------
+    def _should_run_live_search(self, query: str) -> bool:
+        if not query:
+            return False
+        return bool(re.search(
+            r"(?:\bhttps?://|\b(?:search|google|dhoondo|khojo|find)\b|"
+            r"\b(?:latest|current|today|tonight|live|now|breaking|news|price|"
+            r"score|weather|mausam|forecast|networth|net worth|who is|what is|"
+            r"where is|when is|kaun hai|kya hai|aaj|taza)\b)",
+            query,
+            re.IGNORECASE,
+        ))
+
+    def _perform_live_search(self, query: str, limit: int = 6) -> list[dict]:
+        import html
+
+        results = []
+        q = re.sub(r"[\?!.]+$", "", query.strip()).strip()
+        if not q:
+            return results
+
+        try:
+            url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(q)
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+            })
+            with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
+                page = resp.read().decode("utf-8", errors="replace")
+            for block in re.findall(r'<div class="[^"]*result__body[^"]*">([\s\S]*?)(?=<div class="[^"]*result__body|$)', page)[:limit]:
+                link = re.search(r'<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)</a>', block)
+                if not link:
+                    continue
+                raw_url = link.group(1)
+                parsed_url = urllib.parse.urlparse(raw_url)
+                uddg = urllib.parse.parse_qs(parsed_url.query).get("uddg")
+                if uddg:
+                    raw_url = uddg[0]
+                snippet_match = re.search(r'<(?:a|div)[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)</(?:a|div)>', block)
+                title = html.unescape(re.sub(r"<[^>]+>", "", link.group(2))).strip()
+                snippet = html.unescape(re.sub(r"<[^>]+>", "", snippet_match.group(1))).strip() if snippet_match else ""
+                if title:
+                    results.append({"title": title, "url": raw_url, "snippet": snippet})
+        except Exception as exc:
+            sys.stderr.write(f"Live DuckDuckGo search failed: {exc}\n")
+
+        if len(results) < 2:
+            try:
+                url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(q)}&format=json&no_html=1&skip_disambig=1"
+                req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0"})
+                with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
+                    data = json.loads(resp.read().decode())
+                abstract = data.get("AbstractText", "") or data.get("Abstract", "")
+                if abstract:
+                    results.append({
+                        "title": data.get("Heading", "") or q,
+                        "snippet": abstract[:350],
+                        "url": data.get("AbstractURL", "") or "https://duckduckgo.com/?q=" + urllib.parse.quote(q),
+                    })
+            except Exception as exc:
+                sys.stderr.write(f"DuckDuckGo instant answer failed: {exc}\n")
+
+        if len(results) < 2:
+            try:
+                url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=" + urllib.parse.quote(q) + "&format=json&utf8="
+                req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0"})
+                with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
+                    data = json.loads(resp.read().decode())
+                for item in data.get("query", {}).get("search", [])[:4]:
+                    snippet = html.unescape(re.sub(r"<[^>]+>", "", item.get("snippet", ""))).strip()
+                    title = item.get("title", "")
+                    results.append({
+                        "title": title,
+                        "snippet": snippet,
+                        "url": f"https://en.wikipedia.org/wiki/{urllib.parse.quote(title.replace(' ', '_'))}",
+                    })
+            except Exception as exc:
+                sys.stderr.write(f"Wikipedia fallback search failed: {exc}\n")
+
+        unique = []
+        seen = set()
+        for result in results:
+            key = (result.get("url", ""), result.get("title", ""))
+            if key not in seen:
+                seen.add(key)
+                unique.append(result)
+        return unique[:limit]
+
+    def _attach_live_search_context(self, messages: list, force: bool = False) -> list:
+        if not isinstance(messages, list):
+            return messages
+        latest_user = ""
+        for message in reversed(messages):
+            if isinstance(message, dict) and message.get("role") == "user":
+                content = message.get("content")
+                latest_user = content if isinstance(content, str) else ""
+                break
+        if not latest_user or (not force and not self._should_run_live_search(latest_user)):
+            return messages
+
+        results = self._perform_live_search(latest_user)
+        if not results:
+            return messages
+
+        copied = [dict(message) if isinstance(message, dict) else message for message in messages]
+        facts = "\n".join(
+            f"[Source {i}: {item['title']}]\nSnippet: {item['snippet']}\nURL: {item['url']}"
+            for i, item in enumerate(results, 1)
+        )
+        copied.insert(0, {
+            "role": "system",
+            "content": (
+                "[LIVE WEB SEARCH RESULTS]\n"
+                f"{facts}\n\n"
+                "Use these live sources when answering. Cite URLs. "
+                "Do not claim that you cannot search the web."
+            ),
+        })
+        return copied
+
+    def _run_openai_tool_loop(self, url: str, model: str, messages: list, tools: list,
+                              tool_choice: str, stream: bool, max_tokens: int,
+                              headers: dict):
+        working_messages = [dict(message) if isinstance(message, dict) else message for message in messages]
+        final_content = ""
+        final_raw = None
+
+        for _round in range(3):
+            request_body = {
+                "model": model,
+                "messages": working_messages,
+                "stream": False,
+                "max_tokens": max_tokens,
+                **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(request_body).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=45, context=_get_ssl_context()) as resp:
+                final_raw = json.loads(resp.read().decode("utf-8"))
+
+            choices = final_raw.get("choices", []) if isinstance(final_raw, dict) else []
+            if not choices:
+                break
+            message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+            final_content = message.get("content") or ""
+            tool_calls = message.get("tool_calls") or []
+
+            if not tool_calls:
+                break
+
+            working_messages.append({
+                "role": "assistant",
+                "content": final_content,
+                "tool_calls": tool_calls,
+            })
+
+            executed_any = False
+            for tool_call in tool_calls:
+                if not isinstance(tool_call, dict):
+                    continue
+                function = tool_call.get("function", {}) if isinstance(tool_call, dict) else {}
+                name = function.get("name", "") if isinstance(function, dict) else ""
+                if name not in ("web_search", "search_web"):
+                    continue
+                query = _tool_call_query(tool_call)
+                if not query:
+                    continue
+                results = self._perform_live_search(query)
+                working_messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.get("id", ""),
+                    "content": json.dumps({"query": query, "results": results}, ensure_ascii=False),
+                })
+                executed_any = True
+
+            if not executed_any:
+                break
+
+        if stream:
+            self._start_sse()
+            if final_content:
+                chunk = {
+                    "choices": [{"index": 0, "delta": {"content": final_content}, "finish_reason": None}],
+                    "provider": "tool-search",
+                    "model": model,
+                }
+                self._send_chunk(f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n".encode("utf-8"))
+            self._send_chunk(b"data: [DONE]\n\n")
+            self._end_chunks()
+            return
+
+        if isinstance(final_raw, dict):
+            self._json_response(final_raw)
+        else:
+            self._json_response({
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": final_content}, "finish_reason": "stop"}],
+                "model": model,
+            })
+
     def _handle_search(self, q: str):
         if not q.strip():
             self._json_response({"query": "", "results": []})
@@ -1268,7 +1526,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             req = urllib.request.Request(ddg_html_url, headers={
                 "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             })
-            with urllib.request.urlopen(req, timeout=5, context=_get_ssl_context()) as resp:
+            with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
                 c = resp.read().decode("utf-8", errors="replace")
                 bodies = re.findall(r"<div class=\"[^\"]*result__body[^\"]*\">([\s\S]*?)(?:<div class=\"[^\"]*result__body|\Z)", c)
                 for b in bodies[:5]:
@@ -1290,7 +1548,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             try:
                 ddg_url = f"https://api.duckduckgo.com/?q={urllib.parse.quote(q_clean)}&format=json&no_html=1&skip_disambig=1"
                 req = urllib.request.Request(ddg_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-                with urllib.request.urlopen(req, timeout=4, context=_get_ssl_context()) as resp:
+                with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
                     d = json.loads(resp.read().decode())
                     abstract = d.get("AbstractText", "") or d.get("Abstract", "")
                     heading = d.get("Heading", "")
@@ -1316,7 +1574,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             try:
                 url = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(q_clean)}&format=json&utf8="
                 req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0 (Linux; en)"})
-                with urllib.request.urlopen(req, timeout=5, context=_get_ssl_context()) as resp:
+                with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
                     data = json.loads(resp.read().decode())
                     items = data.get("query", {}).get("search", [])
                     for it in items[:4]:
