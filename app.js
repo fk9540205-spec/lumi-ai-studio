@@ -9298,7 +9298,7 @@
 
     window.onGoogleSignInFailure = function(err) {
       console.warn("Google Sign-In failed:", err);
-      showToast("Google Sign-In cancelled or failed");
+      showToast(err || "Google Sign-In cancelled or failed");
     };
 
     const googleAuthBtn = document.querySelector("#google-auth-btn");
