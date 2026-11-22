@@ -1063,6 +1063,227 @@
   };
   window.GenUIState = GenUIState;
 
+
+  // --- ChatGPT Mobile Image Studio Suite (Pages 1, 2, 3, 4, 5, 6) ---
+  const ChatGPTImageStudio = {
+    activeViewer: null, // { url, prompt, msgId, zoomed, markup, drawer, markupColor, markupWidth }
+    markupCtx: null,
+    isDrawing: false,
+    lastX: 0,
+    lastY: 0,
+    wizardPresets: {
+      step1: [
+        { label: "Anime girl 🌸", val: "Anime girl cute character" },
+        { label: "Dark cinematic 🖤", val: "Dark cinematic moody atmosphere" },
+        { label: "Nature landscape 🌄", val: "Scenic nature mountain landscape golden hour" },
+        { label: "Futuristic AI 🤖", val: "Futuristic AI cyberpunk neon robot" },
+        { label: "Cute wallpaper ✨", val: "Cute aesthetic pastel wallpaper" },
+        { label: "Fantasy world 🌌", val: "Fantasy celestial mythical world aurora" },
+        { label: "You decide 🎨", val: "Creative masterpiece artistic composition" },
+      ],
+      step2: [
+        { label: "Ultra realistic", val: "Ultra realistic 8k photorealistic photography" },
+        { label: "3D cinematic", val: "3D cinematic CGI render unreal engine 5" },
+        { label: "Anime art", val: "Anime art style studio ghibli aesthetic makoto shinkai" },
+        { label: "Digital painting", val: "Digital painting concept art detailed brushwork" },
+        { label: "Photorealistic", val: "Photorealistic raw 35mm portrait depth of field" },
+      ]
+    },
+    renderWizard(msg) {
+      const step = (msg.imageWizard && msg.imageWizard.step) || 1;
+      const isStep1 = step === 1;
+      const title = isStep1 ? "Kis cheez ki image chahiye?" : "Image ka style kaisa ho?";
+      const counter = isStep1 ? "< 1 of 2 >" : "< 2 of 2 >";
+      const options = isStep1 ? this.wizardPresets.step1 : this.wizardPresets.step2;
+      const placeholder = isStep1 ? "Apna idea likho" : "Koi aur style";
+
+      return `
+        <div class="chatgpt-wizard-card" id="wizard-card-${msg.id}">
+          <div class="chatgpt-wizard-header">
+            <div class="chatgpt-step-nav">
+              <button type="button" class="chatgpt-step-nav-btn" data-action="wizard-nav" data-msg-id="${msg.id}" data-target-step="1" ${isStep1 ? "disabled" : ""}>&lt;</button>
+              <span>${isStep1 ? "1 of 2" : "2 of 2"}</span>
+              <button type="button" class="chatgpt-step-nav-btn" data-action="wizard-nav" data-msg-id="${msg.id}" data-target-step="2" ${!isStep1 ? "disabled" : ""}>&gt;</button>
+            </div>
+            <button type="button" class="chatgpt-close-btn" data-action="wizard-close" data-msg-id="${msg.id}" title="Close">✕</button>
+          </div>
+          <div class="chatgpt-wizard-title">${title}</div>
+          <div class="chatgpt-wizard-options">
+            ${options.map(opt => `
+              <div class="chatgpt-wizard-opt" data-action="wizard-choose" data-msg-id="${msg.id}" data-step="${step}" data-val="${escapeHtml(opt.val)}" data-label="${escapeHtml(opt.label)}">
+                <span>${opt.label}</span>
+              </div>
+            `).join("")}
+          </div>
+          <div class="chatgpt-wizard-footer">
+            <div class="chatgpt-wizard-input-wrap">
+              <input type="text" class="chatgpt-wizard-input" id="wizard-input-${msg.id}" placeholder="${placeholder}" data-msg-id="${msg.id}" data-step="${step}" />
+              <button type="button" class="chatgpt-wizard-input-submit" data-action="wizard-submit-input" data-msg-id="${msg.id}" data-step="${step}">➔</button>
+            </div>
+            <button type="button" class="chatgpt-wizard-skip-btn" data-action="wizard-skip" data-msg-id="${msg.id}" data-step="${step}">Skip</button>
+          </div>
+        </div>
+      `;
+    },
+    renderSummary(choices) {
+      if (!choices || !choices.subject) return "";
+      return `
+        <div class="chatgpt-prompt-summary animate-rise-in">
+          <div class="chatgpt-summary-row">
+            <div class="chatgpt-summary-label">Kis cheez ki image chahiye?</div>
+            <div class="chatgpt-summary-value">${escapeHtml(choices.subject)}</div>
+          </div>
+          <div class="chatgpt-summary-row">
+            <div class="chatgpt-summary-label">Image ka style kaisa ho ?</div>
+            <div class="chatgpt-summary-value">${escapeHtml(choices.style || "Ultra realistic")}</div>
+          </div>
+        </div>
+      `;
+    },
+    renderCanvasProgress(msg) {
+      const pct = msg.generationPercent || 7;
+      const stageText = msg.generationStage || (pct > 60 ? "Polishing details" : pct > 20 ? "Making the first draft" : "Sketching it out");
+      const isPolishing = pct > 60;
+
+      return `
+        <div class="chatgpt-canvas-card animate-rise-in" id="canvas-card-${msg.id}">
+          <div class="chatgpt-canvas-stage-text">${stageText}</div>
+          <div class="chatgpt-canvas-visual">
+            ${isPolishing
+              ? `<div class="chatgpt-polishing-beam">
+                   <div class="chatgpt-beam-head"></div>
+                   <div class="chatgpt-beam-dot d1"></div>
+                   <div class="chatgpt-beam-dot d2"></div>
+                   <div class="chatgpt-beam-dot d3"></div>
+                   <div class="chatgpt-beam-dot d4"></div>
+                 </div>`
+              : `<div class="chatgpt-dot-grid">
+                   ${Array.from({length: 120}).map((_, i) => `<span class="c-dot dot-${i % 8}"></span>`).join("")}
+                 </div>`
+            }
+            <div class="chatgpt-percent-pill">${pct}%</div>
+          </div>
+        </div>
+      `;
+    },
+    renderFullscreenViewer() {
+      if (!this.activeViewer || !this.activeViewer.url) return "";
+      const v = this.activeViewer;
+      const isZoomed = v.zoomed || false;
+      const isMarkup = v.markup || false;
+      const drawer = v.drawer || null;
+
+      return `
+        <div class="chatgpt-fullscreen-viewer" id="chatgpt-image-viewer-modal">
+          <!-- Top Bar (Page 1) -->
+          <div class="viewer-top-bar">
+            <button type="button" class="viewer-circle-btn" id="viewer-close-btn" title="Close">✕</button>
+            <div class="viewer-top-right">
+              <button type="button" class="viewer-circle-btn" id="viewer-options-btn" title="Options">⋮</button>
+              <button type="button" class="viewer-circle-btn" id="viewer-download-btn" title="Download">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </button>
+              <button type="button" class="viewer-share-pill" id="viewer-share-btn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                <span>Share</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Center Stage (Page 1) -->
+          <div class="viewer-center-stage" id="viewer-stage">
+            <img src="${escapeHtml(v.url)}" alt="${escapeHtml(v.prompt || "AI Image")}" class="viewer-main-img ${isZoomed ? 'zoomed' : ''}" id="viewer-img" />
+            <canvas id="viewer-markup-canvas" class="${isMarkup ? 'active' : ''}"></canvas>
+          </div>
+
+          <!-- Markup Mini Palette (When Markup is Active) -->
+          ${isMarkup ? `
+            <div class="viewer-markup-palette animate-rise-in">
+              <span class="markup-color-swatch ${(v.markupColor || '#ffffff') === '#ffffff' ? 'active' : ''}" data-color="#ffffff" style="background:#ffffff;"></span>
+              <span class="markup-color-swatch ${v.markupColor === '#ec4899' ? 'active' : ''}" data-color="#ec4899" style="background:#ec4899;"></span>
+              <span class="markup-color-swatch ${v.markupColor === '#ef4444' ? 'active' : ''}" data-color="#ef4444" style="background:#ef4444;"></span>
+              <span class="markup-color-swatch ${v.markupColor === '#eab308' ? 'active' : ''}" data-color="#eab308" style="background:#eab308;"></span>
+              <span class="markup-color-swatch ${v.markupColor === '#06b6d4' ? 'active' : ''}" data-color="#06b6d4" style="background:#06b6d4;"></span>
+              <button type="button" class="markup-action-btn" id="markup-clear-btn">Clear</button>
+              <button type="button" class="markup-action-btn" id="markup-done-btn">Save</button>
+            </div>
+          ` : ""}
+
+          <!-- Drawers for Edit / Resize / Remove (Page 1) -->
+          ${drawer === "edit" ? `
+            <div class="viewer-drawer animate-rise-in" id="viewer-edit-drawer">
+              <div class="viewer-drawer-header">
+                <div class="viewer-drawer-title">✨ AI Image Edit / Remix</div>
+                <button type="button" class="viewer-drawer-close" data-action="close-drawer">✕</button>
+              </div>
+              <div class="flex gap-2">
+                <input type="text" id="viewer-edit-input" class="chatgpt-wizard-input flex-1" placeholder="Describe edits: e.g. add cat ears, snowy background, neon lighting..." />
+                <button type="button" id="viewer-edit-submit-btn" class="chatgpt-wizard-skip-btn">Apply Edit</button>
+              </div>
+            </div>
+          ` : ""}
+
+          ${drawer === "resize" ? `
+            <div class="viewer-drawer animate-rise-in" id="viewer-resize-drawer">
+              <div class="viewer-drawer-header">
+                <div class="viewer-drawer-title">⬚ Aspect Ratio & Canvas Resize</div>
+                <button type="button" class="viewer-drawer-close" data-action="close-drawer">✕</button>
+              </div>
+              <div class="viewer-ratio-grid">
+                <button type="button" class="viewer-ratio-btn" data-aspect="1:1" data-label="Square (1:1)">
+                  <div class="viewer-ratio-box sq"></div>
+                  <span>Square (1:1)</span>
+                </button>
+                <button type="button" class="viewer-ratio-btn" data-aspect="16:9" data-label="Landscape (16:9)">
+                  <div class="viewer-ratio-box land"></div>
+                  <span>Wide (16:9)</span>
+                </button>
+                <button type="button" class="viewer-ratio-btn" data-aspect="9:16" data-label="Portrait (9:16)">
+                  <div class="viewer-ratio-box port"></div>
+                  <span>Story (9:16)</span>
+                </button>
+              </div>
+            </div>
+          ` : ""}
+
+          ${drawer === "remove" ? `
+            <div class="viewer-drawer animate-rise-in" id="viewer-remove-drawer">
+              <div class="viewer-drawer-header">
+                <div class="viewer-drawer-title">⌫ Smart Object Remover</div>
+                <button type="button" class="viewer-drawer-close" data-action="close-drawer">✕</button>
+              </div>
+              <div class="flex gap-2">
+                <input type="text" id="viewer-remove-input" class="chatgpt-wizard-input flex-1" placeholder="What to remove: e.g. remove headphones, remove person in background..." />
+                <button type="button" id="viewer-remove-submit-btn" class="chatgpt-wizard-skip-btn">Erase</button>
+              </div>
+            </div>
+          ` : ""}
+
+          <!-- Bottom Toolbar (Page 1) -->
+          <div class="viewer-bottom-bar">
+            <div class="viewer-action-item" data-action="viewer-tool" data-tool="edit">
+              <div class="viewer-action-circle">⊕</div>
+              <div class="viewer-action-label">Edit</div>
+            </div>
+            <div class="viewer-action-item" data-action="viewer-tool" data-tool="markup">
+              <div class="viewer-action-circle">∿</div>
+              <div class="viewer-action-label">Markup</div>
+            </div>
+            <div class="viewer-action-item" data-action="viewer-tool" data-tool="resize">
+              <div class="viewer-action-circle">⬚</div>
+              <div class="viewer-action-label">Resize</div>
+            </div>
+            <div class="viewer-action-item" data-action="viewer-tool" data-tool="remove">
+              <div class="viewer-action-circle">⌫</div>
+              <div class="viewer-action-label">Remove</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  };
+  window.ChatGPTImageStudio = ChatGPTImageStudio;
+
   // --- ChatGPT-Style Generative UI (GenUI) Engine & Component System ---
   const GenUIRenderer = {
     isRecognizedType(type) {
@@ -4251,30 +4472,24 @@
 
           <!-- Ultra-Clean Studio Image Generator Card -->
           ${
+            msg.imageWizard && msg.imageWizard.active
+              ? ChatGPTImageStudio.renderWizard(msg)
+              : ""
+          }
+
+          ${
+            msg.imageChoices
+              ? ChatGPTImageStudio.renderSummary(msg.imageChoices)
+              : ""
+          }
+
+          ${
             msg.imageLoading
-              ? `
-            <div class="pro-gen-card pro-image-gen-card my-3" id="pro-img-${msg.id}">
-              <div class="pro-gen-header">
-                <div class="pro-gen-badge">
-                  <span class="pro-pulse-dot"></span>
-                  <span>${escapeHtml(msg.imageProvider || "Stability AI SD 3.5 Large (Studio Quality)")}</span>
-                </div>
-                <span class="pro-gen-timer" id="image-stage-${msg.id}">${escapeHtml(msg.generationStage || "Synthesizing")}</span>
-              </div>
-              <div class="pro-gen-body">
-                <div class="pro-shimmer-sweep"></div>
-                <div class="pro-spinner-ring"></div>
-                <div class="pro-gen-title">Rendering 8K Masterpiece</div>
-                <div class="pro-gen-prompt">"${escapeHtml(msg.imagePrompt || "")}"</div>
-              </div>
-              <div class="pro-progress-track">
-                <div class="pro-progress-fill"></div>
-              </div>
-            </div>`
+              ? ChatGPTImageStudio.renderCanvasProgress(msg)
               : msg.imageUrl
               ? `
             <div class="ai-image-card my-3" id="pro-img-${msg.id}">
-              <img src="${escapeHtml(msg.imageUrl)}" alt="${escapeHtml(msg.imagePrompt || "Generated Image")}" loading="lazy" class="cursor-pointer" data-action="zoom-image" data-src="${escapeHtml(msg.imageUrl)}" />
+              <img src="${escapeHtml(msg.imageUrl)}" alt="${escapeHtml(msg.imagePrompt || "Generated Image")}" loading="lazy" class="cursor-pointer" data-action="zoom-image" data-src="${escapeHtml(msg.imageUrl)}" data-prompt="${escapeHtml(msg.imagePrompt || "")}" data-msg-id="${msg.id}" />
               <div class="ai-image-overlay">
                 <span class="text-xs text-white/90 truncate max-w-[200px] font-medium drop-shadow">
                   🎨 ${escapeHtml(msg.imagePrompt || "AI Generated Image")}
@@ -5397,41 +5612,57 @@
     };
 
     // Reusable Real-Time Generative Image Flow
-    const triggerImageGeneration = (imagePrompt, targetMsg) => {
+    const triggerImageGeneration = (imagePrompt, targetMsg, aspect = "1:1") => {
       let enhancedPrompt = imagePrompt;
+      if (aspect === "16:9" && !enhancedPrompt.includes("16:9")) {
+        enhancedPrompt += ", 16:9 widescreen landscape aspect ratio";
+      } else if (aspect === "9:16" && !enhancedPrompt.includes("9:16")) {
+        enhancedPrompt += ", 9:16 vertical smartphone wallpaper aspect ratio";
+      }
+
       if (!/photorealistic|8k|masterpiece|cinematic|detailed/i.test(enhancedPrompt)) {
-        enhancedPrompt = `${imagePrompt}, highly detailed, photorealistic, 8k resolution, cinematic lighting, masterpiece`;
+        enhancedPrompt = `${enhancedPrompt}, highly detailed, photorealistic, 8k resolution, cinematic lighting, masterpiece`;
       }
 
       targetMsg.imagePrompt = imagePrompt;
       targetMsg.imageLoading = true;
+      targetMsg.generationPercent = 7;
+      targetMsg.generationStage = "Sketching it out";
       targetMsg.content = "";
-      targetMsg.generationStage = "SAMPLING LATENT SPACE";
       saveJson(STORAGE.CHATS, conversations);
       if (!updateAssistantMsgDOM(targetMsg, false, true)) {
         render();
       }
       scrollToBottom();
 
-      const stages = [
-        "SAMPLING LATENT SPACE",
-        "DIFFUSION DENOISING (24/30)",
-        "SYNTHESIZING 8K TEXTURES",
-        "FINALIZING MASTERPIECE"
-      ];
-      let stageIdx = 0;
+      let currentPct = 7;
       const stageTimer = setInterval(() => {
         if (!targetMsg.imageLoading) {
           clearInterval(stageTimer);
           return;
         }
-        stageIdx = (stageIdx + 1) % stages.length;
-        targetMsg.generationStage = stages[stageIdx];
-        const stageEl = document.querySelector(`#image-stage-${targetMsg.id}`);
-        if (stageEl) {
-          stageEl.textContent = stages[stageIdx];
+        if (currentPct < 22) {
+          currentPct += 5;
+          targetMsg.generationStage = "Sketching it out";
+        } else if (currentPct < 65) {
+          currentPct += 8;
+          targetMsg.generationStage = "Making the first draft";
+        } else if (currentPct < 96) {
+          currentPct += 4;
+          targetMsg.generationStage = "Polishing details";
         }
-      }, 1000);
+        targetMsg.generationPercent = currentPct;
+        const card = document.querySelector(`#canvas-card-${targetMsg.id}`);
+        if (card) {
+          const stEl = card.querySelector(".chatgpt-canvas-stage-text");
+          const pctEl = card.querySelector(".chatgpt-percent-pill");
+          if (stEl) stEl.textContent = targetMsg.generationStage;
+          if (pctEl) pctEl.textContent = `${targetMsg.generationPercent}%`;
+          if (targetMsg.generationPercent > 60 && !card.querySelector(".chatgpt-polishing-beam")) {
+            updateAssistantMsgDOM(targetMsg, false, true);
+          }
+        }
+      }, 700);
 
       const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
       const candidateEndpoints = isLocalHost
@@ -5628,6 +5859,31 @@
         .trim();
       if (!videoPrompt) videoPrompt = prompt.trim();
       triggerVideoGeneration(videoPrompt, assistantMsg);
+      return;
+    }
+
+    // 1. CHATGPT-STYLE INTERACTIVE IMAGE CREATION WIZARD & GENERATION
+    const cleanLowerPrompt = prompt.trim().toLowerCase();
+    const isVagueImagePrompt =
+      /^(?:ek\s+)?(?:image|photo|tasveer|picture|pic|wallpaper)\s*(?:banao|banado|bana\s+do|chahiye|dikhao)(?:\s+to)?$/i.test(cleanLowerPrompt) ||
+      /^(?:banao|banado|generate|create)\s*(?:ek\s+)?(?:image|photo|tasveer|picture|pic|wallpaper)(?:\s+to)?$/i.test(cleanLowerPrompt) ||
+      /^(?:can you\s+)?(?:make|generate|create)\s*(?:an?\s+)?image$/i.test(cleanLowerPrompt) ||
+      cleanLowerPrompt === 'image banao' || cleanLowerPrompt === 'ek image banao to' || cleanLowerPrompt === 'photo banao';
+
+    if (isVagueImagePrompt) {
+      assistantMsg.content = 'Kaisi image banani hai? 😄';
+      assistantMsg.imageWizard = {
+        step: 1,
+        totalSteps: 2,
+        subject: null,
+        style: null,
+        active: true
+      };
+      saveJson(STORAGE.CHATS, conversations);
+      AudioEffects.play('send');
+      render();
+      restoreComposerButtons();
+      scrollToBottom();
       return;
     }
 
@@ -7708,7 +7964,9 @@
     if (settingsModalOpen) {
       root.innerHTML += renderSettingsModal();
     }
-    if (lightboxImageSrc) {
+    if (ChatGPTImageStudio.activeViewer && ChatGPTImageStudio.activeViewer.url) {
+      root.innerHTML += ChatGPTImageStudio.renderFullscreenViewer();
+    } else if (lightboxImageSrc) {
       root.innerHTML += renderImageLightbox();
     }
     attachEventListeners();
@@ -9346,6 +9604,403 @@
         }
       });
     });
+
+
+    // --- CHATGPT IMAGE STUDIO EVENT DELEGATION ---
+    // A. Wizard Step Navigation
+    document.querySelectorAll("[data-action='wizard-nav']").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute("data-msg-id");
+        const targetStep = parseInt(btn.getAttribute("data-target-step"), 10) || 1;
+        const thread = getCurrentThread();
+        if (!thread) return;
+        const msg = thread.messages.find(m => m.id === msgId);
+        if (msg && msg.imageWizard) {
+          msg.imageWizard.step = targetStep;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+        }
+      });
+    });
+
+    // B. Wizard Option Click
+    document.querySelectorAll("[data-action='wizard-choose']").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute("data-msg-id");
+        const step = parseInt(btn.getAttribute("data-step"), 10) || 1;
+        const val = btn.getAttribute("data-val");
+        const label = btn.getAttribute("data-label");
+        const thread = getCurrentThread();
+        if (!thread) return;
+        const msg = thread.messages.find(m => m.id === msgId);
+        if (!msg || !msg.imageWizard) return;
+
+        AudioEffects.play("click");
+        if (step === 1) {
+          msg.imageWizard.subject = label || val;
+          msg.imageWizard.subjectPrompt = val;
+          msg.imageWizard.step = 2;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+        } else {
+          msg.imageWizard.style = label || val;
+          msg.imageWizard.stylePrompt = val;
+          msg.imageWizard.active = false;
+          msg.imageChoices = {
+            subject: msg.imageWizard.subject || "AI Choice 🌸",
+            style: msg.imageWizard.style || "Ultra realistic"
+          };
+          const finalPrompt = `${msg.imageWizard.subjectPrompt || msg.imageWizard.subject}, ${msg.imageWizard.stylePrompt || msg.imageWizard.style}`;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+          triggerImageGeneration(finalPrompt, msg);
+        }
+      });
+    });
+
+    // C. Wizard Skip Button
+    document.querySelectorAll("[data-action='wizard-skip']").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute("data-msg-id");
+        const step = parseInt(btn.getAttribute("data-step"), 10) || 1;
+        const thread = getCurrentThread();
+        if (!thread) return;
+        const msg = thread.messages.find(m => m.id === msgId);
+        if (!msg || !msg.imageWizard) return;
+
+        AudioEffects.play("click");
+        if (step === 1) {
+          msg.imageWizard.subject = "You decide 🎨";
+          msg.imageWizard.subjectPrompt = "Creative artistic masterpiece";
+          msg.imageWizard.step = 2;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+        } else {
+          msg.imageWizard.style = "Ultra realistic";
+          msg.imageWizard.stylePrompt = "Ultra realistic 8k photorealistic";
+          msg.imageWizard.active = false;
+          msg.imageChoices = {
+            subject: msg.imageWizard.subject || "You decide 🎨",
+            style: "Ultra realistic"
+          };
+          const finalPrompt = `${msg.imageWizard.subjectPrompt || msg.imageWizard.subject}, Ultra realistic 8k`;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+          triggerImageGeneration(finalPrompt, msg);
+        }
+      });
+    });
+
+    // D. Wizard Custom Input Submit
+    const handleWizardCustomSubmit = (msgId, step) => {
+      const inp = document.querySelector(`#wizard-input-${msgId}`);
+      const val = inp ? inp.value.trim() : "";
+      if (!val) return;
+      const thread = getCurrentThread();
+      if (!thread) return;
+      const msg = thread.messages.find(m => m.id === msgId);
+      if (!msg || !msg.imageWizard) return;
+
+      AudioEffects.play("click");
+      if (step === 1) {
+        msg.imageWizard.subject = val;
+        msg.imageWizard.subjectPrompt = val;
+        msg.imageWizard.step = 2;
+        saveJson(STORAGE.CHATS, conversations);
+        render();
+      } else {
+        msg.imageWizard.style = val;
+        msg.imageWizard.stylePrompt = val;
+        msg.imageWizard.active = false;
+        msg.imageChoices = {
+          subject: msg.imageWizard.subject || "Custom",
+          style: val
+        };
+        const finalPrompt = `${msg.imageWizard.subjectPrompt || msg.imageWizard.subject}, ${val}`;
+        saveJson(STORAGE.CHATS, conversations);
+        render();
+        triggerImageGeneration(finalPrompt, msg);
+      }
+    };
+
+    document.querySelectorAll("[data-action='wizard-submit-input']").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute("data-msg-id");
+        const step = parseInt(btn.getAttribute("data-step"), 10) || 1;
+        handleWizardCustomSubmit(msgId, step);
+      });
+    });
+
+    document.querySelectorAll(".chatgpt-wizard-input").forEach(inp => {
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const msgId = inp.getAttribute("data-msg-id");
+          const step = parseInt(inp.getAttribute("data-step"), 10) || 1;
+          handleWizardCustomSubmit(msgId, step);
+        }
+      });
+    });
+
+    // E. Wizard Close Button
+    document.querySelectorAll("[data-action='wizard-close']").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const msgId = btn.getAttribute("data-msg-id");
+        const thread = getCurrentThread();
+        if (!thread) return;
+        const msg = thread.messages.find(m => m.id === msgId);
+        if (msg && msg.imageWizard) {
+          msg.imageWizard.active = false;
+          saveJson(STORAGE.CHATS, conversations);
+          render();
+        }
+      });
+    });
+
+    // F. Full-Screen Viewer Open
+    document.querySelectorAll("[data-action='zoom-image']").forEach(img => {
+      img.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const src = img.getAttribute("data-src") || img.src;
+        const prompt = img.getAttribute("data-prompt") || img.getAttribute("alt") || "AI Generated Image";
+        const msgId = img.getAttribute("data-msg-id") || "";
+        if (src) {
+          ChatGPTImageStudio.activeViewer = {
+            url: src,
+            prompt: prompt,
+            msgId: msgId,
+            zoomed: false,
+            markup: false,
+            drawer: null,
+            markupColor: "#ffffff",
+            markupWidth: 4
+          };
+          render();
+        }
+      });
+    });
+
+    // G. Full-Screen Viewer Controls (Page 1)
+    const viewerCloseBtn = document.querySelector("#viewer-close-btn");
+    if (viewerCloseBtn) {
+      viewerCloseBtn.addEventListener("click", () => {
+        ChatGPTImageStudio.activeViewer = null;
+        render();
+      });
+    }
+
+    const viewerDownloadBtn = document.querySelector("#viewer-download-btn");
+    if (viewerDownloadBtn && ChatGPTImageStudio.activeViewer) {
+      viewerDownloadBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        downloadImageFile(ChatGPTImageStudio.activeViewer.url, ChatGPTImageStudio.activeViewer.prompt || "lumi-image");
+      });
+    }
+
+    const viewerShareBtn = document.querySelector("#viewer-share-btn");
+    if (viewerShareBtn && ChatGPTImageStudio.activeViewer) {
+      viewerShareBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const url = ChatGPTImageStudio.activeViewer.url;
+        const prompt = ChatGPTImageStudio.activeViewer.prompt || "AI Generated Image";
+        if (navigator.share) {
+          try {
+            await navigator.share({ title: prompt, text: prompt, url: url });
+          } catch (shErr) {}
+        } else {
+          navigator.clipboard.writeText(url);
+          showToast("Image link copied to clipboard!");
+        }
+      });
+    }
+
+    const viewerImg = document.querySelector("#viewer-img");
+    if (viewerImg && ChatGPTImageStudio.activeViewer) {
+      viewerImg.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (!ChatGPTImageStudio.activeViewer.markup) {
+          ChatGPTImageStudio.activeViewer.zoomed = !ChatGPTImageStudio.activeViewer.zoomed;
+          render();
+        }
+      });
+    }
+
+    // H. Viewer Bottom Tools (Edit, Markup, Resize, Remove)
+    document.querySelectorAll("[data-action='viewer-tool']").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const tool = btn.getAttribute("data-tool");
+        if (!ChatGPTImageStudio.activeViewer) return;
+
+        if (tool === "markup") {
+          ChatGPTImageStudio.activeViewer.markup = !ChatGPTImageStudio.activeViewer.markup;
+          ChatGPTImageStudio.activeViewer.drawer = null;
+          render();
+          if (ChatGPTImageStudio.activeViewer.markup) {
+            initMarkupCanvas();
+          }
+        } else {
+          ChatGPTImageStudio.activeViewer.drawer = ChatGPTImageStudio.activeViewer.drawer === tool ? null : tool;
+          ChatGPTImageStudio.activeViewer.markup = false;
+          render();
+        }
+      });
+    });
+
+    // Close Drawers
+    document.querySelectorAll("[data-action='close-drawer']").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (ChatGPTImageStudio.activeViewer) {
+          ChatGPTImageStudio.activeViewer.drawer = null;
+          render();
+        }
+      });
+    });
+
+    // Resize Ratio Selection
+    document.querySelectorAll(".viewer-ratio-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const aspect = btn.getAttribute("data-aspect");
+        const prompt = ChatGPTImageStudio.activeViewer ? ChatGPTImageStudio.activeViewer.prompt : "";
+        ChatGPTImageStudio.activeViewer = null;
+        render();
+        if (prompt) {
+          sendMessage(`/image ${prompt} --ar ${aspect}`);
+        }
+      });
+    });
+
+    // Edit Prompt Submission
+    const viewerEditSubmitBtn = document.querySelector("#viewer-edit-submit-btn");
+    if (viewerEditSubmitBtn) {
+      viewerEditSubmitBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const inp = document.querySelector("#viewer-edit-input");
+        const editPrompt = inp ? inp.value.trim() : "";
+        const originalPrompt = ChatGPTImageStudio.activeViewer ? ChatGPTImageStudio.activeViewer.prompt : "";
+        if (editPrompt) {
+          ChatGPTImageStudio.activeViewer = null;
+          render();
+          sendMessage(`/image ${originalPrompt}, modified: ${editPrompt}`);
+        }
+      });
+    }
+
+    // Remove Object Submission
+    const viewerRemoveSubmitBtn = document.querySelector("#viewer-remove-submit-btn");
+    if (viewerRemoveSubmitBtn) {
+      viewerRemoveSubmitBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const inp = document.querySelector("#viewer-remove-input");
+        const removePrompt = inp ? inp.value.trim() : "";
+        const originalPrompt = ChatGPTImageStudio.activeViewer ? ChatGPTImageStudio.activeViewer.prompt : "";
+        if (removePrompt) {
+          ChatGPTImageStudio.activeViewer = null;
+          render();
+          sendMessage(`/image ${originalPrompt}, cleanly remove ${removePrompt}, inpaint background seamlessly`);
+        }
+      });
+    }
+
+    // Markup Canvas Initialization
+    function initMarkupCanvas() {
+      const canvas = document.querySelector("#viewer-markup-canvas");
+      const img = document.querySelector("#viewer-img");
+      if (!canvas || !img) return;
+
+      canvas.width = img.clientWidth || 340;
+      canvas.height = img.clientHeight || 340;
+      const ctx = canvas.getContext("2d");
+      ChatGPTImageStudio.markupCtx = ctx;
+
+      let drawing = false;
+      let lastX = 0;
+      let lastY = 0;
+
+      const getPos = (evt) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+        return {
+          x: clientX - rect.left,
+          y: clientY - rect.top
+        };
+      };
+
+      const startDraw = (evt) => {
+        evt.preventDefault();
+        drawing = true;
+        const pos = getPos(evt);
+        lastX = pos.x;
+        lastY = pos.y;
+      };
+
+      const drawMove = (evt) => {
+        if (!drawing) return;
+        evt.preventDefault();
+        const pos = getPos(evt);
+        ctx.strokeStyle = (ChatGPTImageStudio.activeViewer && ChatGPTImageStudio.activeViewer.markupColor) || "#ec4899";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+        lastX = pos.x;
+        lastY = pos.y;
+      };
+
+      const stopDraw = () => { drawing = false; };
+
+      canvas.addEventListener("mousedown", startDraw);
+      canvas.addEventListener("mousemove", drawMove);
+      canvas.addEventListener("mouseup", stopDraw);
+      canvas.addEventListener("touchstart", startDraw, { passive: false });
+      canvas.addEventListener("touchmove", drawMove, { passive: false });
+      canvas.addEventListener("touchend", stopDraw);
+
+      // Swatches
+      document.querySelectorAll(".markup-color-swatch").forEach(swatch => {
+        swatch.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const col = swatch.getAttribute("data-color");
+          if (ChatGPTImageStudio.activeViewer) {
+            ChatGPTImageStudio.activeViewer.markupColor = col;
+          }
+          document.querySelectorAll(".markup-color-swatch").forEach(s => s.classList.remove("active"));
+          swatch.classList.add("active");
+        });
+      });
+
+      const clearBtn = document.querySelector("#markup-clear-btn");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+      }
+
+      const doneBtn = document.querySelector("#markup-done-btn");
+      if (doneBtn) {
+        doneBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          showToast("Markup saved!");
+          if (ChatGPTImageStudio.activeViewer) {
+            ChatGPTImageStudio.activeViewer.markup = false;
+            render();
+          }
+        });
+      }
+    }
+
 
     // In-App Fullscreen Image Lightbox Handlers
     const closeLightboxBtn = document.querySelector("#close-lightbox-btn");
