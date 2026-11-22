@@ -5428,15 +5428,41 @@
   }
 
   // --- Real API Streaming Integration ---
-  async function streamFromCustomProvider(provider, modelName, chatHistory, onChunk, abortSignal) {
+  async function streamFromCustomProvider(provider, modelName, chatHistory, onChunk, abortSignal, imagePayload = null) {
     const isAnthropic = provider.protocol === "anthropic";
     const apiKey = provider.apiKey || "";
+    const historyWithImage = imagePayload
+      ? chatHistory.map((message, index) => (
+          index === chatHistory.length - 1 && message.role === "user"
+            ? { ...message, content: [
+                { type: "text", text: typeof message.content === "string" ? message.content : "Please examine the attached image." },
+                { type: "image_url", image_url: { url: imagePayload } },
+              ] }
+            : message
+        ))
+      : chatHistory;
 
     if (isAnthropic) {
-      const systemMsg = chatHistory.find((m) => m.role === "system")?.content || "";
-      const nonSystemMsgs = chatHistory
+      const systemMsg = historyWithImage.find((m) => m.role === "system")?.content || "";
+      const nonSystemMsgs = historyWithImage
         .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role, content: m.content }));
+        .map((m) => {
+          if (imagePayload && m.role === "user" && Array.isArray(m.content)) {
+            const text = m.content.find((part) => part.type === "text")?.text || "Please examine the attached image.";
+            const mediaMatch = imagePayload.match(/^data:(image\/[^;]+);base64,(.+)$/);
+            return {
+              role: "user",
+              content: [
+                { type: "text", text },
+                ...(mediaMatch ? [{
+                  type: "image",
+                  source: { type: "base64", media_type: mediaMatch[1], data: mediaMatch[2] },
+                }] : []),
+              ],
+            };
+          }
+          return { role: m.role, content: m.content };
+        });
       if (nonSystemMsgs.length === 0) {
         nonSystemMsgs.push({ role: "user", content: "Hello" });
       }
@@ -5524,9 +5550,22 @@
       headers,
       body: JSON.stringify({
         model: modelName || provider.default_model || "gpt-4o",
-        messages: chatHistory,
+        messages: historyWithImage,
         stream: true,
         max_tokens: 4096,
+        tools: [{
+          type: "function",
+          function: {
+            name: "web_search",
+            description: "Search the live web for current facts, news, prices, scores, weather, or URLs.",
+            parameters: {
+              type: "object",
+              properties: { query: { type: "string", description: "Exact live web search query" } },
+              required: ["query"],
+            },
+          },
+        }],
+        tool_choice: "auto",
       }),
     });
 
@@ -6343,7 +6382,7 @@
         /^(search|google|dhoondo|khojo|find|who is|what is|when is|where is|latest|current|today'?s|news about|live score)\b/i.test(prompt.trim()) ||
         /\b(search\s*(?:karo|karke|kar)|google\s*(?:karo|karke|pe)?|dhoond\s*(?:kar|ke|karo)?|khoj\s*(?:kar|ke|karo)?|latest news|aaj ki|today|ipl score|score|news|who is|kaun hai|kya hai)\b/i.test(prompt);
 
-      if (false && hasSearchIntent) {
+      if (hasSearchIntent) {
         let cleanQuery = prompt
           .replace(/^\/search\s+/i, "")
           .replace(/^(?:please\s+|can\s+you\s+)?(?:search(?:\s+the\s+web|\s+online|\s+on\s+google)?|google\s*(?:karke|karo|pe|par)|dhoondo|khojo)(?:\s+(?:for|about|me))?\s+/i, "")
@@ -6572,6 +6611,51 @@
           .map((m) => ({ role: m.role, content: m.content }))
       ];
 
+      const shouldSearchLive =
+        webSearchEnabled ||
+        isSearchExplicit ||
+        /^(search|google|dhoondo|khojo|find|latest|current|today'?s|news about|live score)\b/i.test(prompt.trim()) ||
+        /\b(latest|current|today|tonight|live|breaking|news|price|score|weather|mausam|forecast|networth|net worth|aaj|taza)\b/i.test(prompt);
+
+      if (!webContext && shouldSearchLive) {
+        const searchQuery = prompt
+          .replace(/^\/search\s+/i, "")
+          .replace(/^(?:please\s+|can\s+you\s+)?(?:search(?:\s+the\s+web|\s+online|\s+on\s+google)?|google|dhoondo|khojo|find)(?:\s+(?:for|about|me))?\s+/i, "")
+          .trim();
+        const candidateEndpoints = [
+          `${window.location.origin && window.location.origin.startsWith("http") ? window.location.origin : "http://127.0.0.1:3456"}/api/search`,
+          "http://127.0.0.1:3456/api/search",
+          "http://localhost:3456/api/search",
+          "https://lumi-backend-v4-production.up.railway.app/api/search",
+        ];
+        for (const endpoint of [...new Set(candidateEndpoints)]) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4500);
+            const response = await fetch(`${endpoint}?q=${encodeURIComponent(searchQuery || prompt.trim())}`, {
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            if (!response.ok) continue;
+            const data = await response.json();
+            if (Array.isArray(data.results) && data.results.length > 0) {
+              assistantMsg.searchResults = data.results;
+              const currentDate = new Date().toLocaleDateString("en-CA");
+              webContext =
+                `\n\n[LIVE WEB SEARCH RESULTS — ${currentDate}]:\n` +
+                data.results.map((result, index) =>
+                  `[Source ${index + 1}: ${result.title}]\nSnippet: ${result.snippet}\nURL: ${result.url}`
+                ).join("\n\n") +
+                "\n\nUse only these live retrieved sources for current facts. Cite the source URLs. Do not claim that live search or internet access is unavailable.";
+              render();
+              break;
+            }
+          } catch (searchError) {
+            console.warn("Live web search failed:", searchError);
+          }
+        }
+      }
+
       const extraContext = (webContext || "") + (scrapedContext || "") + (fileContext || "");
       if (extraContext && chatHistory.length > 0) {
         chatHistory[chatHistory.length - 1].content += extraContext;
@@ -6588,7 +6672,8 @@
           selectedModel.model,
           chatHistory,
           onChunk,
-          streamAbortController.signal
+          streamAbortController.signal,
+          imagePayload
         );
       } else {
         // Built-in Real Free AI Streaming via backend /api/free/chat
@@ -10683,36 +10768,9 @@
 
   // --- Initial Setup & Seed Sample Conversation ---
   function initSeedData() {
-    if (conversations.length === 0) {
-      const demoId = "demo_welcome";
-      conversations = [
-        {
-          id: demoId,
-          title: "Productivity ke 5 tips",
-          createdAt: new Date().toISOString(),
-          model: { provider_id: null, model: "openai" },
-          messages: [
-            {
-              id: "m1",
-              role: "user",
-              content: "Mujhe productivity ke 5 tips do",
-              timestamp: Date.now() - 3600000,
-            },
-            {
-              id: "m2",
-              role: "assistant",
-              content: `### ⚡ 5 Powerful Productivity Tips
-
-1. **Eat That Frog First:** Apne din ka sabse mushkil aur zaroori kaam pehle 90 minutes mein khatam karo jab energy 100% hoti hai.
-2. **The 50/10 Rule:** 50 minutes deep focus work karo, fir 10 minutes ka screen-free break lo.
-3. **2-Minute Rule:** Agar koi kaam 2 minute se kam ka ho, toh baad ke liye mat taalo — turant kar dalo!
-4. **Notification Blackout:** Kaam ke waqt WhatsApp aur Instagram notifications band rakho.
-5. **Top 3 Priorities:** Sone se pehle agle din ke sirf 3 priority tasks decide karo.`,
-              timestamp: Date.now() - 3550000,
-            },
-          ],
-        },
-      ];
+    // 100% Real conversations: No fake/dummy/placeholder demo chats
+    if (!Array.isArray(conversations)) {
+      conversations = [];
       saveJson(STORAGE.CHATS, conversations);
     }
   }

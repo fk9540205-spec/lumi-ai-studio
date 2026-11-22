@@ -135,6 +135,23 @@ def _tool_call_query(tool_call: dict) -> str:
         return str(arguments.get("query") or arguments.get("q") or "")
     return ""
 
+def _attach_image_to_messages(messages: list, image: str | None) -> list:
+    if not isinstance(messages, list) or not image:
+        return messages
+    copied = [dict(message) if isinstance(message, dict) else message for message in messages]
+    for message in reversed(copied):
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        text = message.get("content")
+        if not isinstance(text, str):
+            text = str(text or "")
+        message["content"] = [
+            {"type": "text", "text": text or "Please examine the attached image."},
+            {"type": "image_url", "image_url": {"url": image}},
+        ]
+        break
+    return copied
+
 # ---------------------------------------------------------------------------
 # Duck.ai configuration
 # ---------------------------------------------------------------------------
@@ -605,6 +622,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
         messages = data.get("messages", [])
         tools = data.get("tools") or []
+        image = data.get("image")
+        messages = self._attach_live_search_context(messages, force=bool(data.get("web_search")))
         if not tools:
             tools = [{
                 "type": "function",
@@ -649,7 +668,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         "Content-Type": "application/json",
                         "Authorization": "Bearer lumi-antigravity-local",
                         "Accept": "text/event-stream" if stream else "application/json"
-                    }
+                    },
+                    image
                 )
                 return
             except Exception as cpa_err:
@@ -721,7 +741,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     "Content-Type": "application/json",
                     "Authorization": "Bearer lumi-antigravity-local",
                     "Accept": "text/event-stream" if stream else "application/json"
-                }
+                },
+                image
             )
             return
         except Exception as e:
@@ -810,8 +831,10 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             self._json_response({"provider": "g4f", "status": "offline", "error": str(e)}, 503)
 
     def _run_g4f_tool_loop(self, model, provider_options, messages, tools, tool_choice,
-                           requested_model, stream):
-        working_messages = [dict(message) if isinstance(message, dict) else message for message in messages]
+                           requested_model, stream, image=None):
+        working_messages = _attach_image_to_messages(messages, image)
+        working_messages = self._attach_live_search_context(working_messages)
+        working_messages = [dict(message) if isinstance(message, dict) else message for message in working_messages]
         final_content = ""
         tool_round = 0
 
@@ -821,6 +844,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 **provider_options,
                 messages=working_messages,
                 stream=False,
+                **({"image": image} if image else {}),
                 **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
             )
             message = response.choices[0].message
@@ -932,6 +956,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                     tool_choice=tool_choice,
                     requested_model=requested_model,
                     stream=stream,
+                    image=data.get("image"),
                 )
                 return
             except Exception as e:
@@ -997,6 +1022,8 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         model = data.get("model", "gpt-4o-mini")
         messages = data.get("messages", [])
         stream = data.get("stream", True)
+        messages = _attach_image_to_messages(messages, data.get("image"))
+        messages = self._attach_live_search_context(messages, force=bool(data.get("web_search")))
 
         tools = data.get("tools") or []
         web_search_requested = any(
@@ -1133,6 +1160,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 stream,
                 int(data.get("max_tokens", 4096)),
                 headers,
+                data.get("image") or data.get("base64_image"),
             )
             return
         except Exception as _proxy_err:
@@ -1223,13 +1251,40 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         url = f"{backend_url}/chat/completions"
         try:
             if api_type == "Anthropic Messages":
+                anthropic_messages = _attach_image_to_messages(messages, data.get("image"))
+                converted_messages = []
+                system_parts = []
+                for message in anthropic_messages:
+                    if not isinstance(message, dict):
+                        continue
+                    if message.get("role") == "system":
+                        system_parts.append(str(message.get("content", "")))
+                        continue
+                    content = message.get("content")
+                    if isinstance(content, list):
+                        content_blocks = []
+                        for part in content:
+                            if isinstance(part, dict) and part.get("type") == "image_url":
+                                image_url = part.get("image_url", {}).get("url", "")
+                                match = re.match(r"^data:(image/[^;]+);base64,(.+)$", image_url)
+                                if match:
+                                    content_blocks.append({
+                                        "type": "image",
+                                        "source": {"type": "base64", "media_type": match.group(1), "data": match.group(2)},
+                                    })
+                            elif isinstance(part, dict) and part.get("type") == "text":
+                                content_blocks.append({"type": "text", "text": part.get("text", "")})
+                        content = content_blocks
+                    converted_messages.append({"role": message.get("role", "user"), "content": content})
                 proxy_body = json.dumps({
                     "model": model,
-                    "messages": messages,
+                    "messages": converted_messages,
                     "stream": stream,
                     "max_tokens": max_tokens,
+                    **({"system": "\n".join(system_parts)} if system_parts else {}),
                 }).encode()
-                req = urllib.request.Request(url, data=proxy_body, headers=headers, method="POST")
+                anthropic_url = f"{backend_url}/messages" if backend_url else ""
+                req = urllib.request.Request(anthropic_url, data=proxy_body, headers=headers, method="POST")
                 resp = urllib.request.urlopen(req, timeout=120, context=_get_ssl_context())
                 if stream:
                     self._start_sse()
@@ -1254,6 +1309,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 stream,
                 max_tokens,
                 headers,
+                data.get("image"),
             )
         except Exception as e:
             self._error(502, f"Proxy request failed: {e}")
@@ -1294,6 +1350,35 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         q = re.sub(r"[\?!.]+$", "", query.strip()).strip()
         if not q:
             return results
+
+        weather_match = re.search(r"\b(?:weather|mausam|temperature|forecast|temp)\b", q, re.I)
+        if weather_match:
+            city_match = re.search(r"(?:in|of|at|for|ka|ki)\s+([A-Za-z\s]+)", q, re.I)
+            city = city_match.group(1).strip() if city_match else re.sub(
+                r"\b(?:weather|mausam|temperature|forecast|temp|today|now|tomorrow|current)\b",
+                "",
+                q,
+                flags=re.I,
+            ).strip()
+            if city:
+                try:
+                    url = f"https://wttr.in/{urllib.parse.quote(city)}?format=j1"
+                    req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0"})
+                    with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
+                        weather = json.loads(resp.read().decode())
+                    current = weather.get("current_condition", [{}])[0]
+                    temp = current.get("temp_C", "")
+                    desc = current.get("weatherDesc", [{}])[0].get("value", "")
+                    humidity = current.get("humidity", "")
+                    wind = current.get("windspeedKmph", "")
+                    snippet = f"Current {city.title()} weather: {temp}°C, {desc}. Humidity: {humidity}%, Wind: {wind} km/h"
+                    results.append({
+                        "title": f"Live Weather: {city.title()} ({temp}°C)",
+                        "snippet": snippet,
+                        "url": f"https://wttr.in/{urllib.parse.quote(city)}",
+                    })
+                except Exception as exc:
+                    sys.stderr.write(f"Live weather search failed: {exc}\n")
 
         try:
             url = "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(q)
@@ -1336,6 +1421,31 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
             except Exception as exc:
                 sys.stderr.write(f"DuckDuckGo instant answer failed: {exc}\n")
 
+        if len(results) < 2 and re.search(
+            r"\b(?:latest|current|today|tonight|live|breaking|news|score|price|aaj|taza)\b",
+            q,
+            re.I,
+        ):
+            try:
+                import xml.etree.ElementTree as ET
+                url = "https://news.google.com/rss/search?q=" + urllib.parse.quote(q) + "&hl=en-IN&gl=IN&ceid=IN:en"
+                req = urllib.request.Request(url, headers={"User-Agent": "LumiAI/1.0"})
+                with urllib.request.urlopen(req, timeout=3, context=_get_ssl_context()) as resp:
+                    rss = resp.read()
+                root = ET.fromstring(rss)
+                for item in root.findall(".//item")[:5]:
+                    title = (item.findtext("title") or "").strip()
+                    link = (item.findtext("link") or "").strip()
+                    published = (item.findtext("pubDate") or "").strip()
+                    if title:
+                        results.append({
+                            "title": title,
+                            "snippet": f"{title}{(' Published: ' + published) if published else ''}",
+                            "url": link,
+                        })
+            except Exception as exc:
+                sys.stderr.write(f"Google News RSS fallback failed: {exc}\n")
+
         if len(results) < 2:
             try:
                 url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=" + urllib.parse.quote(q) + "&format=json&utf8="
@@ -1369,7 +1479,14 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         for message in reversed(messages):
             if isinstance(message, dict) and message.get("role") == "user":
                 content = message.get("content")
-                latest_user = content if isinstance(content, str) else ""
+                if isinstance(content, str):
+                    latest_user = content
+                elif isinstance(content, list):
+                    latest_user = " ".join(
+                        str(part.get("text", "") or "")
+                        for part in content
+                        if isinstance(part, dict) and part.get("type") == "text"
+                    ).strip()
                 break
         if not latest_user or (not force and not self._should_run_live_search(latest_user)):
             return messages
@@ -1396,8 +1513,10 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
     def _run_openai_tool_loop(self, url: str, model: str, messages: list, tools: list,
                               tool_choice: str, stream: bool, max_tokens: int,
-                              headers: dict):
-        working_messages = [dict(message) if isinstance(message, dict) else message for message in messages]
+                              headers: dict, image: str | None = None):
+        working_messages = _attach_image_to_messages(messages, image)
+        working_messages = self._attach_live_search_context(working_messages)
+        working_messages = [dict(message) if isinstance(message, dict) else message for message in working_messages]
         final_content = ""
         final_raw = None
 
