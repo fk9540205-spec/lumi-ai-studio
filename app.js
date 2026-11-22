@@ -3254,12 +3254,20 @@
 
         <!-- User Profile Footer -->
         <div class="flex items-center gap-2 border-t border-sidebar-border px-3.5 py-3 bg-card/40">
-          <span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold uppercase text-primary-foreground select-none shrink-0">
-            ${escapeHtml((currentUser.email || "Y")[0])}
-          </span>
-          <span class="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
-            ${escapeHtml(currentUser.email || "Guest")}
-          </span>
+          ${currentUser.photoUrl
+            ? `<img src="${escapeHtml(currentUser.photoUrl)}" alt="${escapeHtml(currentUser.name || "")}" class="size-8 rounded-full object-cover select-none shrink-0 border border-primary/30" onerror="this.style.display='none'" />`
+            : `<span class="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold uppercase text-primary-foreground select-none shrink-0">
+                ${escapeHtml((currentUser.name || currentUser.email || "Y")[0])}
+              </span>`
+          }
+          <div class="min-w-0 flex-1 truncate">
+            <div class="truncate text-xs font-semibold text-foreground">
+              ${escapeHtml(currentUser.name || (currentUser.email ? currentUser.email.split("@")[0] : "Lumi User"))}
+            </div>
+            <div class="truncate text-[10px] text-muted-foreground">
+              ${escapeHtml(currentUser.email || "Guest")}
+            </div>
+          </div>
           <button
             type="button"
             class="rounded-lg p-1.5 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors cursor-pointer shrink-0"
@@ -9150,14 +9158,45 @@
       });
     });
 
-    // 14. Auth Screen Handlers
+    // 14. Auth Screen Handlers (Native Google Sign-In & Web Auth)
+    window.onGoogleSignInSuccess = function(userData) {
+      currentUser = {
+        email: userData.email || "user@lumi.ai",
+        name: userData.name || (userData.email ? userData.email.split("@")[0] : "Lumi User"),
+        photoUrl: userData.photoUrl || null,
+        idToken: userData.idToken || null,
+        provider: "google"
+      };
+      saveJson(STORAGE.USER, currentUser);
+      showToast("✔ Welcome to Lumi, " + currentUser.name + "!");
+      render();
+      navigate("/chat");
+    };
+
+    window.onGoogleSignInFailure = function(err) {
+      console.warn("Google Sign-In failed:", err);
+      showToast("Google Sign-In cancelled or failed");
+    };
+
     const googleAuthBtn = document.querySelector("#google-auth-btn");
     if (googleAuthBtn) {
       googleAuthBtn.addEventListener("click", () => {
-        currentUser = { email: "alex.creator@gmail.com", name: "Alex" };
-        saveJson(STORAGE.USER, currentUser);
-        showToast("Signed in as " + currentUser.email);
-        navigate("/chat");
+        if (window.AndroidAuth && typeof window.AndroidAuth.signInWithGoogle === "function") {
+          showToast("Opening Google Sign-In...");
+          window.AndroidAuth.signInWithGoogle();
+        } else {
+          // Browser Google Sign-In Fallback
+          currentUser = {
+            email: "jayuu3654@gmail.com",
+            name: "Jayu",
+            photoUrl: "https://lh3.googleusercontent.com/a/default-user",
+            provider: "google"
+          };
+          saveJson(STORAGE.USER, currentUser);
+          showToast("Signed in as " + currentUser.email);
+          render();
+          navigate("/chat");
+        }
       });
     }
 
@@ -9188,9 +9227,13 @@
     const signOutBtn = document.querySelector("#sign-out-btn");
     if (signOutBtn) {
       signOutBtn.addEventListener("click", () => {
+        if (window.AndroidAuth && typeof window.AndroidAuth.signOut === "function") {
+          window.AndroidAuth.signOut();
+        }
         currentUser = { email: "guest@lumi.ai", name: "Guest" };
         saveJson(STORAGE.USER, currentUser);
         showToast("Signed out.");
+        render();
         navigate("/auth");
       });
     }

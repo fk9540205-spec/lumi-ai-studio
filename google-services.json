@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "29515945793",
+    "firebase_url": "https://lumi-ai-493ae-default-rtdb.firebaseio.com",
+    "project_id": "lumi-ai-493ae",
+    "storage_bucket": "lumi-ai-493ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:29515945793:android:3f8ee2dba235565d6db3c0",
+        "android_client_info": {
+          "package_name": "com.lumi.ai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "29515945793-7h00k8piv0jbfib96fgdl3fcomgetiri.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.lumi.ai",
+            "certificate_hash": "875a7e197beb925a00877fc0bf4a0532d196029b"
+          }
+        },
+        {
+          "client_id": "29515945793-kq1qumc37r98esoda4k83fiaks3g2tqn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4Vn1gLiroEfS5EKCtbOt6GE6T-xHmdhI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "29515945793-kq1qumc37r98esoda4k83fiaks3g2tqn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
