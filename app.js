@@ -220,7 +220,12 @@
   let currentUser = loadJson(STORAGE.USER, {
     email: "guest@lumi.ai",
     name: "Lumi User",
+    isLoggedIn: false,
   });
+
+  function isUserLoggedIn() {
+    return !!(currentUser && currentUser.isLoggedIn === true && currentUser.email && currentUser.email !== "guest@lumi.ai");
+  }
 
   let searchQuery = "";
   let sidebarOpen = false;
@@ -433,13 +438,103 @@
     }
   }
 
+  // --- Cloud Sync Engine (Firebase Realtime Database) ---
+  let _cloudSyncDebounceTimer = null;
+  function triggerCloudChatsSync() {
+    if (_cloudSyncDebounceTimer) clearTimeout(_cloudSyncDebounceTimer);
+    _cloudSyncDebounceTimer = setTimeout(() => {
+      if (typeof LumiCloudSync !== "undefined" && isUserLoggedIn()) {
+        LumiCloudSync.pushCloudData(currentUser);
+      }
+    }, 1500);
+  }
+
   function saveJson(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      if (key === STORAGE.CHATS) {
+        triggerCloudChatsSync();
+      }
     } catch (e) {
       console.warn("Storage save failed:", e);
     }
   }
+
+  const LumiCloudSync = {
+    RTDB_BASE: "https://lumi-ai-493ae-default-rtdb.firebaseio.com",
+
+    getSafeUserKey(email) {
+      if (!email) return "anonymous";
+      return email.toLowerCase().replace(/[.#$\[\]]/g, "_");
+    },
+
+    async syncUserData(user) {
+      if (!user || !user.email || user.email === "guest@lumi.ai") return;
+      const userKey = this.getSafeUserKey(user.email);
+      const url = `${this.RTDB_BASE}/users/${userKey}.json`;
+
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const cloudData = await res.json();
+          if (cloudData) {
+            // Restore cloud conversations if local empty
+            if (cloudData.conversations && Array.isArray(cloudData.conversations) && cloudData.conversations.length > 0) {
+              if (!conversations || conversations.length === 0) {
+                conversations = cloudData.conversations;
+                try { localStorage.setItem(STORAGE.CHATS, JSON.stringify(conversations)); } catch (_) {}
+              }
+            }
+            // Restore cloud settings
+            if (cloudData.settings) {
+              if (cloudData.settings.accentColor) localStorage.setItem("lumi_accent_color", cloudData.settings.accentColor);
+              if (cloudData.settings.customInstructions) localStorage.setItem("lumi_custom_instructions", cloudData.settings.customInstructions);
+              if (cloudData.settings.tone) localStorage.setItem("lumi_tone_primary", cloudData.settings.tone);
+              if (cloudData.settings.nickname) localStorage.setItem("lumi_user_nickname", cloudData.settings.nickname);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[LumiCloudSync] Fetch failed:", err);
+      }
+
+      this.pushCloudData(user);
+    },
+
+    async pushCloudData(user) {
+      if (!user || !user.email || user.email === "guest@lumi.ai") return;
+      const userKey = this.getSafeUserKey(user.email);
+      const url = `${this.RTDB_BASE}/users/${userKey}.json`;
+
+      const payload = {
+        profile: {
+          name: user.name || "",
+          email: user.email || "",
+          photoUrl: user.photoUrl || "",
+          provider: user.provider || "google",
+          lastActive: Date.now()
+        },
+        settings: {
+          accentColor: localStorage.getItem("lumi_accent_color") || "pink",
+          nickname: localStorage.getItem("lumi_user_nickname") || (user.name ? user.name.split(" ")[0] : "User"),
+          customInstructions: localStorage.getItem("lumi_custom_instructions") || "",
+          tone: localStorage.getItem("lumi_tone_primary") || "brotherly_hinglish"
+        },
+        conversations: conversations || [],
+        updatedAt: Date.now()
+      };
+
+      try {
+        await fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        console.warn("[LumiCloudSync] Push failed:", err);
+      }
+    }
+  };
 
   // --- Autonomous Mind, Tone Adaptation & Long-Term Memory Engine ---
   const LumiAutonomousMind = {
@@ -4031,13 +4126,19 @@
           <!-- Account Name Row -->
           <div id="settings-account-row" class="lumi-settings-row">
             <div style="display:flex;align-items:center;gap:0.85rem;">
-              <div style="width:34px;height:34px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#9333ea,#6366f1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px;flex-shrink:0;">
-                JA
+              ${currentUser && currentUser.photoUrl
+                ? `<img src="${escapeHtml(currentUser.photoUrl)}" alt="${escapeHtml(currentUser.name || '')}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid rgba(255,255,255,0.2);" onerror="this.style.display='none'" />`
+                : `<div style="width:34px;height:34px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#9333ea,#6366f1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:13px;flex-shrink:0;">
+                    ${escapeHtml(((currentUser && currentUser.name) || (currentUser && currentUser.email) || "L")[0].toUpperCase())}
+                  </div>`
+              }
+              <div>
+                <span class="lumi-settings-row-label">Account</span>
+                <div style="font-size:11px;color:#9e9e9e;">${escapeHtml(currentUser && currentUser.email ? currentUser.email : "Not signed in")}</div>
               </div>
-              <span class="lumi-settings-row-label">Account</span>
             </div>
             <div class="lumi-settings-row-value">
-              <span id="settings-account-name-display">${escapeHtml(accountName)}</span>
+              <span id="settings-account-name-display">${escapeHtml((currentUser && currentUser.name) || (currentUser && currentUser.email ? currentUser.email.split("@")[0] : accountName))}</span>
               ${chevronRight}
             </div>
           </div>
@@ -4047,7 +4148,7 @@
               <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;">
                 <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
               </div>
-              <span class="lumi-settings-row-label">Switch account</span>
+              <span class="lumi-settings-row-label">${isUserLoggedIn() ? "Switch account" : "Sign in with Google"}</span>
             </div>
             ${chevronRight}
           </a>
@@ -4158,6 +4259,19 @@
             </div>
             ${chevronRight}
           </a>
+        </div>
+
+        <!-- Sign Out Card -->
+        <div class="lumi-settings-card" style="margin-top:1rem;">
+          <div id="settings-logout-btn" class="lumi-settings-row" style="color:#fb7185;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:0.85rem;">
+              <div style="width:34px;display:flex;align-items:center;justify-content:center;color:#fb7185;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+              </div>
+              <span class="lumi-settings-row-label" style="color:#fb7185;">${isUserLoggedIn() ? "Sign out" : "Sign in to Lumi"}</span>
+            </div>
+            ${chevronRight}
+          </div>
         </div>
 
         <!-- Bottom Search Pill -->
@@ -5048,40 +5162,34 @@
   // 8. AUTH PAGE
   function renderAuthPage() {
     return `
-      <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
-        <div class="aurora opacity-60"></div>
+      <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8">
+        <div class="aurora opacity-70"></div>
 
-        <div class="animate-rise-in relative z-10 w-full max-w-sm rounded-3xl border border-border bg-card/90 p-8 shadow-composer backdrop-blur">
-          <a class="mx-auto block w-fit" href="#/" aria-label="Lumi home">
-            <img src="${LUMI_LOGO}" alt="Lumi" class="size-12 object-contain select-none" />
-          </a>
+        <div class="animate-rise-in relative z-10 w-full max-w-sm rounded-3xl border border-border bg-card/95 p-7 shadow-composer backdrop-blur">
+          <div class="mx-auto block w-fit">
+            <div class="relative size-14 mx-auto flex items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-600/30 to-pink-500/20 p-2.5 border border-border/80 shadow-md">
+              <img src="${LUMI_LOGO}" alt="Lumi" class="size-10 object-contain select-none" />
+            </div>
+          </div>
 
-          <h1 class="mt-5 text-center font-display text-3xl font-normal text-foreground">Welcome back</h1>
-          <p class="mt-1 text-center text-xs text-muted-foreground">Sign in to save and sync your conversations.</p>
+          <h1 class="mt-4 text-center font-display text-2xl font-bold tracking-tight text-foreground">Welcome to Lumi</h1>
+          <p class="mt-1.5 text-center text-xs text-muted-foreground leading-relaxed">
+            Sign in to automatically sync your profile, chats, settings & images across all your devices.
+          </p>
 
-          <div class="mt-6 space-y-2.5">
+          <div class="mt-6 space-y-3">
             <!-- Google Button -->
             <button
               type="button"
               id="google-auth-btn"
-              class="flex h-11 w-full items-center justify-center gap-2.5 rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-accent transition-colors shadow-2xs"
+              class="flex h-12 w-full items-center justify-center gap-3 rounded-full border border-border bg-card px-4 text-sm font-semibold text-foreground hover:bg-accent transition-all shadow-md active:scale-98 cursor-pointer"
             >
               ${ICONS.google} <span>Continue with Google</span>
             </button>
-
-            <!-- Lovable Button -->
-            <button
-              type="button"
-              id="lovable-auth-btn"
-              class="flex h-11 w-full items-center justify-center gap-2.5 rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-accent transition-colors shadow-2xs"
-            >
-              <img src="${LOVABLE_MARK}" class="size-4 object-contain" alt="" />
-              <span>Continue with Lovable</span>
-            </button>
           </div>
 
-          <div class="relative my-6 text-center text-xs text-muted-foreground after:absolute after:inset-x-0 after:top-1/2 after:h-px after:bg-border after:-z-10">
-            <span class="bg-card px-2 font-medium">or</span>
+          <div class="relative my-5 text-center text-xs text-muted-foreground after:absolute after:inset-x-0 after:top-1/2 after:h-px after:bg-border after:-z-10">
+            <span class="bg-card px-2 font-medium">or continue with email</span>
           </div>
 
           <!-- Email Form -->
@@ -5093,22 +5201,22 @@
                 required
                 placeholder="Enter your email"
                 class="w-full h-11 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-primary placeholder:text-muted-foreground"
-                value="creator@lovable.app"
+                value=""
               />
             </div>
 
             <button
               type="submit"
-              class="h-11 w-full rounded-full bg-primary font-medium text-sm text-primary-foreground hover:bg-primary/90 transition-transform active:scale-98"
+              class="h-11 w-full rounded-full bg-primary font-medium text-sm text-primary-foreground hover:bg-primary/90 transition-transform active:scale-98 cursor-pointer shadow-xs"
             >
               Continue with Email
             </button>
           </form>
 
-          <div class="mt-5 pt-3 border-t border-border/60 text-center">
-            <a href="#/chat" class="text-xs text-muted-foreground hover:text-foreground hover:underline">
+          <div class="mt-5 pt-3.5 border-t border-border/60 text-center">
+            <button type="button" id="continue-guest-btn" class="text-xs text-muted-foreground hover:text-foreground hover:underline cursor-pointer bg-transparent border-0 p-0">
               Continue as Guest &rarr;
-            </a>
+            </button>
           </div>
         </div>
       </div>`;
@@ -7936,12 +8044,14 @@
     }
 
     if (path === "/" || path === "") {
-      if (LumiDevice.isNative()) {
+      if (!isUserLoggedIn() && sessionStorage.getItem("lumi_guest_bypass") !== "true") {
+        window.location.hash = "#/auth";
+        root.innerHTML = renderAuthPage();
+        return;
+      } else {
         window.location.hash = "#/chat";
         const thread = getActiveConversation();
         root.innerHTML = renderChatPage(thread ? thread.id : null);
-      } else {
-        root.innerHTML = renderLanding();
       }
     } else if (path === "/auth") {
       document.body.style.backgroundColor = "";
@@ -7953,6 +8063,11 @@
       document.body.style.backgroundColor = "#000000";
       root.innerHTML = renderSettingsPage(path);
     } else if (path.startsWith("/chat")) {
+      if (!isUserLoggedIn() && sessionStorage.getItem("lumi_guest_bypass") !== "true") {
+        window.location.hash = "#/auth";
+        root.innerHTML = renderAuthPage();
+        return;
+      }
       document.body.style.backgroundColor = "";
       const threadId = path.startsWith("/chat/") ? path.slice(6) : null;
       root.innerHTML = renderChatPage(threadId);
@@ -9165,9 +9280,17 @@
         name: userData.name || (userData.email ? userData.email.split("@")[0] : "Lumi User"),
         photoUrl: userData.photoUrl || null,
         idToken: userData.idToken || null,
-        provider: "google"
+        provider: "google",
+        isLoggedIn: true
       };
       saveJson(STORAGE.USER, currentUser);
+      if (currentUser.name) {
+        localStorage.setItem("lumi_user_name", currentUser.name);
+        localStorage.setItem("lumi_user_nickname", currentUser.name.split(" ")[0]);
+      }
+      if (typeof LumiCloudSync !== "undefined") {
+        LumiCloudSync.syncUserData(currentUser);
+      }
       showToast("✔ Welcome to Lumi, " + currentUser.name + "!");
       render();
       navigate("/chat");
@@ -9190,9 +9313,13 @@
             email: "jayuu3654@gmail.com",
             name: "Jayu",
             photoUrl: "https://lh3.googleusercontent.com/a/default-user",
-            provider: "google"
+            provider: "google",
+            isLoggedIn: true
           };
           saveJson(STORAGE.USER, currentUser);
+          if (typeof LumiCloudSync !== "undefined") {
+            LumiCloudSync.syncUserData(currentUser);
+          }
           showToast("Signed in as " + currentUser.email);
           render();
           navigate("/chat");
@@ -9200,12 +9327,10 @@
       });
     }
 
-    const lovableAuthBtn = document.querySelector("#lovable-auth-btn");
-    if (lovableAuthBtn) {
-      lovableAuthBtn.addEventListener("click", () => {
-        currentUser = { email: "creator@lovable.app", name: "Lovable Creator" };
-        saveJson(STORAGE.USER, currentUser);
-        showToast("Signed in with Lovable account");
+    const continueGuestBtn = document.querySelector("#continue-guest-btn");
+    if (continueGuestBtn) {
+      continueGuestBtn.addEventListener("click", () => {
+        sessionStorage.setItem("lumi_guest_bypass", "true");
         navigate("/chat");
       });
     }
@@ -9216,26 +9341,41 @@
         e.preventDefault();
         const emailInput = document.querySelector("#auth-email-input");
         const email = emailInput ? emailInput.value.trim() : "user@lumi.ai";
-        currentUser = { email: email || "user@lumi.ai", name: email.split("@")[0] };
+        currentUser = {
+          email: email || "user@lumi.ai",
+          name: email.split("@")[0],
+          isLoggedIn: true,
+          provider: "email"
+        };
         saveJson(STORAGE.USER, currentUser);
+        if (typeof LumiCloudSync !== "undefined") {
+          LumiCloudSync.syncUserData(currentUser);
+        }
         showToast("Welcome to Lumi, " + currentUser.name + "!");
         navigate("/chat");
       });
     }
 
-    // 14. Sign Out
+    // Sign out handlers (Sidebar & Settings)
+    const handleSignOutAction = () => {
+      if (window.AndroidAuth && typeof window.AndroidAuth.signOut === "function") {
+        window.AndroidAuth.signOut();
+      }
+      currentUser = { email: "guest@lumi.ai", name: "Guest", isLoggedIn: false };
+      saveJson(STORAGE.USER, currentUser);
+      sessionStorage.removeItem("lumi_guest_bypass");
+      showToast("Signed out.");
+      render();
+      navigate("/auth");
+    };
+
     const signOutBtn = document.querySelector("#sign-out-btn");
     if (signOutBtn) {
-      signOutBtn.addEventListener("click", () => {
-        if (window.AndroidAuth && typeof window.AndroidAuth.signOut === "function") {
-          window.AndroidAuth.signOut();
-        }
-        currentUser = { email: "guest@lumi.ai", name: "Guest" };
-        saveJson(STORAGE.USER, currentUser);
-        showToast("Signed out.");
-        render();
-        navigate("/auth");
-      });
+      signOutBtn.addEventListener("click", handleSignOutAction);
+    }
+    const settingsLogoutBtn = document.querySelector("#settings-logout-btn");
+    if (settingsLogoutBtn) {
+      settingsLogoutBtn.addEventListener("click", handleSignOutAction);
     }
 
     // 15. Settings & Theme Handlers
@@ -10254,8 +10394,14 @@
         if (nativeUserStr) {
           const nativeUser = JSON.parse(nativeUserStr);
           if (nativeUser && nativeUser.email) {
-            currentUser = nativeUser;
+            currentUser = {
+              ...nativeUser,
+              isLoggedIn: true
+            };
             saveJson(STORAGE.USER, currentUser);
+            if (typeof LumiCloudSync !== "undefined") {
+              LumiCloudSync.syncUserData(currentUser);
+            }
           }
         }
       } catch (e) {
@@ -10263,7 +10409,11 @@
       }
     }
     LumiAutonomousMind.analyzeAndSync(conversations);
-    if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
+
+    // Initial Screen: Open directly on Auth/Login Screen if not signed in!
+    if (!isUserLoggedIn() && sessionStorage.getItem("lumi_guest_bypass") !== "true") {
+      window.location.hash = "#/auth";
+    } else if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
       window.location.hash = "#/chat";
     }
     render();
