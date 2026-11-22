@@ -235,6 +235,7 @@
   let editingChatId = null;
 
   let isStreaming = false;
+  let activeStreamingThreadId = null;
   let streamAbortController = null;
   let pendingQueryText = ""; // query passed via URL search or suggestions
 
@@ -4630,30 +4631,37 @@
             </div>
 
             <div class="flex items-center gap-1.5 shrink-0 ml-auto" id="composer-submit-wrapper">
-              <button
-                type="button"
-                id="voice-call-trigger-btn"
-                class="${isStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-secondary/80 text-muted-foreground hover:text-foreground border border-border/70 transition-all active:scale-95 cursor-pointer shrink-0"
-                title="Voice Call"
-              >
-                ${ICONS.mic}
-              </button>
-              <button
-                type="submit"
-                id="submit-prompt-btn"
-                class="${isStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 cursor-pointer shrink-0 shadow-xs"
-                title="Send message"
-              >
-                ${ICONS.send}
-              </button>
-              <button
-                type="button"
-                id="stop-generation-btn"
-                class="${isStreaming ? "inline-flex" : "hidden"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all active:scale-95 cursor-pointer shrink-0"
-                title="Stop generation"
-              >
-                ${ICONS.square}
-              </button>
+              ${(() => {
+                const { path: curPath } = parseLocation();
+                const curThreadId = curPath.startsWith("/chat/") ? curPath.slice(6) : null;
+                const isThisThreadStreaming = isStreaming && activeStreamingThreadId === curThreadId;
+                return `
+                  <button
+                    type="button"
+                    id="voice-call-trigger-btn"
+                    class="${isThisThreadStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-secondary/80 text-muted-foreground hover:text-foreground border border-border/70 transition-all active:scale-95 cursor-pointer shrink-0"
+                    title="Voice Call"
+                  >
+                    ${ICONS.mic}
+                  </button>
+                  <button
+                    type="submit"
+                    id="submit-prompt-btn"
+                    class="${isThisThreadStreaming ? "hidden" : "inline-flex"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 cursor-pointer shrink-0 shadow-xs"
+                    title="Send message"
+                  >
+                    ${ICONS.send}
+                  </button>
+                  <button
+                    type="button"
+                    id="stop-generation-btn"
+                    class="${isThisThreadStreaming ? "inline-flex" : "hidden"} composer-toolbar-btn size-8 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all active:scale-95 cursor-pointer shrink-0"
+                    title="Stop generation"
+                  >
+                    ${ICONS.square}
+                  </button>
+                `;
+              })()}
             </div>
           </div>
         </form>
@@ -5525,6 +5533,7 @@
   // Helper to ensure send button and composer are always restored
   function restoreComposerButtons() {
     isStreaming = false;
+    activeStreamingThreadId = null;
     const stopBtn = document.querySelector("#stop-generation-btn");
     const submitBtn = document.querySelector("#submit-prompt-btn");
     const voiceBtn = document.querySelector("#voice-call-trigger-btn");
@@ -5572,9 +5581,10 @@
     let { path } = parseLocation();
     let threadId = path.startsWith("/chat/") ? path.slice(6) : null;
     let thread = conversations.find((c) => c.id === threadId);
+    const isNewThread = !thread;
 
     // Create a new thread if not in one
-    if (!thread) {
+    if (isNewThread) {
       threadId = "thread_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       thread = {
         id: threadId,
@@ -5585,8 +5595,10 @@
       };
       conversations.unshift(thread);
       saveJson(STORAGE.CHATS, conversations);
-      navigate(`/chat/${threadId}`);
+      window.location.hash = `#/chat/${threadId}`;
     }
+
+    activeStreamingThreadId = threadId;
 
     // Process Attached Files & Images Upfront
     let imagePayload = null;
@@ -5643,9 +5655,11 @@
     saveJson(STORAGE.CHATS, conversations);
     AudioEffects.play("send");
 
-    // In-place append if chat container exists, preventing full-screen repaint/flash!
+    // If brand new thread or messages container not in DOM, render immediately
     const msgsContainer = document.querySelector("#chat-messages-container .space-y-7");
-    if (msgsContainer) {
+    if (isNewThread || !msgsContainer) {
+      render();
+    } else {
       const userHtml = `
         <div class="animate-rise-in user-msg-row" id="msg-row-${userMsg.id}">
           ${
@@ -8184,18 +8198,18 @@
   }
 
   function updateStreamingMessageUI(threadId, currentText, msgId) {
-    let targetEl = null;
+    // Prevent cross-thread message leak: only update DOM if user is viewing this EXACT thread
+    const { path } = parseLocation();
+    const currentActiveThreadId = path.startsWith("/chat/") ? path.slice(6) : null;
+    if (currentActiveThreadId !== threadId) {
+      return; // User has switched to another chat; do not overwrite other chats' messages!
+    }
+
     if (msgId) {
-      targetEl = document.querySelector(`#msg-body-${msgId}`);
-    }
-    if (!targetEl) {
-      const container = document.querySelector("#chat-messages-container");
-      if (container) {
-        targetEl = container.querySelector(".space-y-7 > div:last-child .markdown-body");
+      const targetEl = document.querySelector(`#msg-body-${msgId}`);
+      if (targetEl) {
+        targetEl.innerHTML = `${renderMarkdown(currentText)}<span class="streaming-cursor"></span>`;
       }
-    }
-    if (targetEl) {
-      targetEl.innerHTML = `${renderMarkdown(currentText)}<span class="streaming-cursor"></span>`;
     }
   }
 
@@ -10626,16 +10640,12 @@
               isLoggedIn: true
             };
             saveJson(STORAGE.USER, currentUser);
-            if (typeof LumiCloudSync !== "undefined") {
-              LumiCloudSync.syncUserData(currentUser);
-            }
           }
         }
       } catch (e) {
         console.warn("Failed checking native Google User:", e);
       }
     }
-    LumiAutonomousMind.analyzeAndSync(conversations);
 
     // Initial Screen: Open directly on Auth/Login Screen if not signed in!
     if (!isUserLoggedIn() && sessionStorage.getItem("lumi_guest_bypass") !== "true") {
@@ -10643,7 +10653,23 @@
     } else if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
       window.location.hash = "#/chat";
     }
+
+    // Render immediately in 0ms!
     render();
+
+    // Defer heavy sync and cognitive analysis to background after initial paint
+    setTimeout(() => {
+      try {
+        if (typeof LumiAutonomousMind !== "undefined") {
+          LumiAutonomousMind.analyzeAndSync(conversations);
+        }
+        if (typeof LumiCloudSync !== "undefined" && isUserLoggedIn()) {
+          LumiCloudSync.syncUserData(currentUser);
+        }
+      } catch (err) {
+        console.warn("Background deferred sync error:", err);
+      }
+    }, 300);
   }
 
   if (document.readyState === "loading") {
