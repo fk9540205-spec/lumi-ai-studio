@@ -5717,9 +5717,6 @@
         stopBtn.classList.add("inline-flex");
       }
       scrollToBottom();
-    } else {
-      render();
-      scrollToBottom();
     }
 
     // 0A. NATIVE DEVICE HARDWARE INTENTS (Torch, Battery, Vibrate)
