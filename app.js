@@ -3843,7 +3843,7 @@
     const customPrompt = localStorage.getItem("lumi_custom_instructions") || "";
 
     const chevronRight = `<svg style="width:16px;height:16px;color:#757575;margin-left:4px;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
-    const chevronDown = `<svg style="width:16px;height:16px;color:#9e9e9e;position:absolute;right:0;pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
+    const chevronDown = `<svg style="width:15px;height:15px;color:#9e9e9e;pointer-events:none;flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
 
     // --- SUB-VIEW: GENERAL (#/settings/general) ---
     if (currentPath === "/settings/general") {
@@ -3854,31 +3854,50 @@
           <!-- Card 1: Appearance & Accent Color -->
           <div class="lumi-settings-card">
             <!-- Appearance Row -->
-            <div class="lumi-settings-row">
+            <div class="lumi-settings-row" id="settings-theme-row">
               <span class="lumi-settings-row-label">Appearance</span>
-              <div style="position:relative;display:flex;align-items:center;">
-                <select id="settings-theme-select" class="lumi-settings-select">
-                  <option value="system" ${currentTheme === "system" ? "selected" : ""}>System</option>
-                  <option value="dark" ${currentTheme === "dark" ? "selected" : ""}>Dark</option>
-                  <option value="light" ${currentTheme === "light" ? "selected" : ""}>Light</option>
-                </select>
-                ${chevronDown}
+              <div class="lumi-custom-select-wrap">
+                <button type="button" class="lumi-custom-select-trigger" id="settings-theme-trigger">
+                  <span id="settings-theme-label">${currentTheme === "dark" ? "Dark" : currentTheme === "light" ? "Light" : "System"}</span>
+                  ${chevronDown}
+                </button>
+                <div class="lumi-custom-select-menu hidden" id="settings-theme-menu">
+                  <button type="button" class="lumi-custom-select-item ${currentTheme === "system" ? "selected" : ""}" data-val="system">
+                    <span>System</span>
+                    <span class="lumi-check-icon">${currentTheme === "system" ? ICONS.check : ""}</span>
+                  </button>
+                  <button type="button" class="lumi-custom-select-item ${currentTheme === "dark" ? "selected" : ""}" data-val="dark">
+                    <span>Dark</span>
+                    <span class="lumi-check-icon">${currentTheme === "dark" ? ICONS.check : ""}</span>
+                  </button>
+                  <button type="button" class="lumi-custom-select-item ${currentTheme === "light" ? "selected" : ""}" data-val="light">
+                    <span>Light</span>
+                    <span class="lumi-check-icon">${currentTheme === "light" ? ICONS.check : ""}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             <!-- Accent Color Row -->
-            <div class="lumi-settings-row">
+            <div class="lumi-settings-row" id="settings-accent-row">
               <span class="lumi-settings-row-label">Accent color</span>
-              <div style="position:relative;display:flex;align-items:center;">
-                <span id="settings-accent-dot" style="width:12px;height:12px;border-radius:50%;margin-right:8px;background-color:${getAccentHex(accentColor)};"></span>
-                <select id="settings-accent-select" class="lumi-settings-select">
-                  <option value="pink" ${accentColor === "pink" ? "selected" : ""}>Pink</option>
-                  <option value="purple" ${accentColor === "purple" ? "selected" : ""}>Purple</option>
-                  <option value="indigo" ${accentColor === "indigo" ? "selected" : ""}>Indigo</option>
-                  <option value="emerald" ${accentColor === "emerald" ? "selected" : ""}>Emerald</option>
-                  <option value="amber" ${accentColor === "amber" ? "selected" : ""}>Amber</option>
-                </select>
-                ${chevronDown}
+              <div class="lumi-custom-select-wrap">
+                <button type="button" class="lumi-custom-select-trigger" id="settings-accent-trigger">
+                  <span id="settings-accent-dot" style="width:12px;height:12px;border-radius:50%;margin-right:2px;background-color:${getAccentHex(accentColor)};display:inline-block;"></span>
+                  <span id="settings-accent-label" style="text-transform:capitalize;">${escapeHtml(accentColor)}</span>
+                  ${chevronDown}
+                </button>
+                <div class="lumi-custom-select-menu hidden" id="settings-accent-menu">
+                  ${["pink", "purple", "indigo", "emerald", "amber"].map(acc => `
+                    <button type="button" class="lumi-custom-select-item ${accentColor === acc ? "selected" : ""}" data-val="${acc}">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="width:12px;height:12px;border-radius:50%;background-color:${getAccentHex(acc)};"></span>
+                        <span style="text-transform:capitalize;">${acc}</span>
+                      </div>
+                      <span class="lumi-check-icon">${accentColor === acc ? ICONS.check : ""}</span>
+                    </button>
+                  `).join("")}
+                </div>
               </div>
             </div>
           </div>
@@ -3897,16 +3916,26 @@
 
           <!-- Card: App Language -->
           <div class="lumi-settings-card">
-            <div class="lumi-settings-row">
+            <div class="lumi-settings-row" id="settings-lang-row">
               <span class="lumi-settings-row-label">App language</span>
-              <div style="position:relative;display:flex;align-items:center;">
-                <select id="settings-language-select" class="lumi-settings-select">
-                  <option value="System default" ${appLanguage === "System default" ? "selected" : ""}>System default</option>
-                  <option value="English (US)" ${appLanguage === "English (US)" ? "selected" : ""}>English (US)</option>
-                  <option value="English (UK)" ${appLanguage === "English (UK)" ? "selected" : ""}>English (UK)</option>
-                  <option value="Hindi" ${appLanguage === "Hindi" ? "selected" : ""}>Hindi (हिंदी)</option>
-                </select>
-                ${chevronDown}
+              <div class="lumi-custom-select-wrap">
+                <button type="button" class="lumi-custom-select-trigger" id="settings-lang-trigger">
+                  <span id="settings-lang-label">${escapeHtml(appLanguage)}</span>
+                  ${chevronDown}
+                </button>
+                <div class="lumi-custom-select-menu hidden" id="settings-lang-menu">
+                  ${[
+                    { val: "System default", label: "System default" },
+                    { val: "English (US)", label: "English (US)" },
+                    { val: "English (UK)", label: "English (UK)" },
+                    { val: "Hindi", label: "Hindi (हिंदी)" }
+                  ].map(lang => `
+                    <button type="button" class="lumi-custom-select-item ${appLanguage === lang.val ? "selected" : ""}" data-val="${lang.val}">
+                      <span>${lang.label}</span>
+                      <span class="lumi-check-icon">${appLanguage === lang.val ? ICONS.check : ""}</span>
+                    </button>
+                  `).join("")}
+                </div>
               </div>
             </div>
           </div>
@@ -3930,15 +3959,21 @@
           <!-- Section: Intelligence -->
           <div class="lumi-settings-section-title">Intelligence</div>
           <div class="lumi-settings-card">
-            <div class="lumi-settings-row">
+            <div class="lumi-settings-row" id="settings-visual-row">
               <span class="lumi-settings-row-label">Visual answers</span>
-              <div style="position:relative;display:flex;align-items:center;">
-                <select id="settings-visual-answers-select" class="lumi-settings-select">
-                  <option value="Default" ${visualAnswers === "Default" ? "selected" : ""}>Default</option>
-                  <option value="Always" ${visualAnswers === "Always" ? "selected" : ""}>Always</option>
-                  <option value="Minimal" ${visualAnswers === "Minimal" ? "selected" : ""}>Minimal</option>
-                </select>
-                ${chevronDown}
+              <div class="lumi-custom-select-wrap">
+                <button type="button" class="lumi-custom-select-trigger" id="settings-visual-trigger">
+                  <span id="settings-visual-label">${escapeHtml(visualAnswers)}</span>
+                  ${chevronDown}
+                </button>
+                <div class="lumi-custom-select-menu hidden" id="settings-visual-menu">
+                  ${["Default", "Always", "Minimal"].map(va => `
+                    <button type="button" class="lumi-custom-select-item ${visualAnswers === va ? "selected" : ""}" data-val="${va}">
+                      <span>${va}</span>
+                      <span class="lumi-check-icon">${visualAnswers === va ? ICONS.check : ""}</span>
+                    </button>
+                  `).join("")}
+                </div>
               </div>
             </div>
           </div>
@@ -6252,6 +6287,8 @@
     }
 
     // 2. LIVE REAL-TIME WEATHER & WEB SEARCH
+    // Web search is now executed autonomously by the selected AI provider.
+    /*
     let webContext = "";
     const isSearchExplicit = /^\/search\s+/i.test(prompt);
     const isWeatherQuery = /\b(weather|mausam|temperature|forecast|temp)\b/i.test(prompt);
@@ -6452,15 +6489,18 @@
 
         if (searchResults.length > 0) {
           assistantMsg.searchResults = searchResults;
-          webContext = `\n\n[VERIFIED REAL-TIME LIVE WEB FACTS (Current Date: November 16, 2026)]:\n` +
+          const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+          webContext = `\n\n[VERIFIED REAL-TIME LIVE WEB FACTS (Current Date: ${currentDate})]:\n` +
             searchResults.map((r, i) => `[Source ${i + 1}: ${r.title}]\nDate/Snippet: ${r.snippet}\nSource URL: ${r.url}`).join("\n\n") +
-            `\n\n(CRITICAL INSTRUCTION: Today's date is November 16, 2026. You HAVE just executed a live web search and retrieved the verified real-time facts above. Synthesize this information and answer the user's question completely, accurately, and naturally. State current figures and dates directly. Differentiate actual tracked figures (e.g. Forbes and Bloomberg real-time net worth trackers showing ~$845B to $870B+) from speculative future predictions. NEVER output disclaimers saying "I cannot search the web", "I don't have internet access", or "I cannot browse live links". Present the verified facts directly in your response.)\n`;
+            `\n\n(CRITICAL INSTRUCTION: Today's date is ${currentDate}. You HAVE just executed a live web search and retrieved the verified real-time facts above. Synthesize this information and answer the user's question completely, accurately, and naturally. State current figures and dates directly. Never invent sources or figures. Cite source URLs and never claim that you cannot browse the live web.)\n`;
           render();
           scrollToBottom();
         }
       }
     }
+    */
 
+    let webContext = "";
     // Live URL Scraper Detection
     const urlMatch = prompt.match(/https?:\/\/[^\s]+/i);
     let scrapedContext = "";
@@ -6517,6 +6557,7 @@
       // 1. Build Autonomous System Prompt (Persona + Autonomous Tone & Memory + Formatting + Dynamic GenUI Directive)
       const basePersona = PERSONA_PROMPTS[activePersona] || PERSONA_PROMPTS.general;
       let systemPrompt = basePersona + LumiAutonomousMind.getSystemDirective() + "\n" + GENUI_SYSTEM_INSTRUCTION;
+      systemPrompt += "\n\nFor questions about live facts, news, prices, scores, weather, or anything that needs current information, use the web_search tool yourself. Search before answering and cite the returned URLs.";
       if (genUiDecision && genUiDecision.needUI && genUiDecision.instruction) {
         systemPrompt += "\n\n" + genUiDecision.instruction;
       }
@@ -6580,6 +6621,22 @@
                     image: imagePayload,
                     stream: true,
                     max_tokens: 4096,
+                    web_search: webSearchEnabled || isSearchExplicit,
+                    tools: [{
+                      type: "function",
+                      function: {
+                        name: "web_search",
+                        description: "Search the live web for current facts, news, prices, scores, weather, or URLs.",
+                        parameters: {
+                          type: "object",
+                          properties: {
+                            query: { type: "string", description: "The exact web search query" }
+                          },
+                          required: ["query"]
+                        }
+                      }
+                    }],
+                    tool_choice: "auto",
                   }),
                 });
                 if (candidateResp && candidateResp.ok) {
@@ -8756,6 +8813,9 @@
           document.querySelectorAll(".model-dropdown-menu").forEach((m) => m.classList.add("hidden"));
           document.querySelectorAll(".model-picker-toggle-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
         }
+        if (!e.target.closest(".lumi-custom-select-wrap") && !e.target.closest(".lumi-settings-row")) {
+          document.querySelectorAll(".lumi-custom-select-menu").forEach((m) => m.classList.add("hidden"));
+        }
         if (!e.target.closest(".topbar-dropdown-menu") && !e.target.closest("#toggle-persona-btn") && !e.target.closest("#toggle-export-btn") && !e.target.closest("#toggle-device-tools-btn")) {
           const pMenu = document.querySelector("#persona-dropdown-menu");
           if (pMenu) pMenu.classList.add("hidden");
@@ -9632,25 +9692,81 @@
       });
     }
 
-    // Appearance / Theme Dropdown
-    const themeSelect = document.querySelector("#settings-theme-select");
-    if (themeSelect) {
-      themeSelect.addEventListener("change", (e) => {
-        const theme = e.target.value;
-        applyTheme(theme);
-        showToast(`Appearance set to ${theme.toUpperCase()}`);
+    // Custom Popover Dropdown: Appearance / Theme
+    const themeTrigger = document.querySelector("#settings-theme-trigger");
+    const themeMenu = document.querySelector("#settings-theme-menu");
+    const themeRow = document.querySelector("#settings-theme-row");
+    if (themeTrigger && themeMenu) {
+      const toggleTheme = (e) => {
+        if (e) e.stopPropagation();
+        const isHidden = themeMenu.classList.contains("hidden");
+        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
+        if (isHidden) themeMenu.classList.remove("hidden");
+      };
+      themeTrigger.addEventListener("click", toggleTheme);
+      if (themeRow) {
+        themeRow.addEventListener("click", (e) => {
+          if (!e.target.closest(".lumi-custom-select-menu")) {
+            toggleTheme(e);
+          }
+        });
+      }
+      themeMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = btn.getAttribute("data-val");
+          applyTheme(val);
+          themeMenu.classList.add("hidden");
+          const lbl = document.querySelector("#settings-theme-label");
+          if (lbl) lbl.textContent = val === "dark" ? "Dark" : val === "light" ? "Light" : "System";
+          themeMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+            const isSel = it.getAttribute("data-val") === val;
+            it.classList.toggle("selected", isSel);
+            const chk = it.querySelector(".lumi-check-icon");
+            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
+          });
+          showToast(`Appearance set to ${val.toUpperCase()}`);
+        });
       });
     }
 
-    // Accent Color Dropdown
-    const accentSelect = document.querySelector("#settings-accent-select");
-    if (accentSelect) {
-      accentSelect.addEventListener("change", (e) => {
-        const accent = e.target.value;
-        localStorage.setItem("lumi_accent_color", accent);
-        const dot = document.querySelector("#settings-accent-dot");
-        if (dot) dot.style.backgroundColor = getAccentHex(accent);
-        showToast(`Accent color updated to ${accent}`);
+    // Custom Popover Dropdown: Accent Color
+    const accentTrigger = document.querySelector("#settings-accent-trigger");
+    const accentMenu = document.querySelector("#settings-accent-menu");
+    const accentRow = document.querySelector("#settings-accent-row");
+    if (accentTrigger && accentMenu) {
+      const toggleAccent = (e) => {
+        if (e) e.stopPropagation();
+        const isHidden = accentMenu.classList.contains("hidden");
+        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
+        if (isHidden) accentMenu.classList.remove("hidden");
+      };
+      accentTrigger.addEventListener("click", toggleAccent);
+      if (accentRow) {
+        accentRow.addEventListener("click", (e) => {
+          if (!e.target.closest(".lumi-custom-select-menu")) {
+            toggleAccent(e);
+          }
+        });
+      }
+      accentMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = btn.getAttribute("data-val");
+          localStorage.setItem("lumi_accent_color", val);
+          accentMenu.classList.add("hidden");
+          const dot = document.querySelector("#settings-accent-dot");
+          if (dot) dot.style.backgroundColor = getAccentHex(val);
+          const lbl = document.querySelector("#settings-accent-label");
+          if (lbl) lbl.textContent = val;
+          accentMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+            const isSel = it.getAttribute("data-val") === val;
+            it.classList.toggle("selected", isSel);
+            const chk = it.querySelector(".lumi-check-icon");
+            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
+          });
+          showToast(`Accent color updated to ${val}`);
+        });
       });
     }
 
@@ -9667,21 +9783,79 @@
       });
     }
 
-    // App language
-    const langSelect = document.querySelector("#settings-language-select");
-    if (langSelect) {
-      langSelect.addEventListener("change", (e) => {
-        localStorage.setItem("lumi_app_language", e.target.value);
-        showToast(`App language set to ${e.target.value}`);
+    // Custom Popover Dropdown: App Language
+    const langTrigger = document.querySelector("#settings-lang-trigger");
+    const langMenu = document.querySelector("#settings-lang-menu");
+    const langRow = document.querySelector("#settings-lang-row");
+    if (langTrigger && langMenu) {
+      const toggleLang = (e) => {
+        if (e) e.stopPropagation();
+        const isHidden = langMenu.classList.contains("hidden");
+        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
+        if (isHidden) langMenu.classList.remove("hidden");
+      };
+      langTrigger.addEventListener("click", toggleLang);
+      if (langRow) {
+        langRow.addEventListener("click", (e) => {
+          if (!e.target.closest(".lumi-custom-select-menu")) {
+            toggleLang(e);
+          }
+        });
+      }
+      langMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = btn.getAttribute("data-val");
+          localStorage.setItem("lumi_app_language", val);
+          langMenu.classList.add("hidden");
+          const lbl = document.querySelector("#settings-lang-label");
+          if (lbl) lbl.textContent = val;
+          langMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+            const isSel = it.getAttribute("data-val") === val;
+            it.classList.toggle("selected", isSel);
+            const chk = it.querySelector(".lumi-check-icon");
+            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
+          });
+          showToast(`App language set to ${val}`);
+        });
       });
     }
 
-    // Visual answers
-    const visualAnswersSelect = document.querySelector("#settings-visual-answers-select");
-    if (visualAnswersSelect) {
-      visualAnswersSelect.addEventListener("change", (e) => {
-        localStorage.setItem("lumi_visual_answers", e.target.value);
-        showToast(`Visual answers set to ${e.target.value}`);
+    // Custom Popover Dropdown: Visual Answers
+    const visualTrigger = document.querySelector("#settings-visual-trigger");
+    const visualMenu = document.querySelector("#settings-visual-menu");
+    const visualRow = document.querySelector("#settings-visual-row");
+    if (visualTrigger && visualMenu) {
+      const toggleVisual = (e) => {
+        if (e) e.stopPropagation();
+        const isHidden = visualMenu.classList.contains("hidden");
+        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
+        if (isHidden) visualMenu.classList.remove("hidden");
+      };
+      visualTrigger.addEventListener("click", toggleVisual);
+      if (visualRow) {
+        visualRow.addEventListener("click", (e) => {
+          if (!e.target.closest(".lumi-custom-select-menu")) {
+            toggleVisual(e);
+          }
+        });
+      }
+      visualMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = btn.getAttribute("data-val");
+          localStorage.setItem("lumi_visual_answers", val);
+          visualMenu.classList.add("hidden");
+          const lbl = document.querySelector("#settings-visual-label");
+          if (lbl) lbl.textContent = val;
+          visualMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+            const isSel = it.getAttribute("data-val") === val;
+            it.classList.toggle("selected", isSel);
+            const chk = it.querySelector(".lumi-check-icon");
+            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
+          });
+          showToast(`Visual answers set to ${val}`);
+        });
       });
     }
 

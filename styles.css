@@ -2864,10 +2864,20 @@ html.dark .genui-recom-rank.gold {
 .lumi-settings-card {
   background-color: #212121 !important;
   border-radius: 26px !important;
-  overflow: hidden;
+  overflow: visible !important;
   margin-bottom: 1.1rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-sizing: border-box;
+}
+
+.lumi-settings-card > :first-child {
+  border-top-left-radius: 26px;
+  border-top-right-radius: 26px;
+}
+
+.lumi-settings-card > :last-child {
+  border-bottom-left-radius: 26px;
+  border-bottom-right-radius: 26px;
 }
 
 .lumi-settings-section-title {
@@ -2935,6 +2945,111 @@ html.dark .genui-recom-rank.gold {
 .lumi-settings-select option {
   background-color: #212121;
   color: #ffffff;
+}
+
+/* Lumi Custom Modern Popover Dropdown (100% replaces ugly Android OS select dialog) */
+.lumi-custom-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lumi-custom-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  color: #9e9e9e;
+  font-size: 15px;
+  font-weight: 400;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 4px 0;
+  gap: 6px;
+  font-family: inherit;
+  transition: color 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lumi-custom-select-trigger:active,
+.lumi-custom-select-trigger:hover {
+  color: #ffffff;
+}
+
+.lumi-custom-select-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 180px;
+  background: #1c1c1f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.2);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: lumiSelectFadeIn 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes lumiSelectFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lumi-custom-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 11px;
+  color: #d4d4d8;
+  font-size: 14.5px;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lumi-custom-select-item:active,
+.lumi-custom-select-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.lumi-custom-select-item.selected {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.lumi-custom-select-item .lumi-check-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(--primary, #ec4899);
+}
+
+.lumi-custom-select-item .lumi-check-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .lumi-settings-input {
