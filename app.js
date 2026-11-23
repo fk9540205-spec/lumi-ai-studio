@@ -342,6 +342,53 @@
   // Apply immediately on script execution
   applyTheme(currentTheme);
 
+  // --- Accent Color Management (Pink, Purple, Indigo, Emerald, Amber) ---
+  let currentAccent = localStorage.getItem("lumi_accent_color") || "pink";
+
+  function getAccentHex(accent) {
+    switch (accent) {
+      case "purple": return "#a855f7";
+      case "indigo": return "#6366f1";
+      case "emerald": return "#10b981";
+      case "amber": return "#f59e0b";
+      case "pink":
+      default: return "#ec4899";
+    }
+  }
+
+  function getAccentRgb(accent) {
+    switch (accent) {
+      case "purple": return "168, 85, 247";
+      case "indigo": return "99, 102, 241";
+      case "emerald": return "16, 185, 129";
+      case "amber": return "245, 158, 11";
+      case "pink":
+      default: return "236, 72, 153";
+    }
+  }
+
+  function applyAccentColor(accent) {
+    currentAccent = accent || "pink";
+    localStorage.setItem("lumi_accent_color", currentAccent);
+    const hex = getAccentHex(currentAccent);
+    const rgb = getAccentRgb(currentAccent);
+    document.documentElement.style.setProperty("--accent-primary", hex);
+    document.documentElement.style.setProperty("--accent-color", hex);
+    document.documentElement.style.setProperty("--accent-rgb", rgb);
+    document.documentElement.style.setProperty("--ring", hex);
+    document.documentElement.style.setProperty("--sidebar-ring", hex);
+
+    const dot = document.querySelector("#settings-accent-dot");
+    if (dot) {
+      dot.style.backgroundColor = hex;
+      dot.classList.remove("lumi-dot-pulse");
+      void dot.offsetWidth;
+      dot.classList.add("lumi-dot-pulse");
+    }
+  }
+
+  applyAccentColor(currentAccent);
+
   if (window.matchMedia) {
     window
       .matchMedia("(prefers-color-scheme: dark)")
@@ -787,6 +834,23 @@
 
       if (customInstructions && customInstructions.trim()) {
         directive += `[User Custom Instructions]:\n${customInstructions.trim()}\n`;
+      }
+
+      const nickname = localStorage.getItem("lumi_user_nickname") || "";
+      if (nickname) {
+        directive += `[User Preferred Name]: Address the user naturally as '${nickname}' when speaking to them.\n`;
+      }
+
+      const appLang = localStorage.getItem("lumi_app_language") || "System default";
+      if (appLang && appLang !== "System default") {
+        directive += `[User Preferred App Language]: The user's system preference is ${appLang}. Respect this preference when initiating or speaking naturally.\n`;
+      }
+
+      const visualSetting = localStorage.getItem("lumi_visual_answers") || "Default";
+      if (visualSetting === "Minimal") {
+        directive += `[Visual Style]: Minimal / compact. Prefer clean text over large multi-card blocks.\n`;
+      } else if (visualSetting === "Always") {
+        directive += `[Visual Style]: Highly visual. Actively enrich responses with markdown formatting, cards, and structured layouts.\n`;
       }
 
       if (memories && memories.length > 0) {
@@ -4705,6 +4769,10 @@
 
   // 4. EMPTY CHAT STATE
   function renderEmptyChat() {
+    const userNick = localStorage.getItem("lumi_user_nickname") || "";
+    const greetingText = userNick ? `What's on your mind, ${escapeHtml(userNick)}?` : `What's on your mind?`;
+    const showSuggestions = localStorage.getItem("lumi_homepage_suggestions") !== "false";
+
     return `
       <div class="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 pb-16 min-h-0">
         <div class="aurora opacity-40"></div>
@@ -4714,26 +4782,28 @@
           <img src="${LUMI_LOGO}" alt="Lumi" width="816" height="816" class="animate-float-soft mx-auto size-14 object-contain select-none drop-shadow" />
 
           <h1 class="animate-rise-in mt-6 text-center font-display text-4xl md:text-5xl tracking-tight text-foreground">
-            What's on your mind?
+            ${greetingText}
           </h1>
 
           <div class="animate-rise-in mt-8 [animation-delay:100ms] text-left">
             ${renderComposer("Ask Lumi anything…", false)}
           </div>
 
-          <!-- Suggestion Chips -->
-          <div class="animate-rise-in mt-5 flex flex-wrap justify-center gap-2 [animation-delay:200ms]">
-            ${SUGGESTIONS.map(
-              (text) => `
-              <button
-                type="button"
-                class="suggestion-chip rounded-full border border-border bg-card/70 px-3.5 py-1.5 text-sm text-muted-foreground backdrop-blur transition-all hover:-translate-y-0.5 hover:text-foreground hover:bg-card hover:border-foreground/20 shadow-2xs"
-                data-suggestion="${escapeHtml(text)}"
-              >
-                ${escapeHtml(text)}
-              </button>`
-            ).join("")}
-          </div>
+          ${showSuggestions ? `
+            <!-- Suggestion Chips -->
+            <div class="animate-rise-in mt-5 flex flex-wrap justify-center gap-2 [animation-delay:200ms]">
+              ${SUGGESTIONS.map(
+                (text) => `
+                <button
+                  type="button"
+                  class="suggestion-chip rounded-full border border-border bg-card/70 px-3.5 py-1.5 text-sm text-muted-foreground backdrop-blur transition-all hover:-translate-y-0.5 hover:text-foreground hover:bg-card hover:border-foreground/20 shadow-2xs"
+                  data-suggestion="${escapeHtml(text)}"
+                >
+                  ${escapeHtml(text)}
+                </button>`
+              ).join("")}
+            </div>
+          ` : ""}
         </div>
       </div>`;
   }
@@ -9779,83 +9849,114 @@
       });
     }
 
-    // Custom Popover Dropdown: Appearance / Theme
-    const themeTrigger = document.querySelector("#settings-theme-trigger");
-    const themeMenu = document.querySelector("#settings-theme-menu");
-    const themeRow = document.querySelector("#settings-theme-row");
-    if (themeTrigger && themeMenu) {
-      const toggleTheme = (e) => {
-        if (e) e.stopPropagation();
-        const isHidden = themeMenu.classList.contains("hidden");
-        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
-        if (isHidden) themeMenu.classList.remove("hidden");
-      };
-      themeTrigger.addEventListener("click", toggleTheme);
-      if (themeRow) {
-        themeRow.addEventListener("click", (e) => {
-          if (!e.target.closest(".lumi-custom-select-menu")) {
-            toggleTheme(e);
+    // --- Unified Custom Select Dropdown Manager (Zero stuck menus, smooth animations) ---
+    function closeAllCustomSelects() {
+      document.querySelectorAll(".lumi-custom-select-menu").forEach(m => {
+        m.classList.add("hidden");
+      });
+      document.querySelectorAll(".lumi-custom-select-trigger").forEach(t => {
+        t.classList.remove("open");
+        const svg = t.querySelector("svg");
+        if (svg) svg.style.transform = "rotate(0deg)";
+      });
+      const bd = document.getElementById("lumi-select-backdrop");
+      if (bd) bd.remove();
+    }
+
+    function wireCustomSelect(triggerSelector, menuSelector, rowSelector, onSelect) {
+      const trigger = document.querySelector(triggerSelector);
+      const menu = document.querySelector(menuSelector);
+      const row = document.querySelector(rowSelector);
+      if (!trigger || !menu) return;
+
+      const toggle = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        const isCurrentlyHidden = menu.classList.contains("hidden");
+        closeAllCustomSelects();
+
+        if (isCurrentlyHidden) {
+          menu.classList.remove("hidden");
+          trigger.classList.add("open");
+          const svg = trigger.querySelector("svg");
+          if (svg) svg.style.transform = "rotate(180deg)";
+
+          // Transparent tap backdrop to dismiss on outside click/tap
+          let bd = document.getElementById("lumi-select-backdrop");
+          if (!bd) {
+            bd = document.createElement("div");
+            bd.id = "lumi-select-backdrop";
+            bd.style.cssText = "position:fixed;inset:0;z-index:990;background:rgba(0,0,0,0.001);-webkit-tap-highlight-color:transparent;";
+            document.body.appendChild(bd);
+            bd.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              closeAllCustomSelects();
+            });
+            bd.addEventListener("touchstart", (ev) => {
+              ev.stopPropagation();
+              closeAllCustomSelects();
+            }, { passive: true });
           }
-        });
+        }
+      };
+
+      trigger.onclick = toggle;
+      if (row) {
+        row.onclick = (e) => {
+          if (!e.target.closest(".lumi-custom-select-wrap")) {
+            toggle(e);
+          }
+        };
       }
-      themeMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
+
+      menu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
+        btn.onclick = (e) => {
           e.stopPropagation();
           const val = btn.getAttribute("data-val");
-          applyTheme(val);
-          themeMenu.classList.add("hidden");
-          const lbl = document.querySelector("#settings-theme-label");
-          if (lbl) lbl.textContent = val === "dark" ? "Dark" : val === "light" ? "Light" : "System";
-          themeMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
-            const isSel = it.getAttribute("data-val") === val;
-            it.classList.toggle("selected", isSel);
-            const chk = it.querySelector(".lumi-check-icon");
-            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
-          });
-          showToast(`Appearance set to ${val.toUpperCase()}`);
-        });
+          closeAllCustomSelects();
+          if (onSelect) onSelect(val, btn);
+        };
       });
     }
 
-    // Custom Popover Dropdown: Accent Color
-    const accentTrigger = document.querySelector("#settings-accent-trigger");
-    const accentMenu = document.querySelector("#settings-accent-menu");
-    const accentRow = document.querySelector("#settings-accent-row");
-    if (accentTrigger && accentMenu) {
-      const toggleAccent = (e) => {
-        if (e) e.stopPropagation();
-        const isHidden = accentMenu.classList.contains("hidden");
-        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
-        if (isHidden) accentMenu.classList.remove("hidden");
-      };
-      accentTrigger.addEventListener("click", toggleAccent);
-      if (accentRow) {
-        accentRow.addEventListener("click", (e) => {
-          if (!e.target.closest(".lumi-custom-select-menu")) {
-            toggleAccent(e);
-          }
+    // 1. Appearance / Theme
+    wireCustomSelect("#settings-theme-trigger", "#settings-theme-menu", "#settings-theme-row", (val) => {
+      applyTheme(val);
+      const lbl = document.querySelector("#settings-theme-label");
+      if (lbl) lbl.textContent = val === "dark" ? "Dark" : val === "light" ? "Light" : "System";
+      const menu = document.querySelector("#settings-theme-menu");
+      if (menu) {
+        menu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+          const isSel = it.getAttribute("data-val") === val;
+          it.classList.toggle("selected", isSel);
+          const chk = it.querySelector(".lumi-check-icon");
+          if (chk) chk.innerHTML = isSel ? ICONS.check : "";
         });
       }
-      accentMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const val = btn.getAttribute("data-val");
-          localStorage.setItem("lumi_accent_color", val);
-          accentMenu.classList.add("hidden");
-          const dot = document.querySelector("#settings-accent-dot");
-          if (dot) dot.style.backgroundColor = getAccentHex(val);
-          const lbl = document.querySelector("#settings-accent-label");
-          if (lbl) lbl.textContent = val;
-          accentMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
-            const isSel = it.getAttribute("data-val") === val;
-            it.classList.toggle("selected", isSel);
-            const chk = it.querySelector(".lumi-check-icon");
-            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
-          });
-          showToast(`Accent color updated to ${val}`);
+      showToast(`Appearance set to ${val.toUpperCase()}`);
+    });
+
+    // 2. Accent Color (Live real-time style application + pulse)
+    wireCustomSelect("#settings-accent-trigger", "#settings-accent-menu", "#settings-accent-row", (val) => {
+      applyAccentColor(val);
+      const lbl = document.querySelector("#settings-accent-label");
+      if (lbl) lbl.textContent = val;
+      const menu = document.querySelector("#settings-accent-menu");
+      if (menu) {
+        menu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+          const isSel = it.getAttribute("data-val") === val;
+          it.classList.toggle("selected", isSel);
+          const chk = it.querySelector(".lumi-check-icon");
+          if (chk) chk.innerHTML = isSel ? ICONS.check : "";
         });
-      });
-    }
+      }
+      if (typeof LumiCloudSync !== "undefined" && currentUser) {
+        LumiCloudSync.pushCloudData(currentUser);
+      }
+      showToast(`Accent color updated to ${val}`);
+    });
 
     // Nickname input auto-save
     const nicknameInput = document.querySelector("#settings-nickname-input");
@@ -9870,81 +9971,39 @@
       });
     }
 
-    // Custom Popover Dropdown: App Language
-    const langTrigger = document.querySelector("#settings-lang-trigger");
-    const langMenu = document.querySelector("#settings-lang-menu");
-    const langRow = document.querySelector("#settings-lang-row");
-    if (langTrigger && langMenu) {
-      const toggleLang = (e) => {
-        if (e) e.stopPropagation();
-        const isHidden = langMenu.classList.contains("hidden");
-        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
-        if (isHidden) langMenu.classList.remove("hidden");
-      };
-      langTrigger.addEventListener("click", toggleLang);
-      if (langRow) {
-        langRow.addEventListener("click", (e) => {
-          if (!e.target.closest(".lumi-custom-select-menu")) {
-            toggleLang(e);
-          }
+    // 3. App Language
+    wireCustomSelect("#settings-lang-trigger", "#settings-lang-menu", "#settings-lang-row", (val) => {
+      localStorage.setItem("lumi_app_language", val);
+      const lbl = document.querySelector("#settings-lang-label");
+      if (lbl) lbl.textContent = val;
+      const menu = document.querySelector("#settings-lang-menu");
+      if (menu) {
+        menu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+          const isSel = it.getAttribute("data-val") === val;
+          it.classList.toggle("selected", isSel);
+          const chk = it.querySelector(".lumi-check-icon");
+          if (chk) chk.innerHTML = isSel ? ICONS.check : "";
         });
       }
-      langMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const val = btn.getAttribute("data-val");
-          localStorage.setItem("lumi_app_language", val);
-          langMenu.classList.add("hidden");
-          const lbl = document.querySelector("#settings-lang-label");
-          if (lbl) lbl.textContent = val;
-          langMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
-            const isSel = it.getAttribute("data-val") === val;
-            it.classList.toggle("selected", isSel);
-            const chk = it.querySelector(".lumi-check-icon");
-            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
-          });
-          showToast(`App language set to ${val}`);
-        });
-      });
-    }
+      showToast(`App language set to ${val}`);
+    });
 
-    // Custom Popover Dropdown: Visual Answers
-    const visualTrigger = document.querySelector("#settings-visual-trigger");
-    const visualMenu = document.querySelector("#settings-visual-menu");
-    const visualRow = document.querySelector("#settings-visual-row");
-    if (visualTrigger && visualMenu) {
-      const toggleVisual = (e) => {
-        if (e) e.stopPropagation();
-        const isHidden = visualMenu.classList.contains("hidden");
-        document.querySelectorAll(".lumi-custom-select-menu").forEach(m => m.classList.add("hidden"));
-        if (isHidden) visualMenu.classList.remove("hidden");
-      };
-      visualTrigger.addEventListener("click", toggleVisual);
-      if (visualRow) {
-        visualRow.addEventListener("click", (e) => {
-          if (!e.target.closest(".lumi-custom-select-menu")) {
-            toggleVisual(e);
-          }
+    // 4. Visual Answers
+    wireCustomSelect("#settings-visual-trigger", "#settings-visual-menu", "#settings-visual-row", (val) => {
+      localStorage.setItem("lumi_visual_answers", val);
+      const lbl = document.querySelector("#settings-visual-label");
+      if (lbl) lbl.textContent = val;
+      const menu = document.querySelector("#settings-visual-menu");
+      if (menu) {
+        menu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
+          const isSel = it.getAttribute("data-val") === val;
+          it.classList.toggle("selected", isSel);
+          const chk = it.querySelector(".lumi-check-icon");
+          if (chk) chk.innerHTML = isSel ? ICONS.check : "";
         });
       }
-      visualMenu.querySelectorAll(".lumi-custom-select-item").forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const val = btn.getAttribute("data-val");
-          localStorage.setItem("lumi_visual_answers", val);
-          visualMenu.classList.add("hidden");
-          const lbl = document.querySelector("#settings-visual-label");
-          if (lbl) lbl.textContent = val;
-          visualMenu.querySelectorAll(".lumi-custom-select-item").forEach((it) => {
-            const isSel = it.getAttribute("data-val") === val;
-            it.classList.toggle("selected", isSel);
-            const chk = it.querySelector(".lumi-check-icon");
-            if (chk) chk.innerHTML = isSel ? ICONS.check : "";
-          });
-          showToast(`Visual answers set to ${val}`);
-        });
-      });
-    }
+      showToast(`Visual answers set to ${val}`);
+    });
 
     // Reference photos row
     const refPhotosRow = document.querySelector("#settings-ref-photos-row");

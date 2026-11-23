@@ -7,6 +7,8 @@
   --font-sans: "Geist", "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: "Instrument Serif", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  --accent-primary: #ec4899;
+  --accent-rgb: 236, 72, 153;
 }
 
 /* --------------------------------------------------------------------------
@@ -2967,13 +2969,23 @@ html.dark .genui-recom-rank.gold {
   padding: 4px 0;
   gap: 6px;
   font-family: inherit;
-  transition: color 0.15s ease;
+  transition: color 0.18s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
+.lumi-custom-select-trigger svg {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.lumi-custom-select-trigger.open svg {
+  transform: rotate(180deg) !important;
+}
+
 .lumi-custom-select-trigger:active,
-.lumi-custom-select-trigger:hover {
+.lumi-custom-select-trigger:hover,
+.lumi-custom-select-trigger.open {
   color: #ffffff;
 }
 
@@ -2981,23 +2993,27 @@ html.dark .genui-recom-rank.gold {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  min-width: 180px;
+  min-width: 190px;
   background: #1c1c1f;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 16px;
   padding: 6px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.2);
-  z-index: 999;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.82), 0 0 1px rgba(255, 255, 255, 0.25);
+  z-index: 1000;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  animation: lumiSelectFadeIn 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: lumiSelectFadeIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.lumi-custom-select-menu.hidden {
+  display: none !important;
 }
 
 @keyframes lumiSelectFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.96);
+    transform: translateY(-8px) scale(0.95);
   }
   to {
     opacity: 1;
@@ -3019,7 +3035,7 @@ html.dark .genui-recom-rank.gold {
   font-weight: 400;
   cursor: pointer;
   text-align: left;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
   font-family: inherit;
   box-sizing: border-box;
   user-select: none;
@@ -3044,12 +3060,22 @@ html.dark .genui-recom-rank.gold {
   justify-content: center;
   width: 16px;
   height: 16px;
-  color: var(--primary, #ec4899);
+  color: var(--accent-primary, #ec4899);
 }
 
 .lumi-custom-select-item .lumi-check-icon svg {
   width: 14px;
   height: 14px;
+}
+
+@keyframes lumiDotPulse {
+  0% { transform: scale(0.65); }
+  50% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+.lumi-dot-pulse {
+  animation: lumiDotPulse 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .lumi-settings-input {
@@ -3076,43 +3102,45 @@ html.dark .genui-recom-rank.gold {
   margin-bottom: 1.1rem;
 }
 
-/* Switch toggle matching Android / ChatGPT */
+/* Switch toggle matching Android / ChatGPT with 60fps transform slide */
 .lumi-settings-switch {
-  width: 50px;
-  height: 30px;
+  position: relative;
+  width: 48px;
+  height: 28px;
   border-radius: 9999px;
-  padding: 3px;
-  display: flex;
-  align-items: center;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.24s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .lumi-settings-switch.on {
   background-color: #ffffff;
-  justify-content: flex-end;
 }
 
 .lumi-settings-switch.off {
-  background-color: #39393d;
-  justify-content: flex-start;
+  background-color: #38383c;
 }
 
 .lumi-settings-switch-knob {
-  width: 24px;
-  height: 24px;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.24s ease;
 }
 
 .lumi-settings-switch.on .lumi-settings-switch-knob {
+  transform: translateX(20px);
   background-color: #000000;
 }
 
 .lumi-settings-switch.off .lumi-settings-switch-knob {
+  transform: translateX(0);
   background-color: #8e8e93;
 }
 
