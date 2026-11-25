@@ -4573,6 +4573,132 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
       `);
     },
 
+    startVoiceCall() {
+      this.haptic(20);
+      this.stopSpeakingAnswer();
+      if (typeof LumiVoiceCall !== "undefined" && LumiVoiceCall.open) {
+        LumiVoiceCall.open("study");
+      } else {
+        this.toast("Voice Tutor abhi ready ho raha hai.");
+      }
+    },
+
+    stopSpeakingAnswer() {
+      if (this._answerAudio) {
+        try { this._answerAudio.pause(); } catch {}
+        this._answerAudio = null;
+      }
+      if (window.AndroidAudio && typeof window.AndroidAudio.stop === "function") {
+        try { window.AndroidAudio.stop(); } catch {}
+      }
+      this._speakingIdx = null;
+    },
+
+    async speakAnswer(idx) {
+      if (this._speakingIdx === idx) {
+        this.stopSpeakingAnswer();
+        this.refreshChatInPlace(false);
+        return;
+      }
+      const item = this.getChatHistory()[idx];
+      if (!item) return;
+      this.stopSpeakingAnswer();
+      this._speakingIdx = idx;
+      this.haptic(15);
+      this.refreshChatInPlace(false);
+
+      const parts = [item.intro, item.conceptTitle, item.conceptSummary, item.example ? ("Example: " + item.example) : "", item.exampleNote].filter(Boolean);
+      const cleanText = parts.join(". ")
+        .replace(/[*_`#~]/g, "")
+        .replace(/²/g, " square ")
+        .replace(/≠/g, " not equal to ")
+        .replace(/×/g, " times ")
+        .replace(/=/g, " equals ")
+        .slice(0, 750);
+
+      const voiceId = localStorage.getItem("studyai_live_voice") || "jessica";
+      const ttsEndpoints = [
+        "https://lumi-backend-v4-production.up.railway.app/api/tts",
+        "http://127.0.0.1:3456/api/tts"
+      ];
+      if (window.location.origin && window.location.origin.startsWith("https://")) {
+        ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
+      }
+
+      let played = false;
+      for (const ep of ttsEndpoints) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 12000);
+          const r = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              input: cleanText,
+              voice: voiceId,
+              elevenlabs_api_key: localStorage.getItem("lumi_elevenlabs_key") || ""
+            }),
+            signal: ctrl.signal
+          });
+          clearTimeout(t);
+          if (r.ok) {
+            const blob = await r.blob();
+            if (blob && blob.size > 200) {
+              const url = URL.createObjectURL(blob);
+              const audio = new Audio(url);
+              this._answerAudio = audio;
+              audio.onended = () => {
+                URL.revokeObjectURL(url);
+                this._speakingIdx = null;
+                this._answerAudio = null;
+                this.refreshChatInPlace(false);
+              };
+              audio.onerror = () => {
+                URL.revokeObjectURL(url);
+                this._speakingIdx = null;
+                this._answerAudio = null;
+                this.refreshChatInPlace(false);
+              };
+              await audio.play();
+              played = true;
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+      if (!played) {
+        this._speakingIdx = null;
+        this.refreshChatInPlace(false);
+        this.toast("Voice audio load nahi ho paya.");
+      }
+    },
+
+    saveVoiceSessionTurns(turns) {
+      if (!Array.isArray(turns) || !turns.length) return;
+      const history = this.getChatHistory();
+      for (let i = 0; i < turns.length; i++) {
+        if (turns[i].role === "user") {
+          const reply = (turns[i + 1] && turns[i + 1].role === "assistant") ? turns[i + 1].content : "";
+          history.push({
+            question: turns[i].content,
+            loading: false,
+            intro: reply,
+            conceptTitle: "",
+            conceptSummary: "",
+            suggestedChips: [
+              { label: "Aur Example Do", action: "ask", payload: `${turns[i].content} ka ek aur aasan example do` },
+              { label: "Quick Quiz Lo", action: "quiz", payload: turns[i].content.slice(0, 40) }
+            ]
+          });
+          if (reply) i++;
+        }
+      }
+      this.saveChatHistory(history);
+      if (window.location.hash.startsWith("#/study")) {
+        this.refreshChatInPlace(true);
+      }
+    },
+
     scrollChatToBottom(smooth = true) {
       setTimeout(() => {
         const sc = document.getElementById("studyai-chat-scroll");
@@ -4860,10 +4986,16 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
           <div class="studyai-greeting-wrap">
             <div class="studyai-greeting">Hi ${escapeHtml(nickname)} <svg width="24" height="24" viewBox="0 0 36 36" style="display:inline-block;vertical-align:-4px;"><path fill="#FFDC5D" d="M30.5 17.1c-.4-.7-1.3-1-2-.5l-1.6 1v-7c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5v4.5l-.6-.3c-.7-.4-1.6-.2-2 .5s-.2 1.6.5 2l.6.3v1l-2-1.1c-.7-.4-1.6-.2-2 .5s-.2 1.6.5 2l2.9 1.7.1.1.2.2 4.1 2.4c3.1 1.8 7.1.7 8.9-2.4 1.8-3.1.8-7.1-2.4-8.9l-2.3-1.3-.1-.1.1-.7z"/><path fill="#FFAC33" d="M10.9 32.5C7.1 30.3 5.8 25.4 8 21.6l6.2-10.8c2.2-3.8 7.1-5.1 10.9-2.9.7.4 1.3 1.3.9 2s-1.3 1-2 .5c-2.7-1.5-6.1-.6-7.7 2.1L9.6 23.8c-1.5 2.7-.6 6.1 2.1 7.7.7.4 1 1.3.5 2-.4.7-1.3 1-2 .5z"/><path fill="#FFDC5D" d="M12.9 28.2c-2.7-1.5-3.6-5-2.1-7.7l6.6-11.5c1.5-2.7 5-3.6 7.7-2.1.8.5 1.1 1.5.6 2.3s-1.5 1.1-2.3.6c-1.6-.9-3.6-.4-4.5 1.2l-6.6 11.5c-.9 1.6-.4 3.6 1.2 4.5.8.5 1.1 1.5.6 2.3s-1.5 1.1-2.3.6l-1.9-1.1z"/></svg></div>
             <div class="studyai-subgreeting">Your Personal AI Mentor</div>
-            <button type="button" class="studyai-profile-pill" onclick="StudyAI.openProfileModal();">
-              <span>🎓 ${escapeHtml(profile.studying)} • 🎯 ${escapeHtml(profile.goal)}</span>
-              <span style="opacity:0.55;">✎</span>
-            </button>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;">
+              <button type="button" class="studyai-profile-pill" style="margin-top:0;" onclick="StudyAI.openProfileModal();">
+                <span>🎓 ${escapeHtml(profile.studying)} • 🎯 ${escapeHtml(profile.goal)}</span>
+                <span style="opacity:0.55;">✎</span>
+              </button>
+              <button type="button" class="studyai-profile-pill" style="margin-top:0;background:#18181b;color:#ffffff;border-color:#18181b;" onclick="StudyAI.startVoiceCall();">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+                <span>Voice Call</span>
+              </button>
+            </div>
           </div>
 
           <!-- Hero Welcome Card -->
@@ -5155,16 +5287,17 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
                   </div>
                 ` : ""}
 
-                <!-- AI-Decided Contextual Follow-Up Chips -->
-                ${item.suggestedChips && item.suggestedChips.length ? `
-                  <div class="studyai-pills-row">
-                    ${item.suggestedChips.map((chip, cIdx) => `
-                      <button type="button" class="studyai-pill-btn" onclick="StudyAI.handleSuggestedChip(${idx}, ${cIdx});">
-                        <span>${escapeHtml(chip.label)}</span>
-                      </button>
-                    `).join("")}
-                  </div>
-                ` : ""}
+                <!-- Listen Button + AI-Decided Contextual Follow-Up Chips -->
+                <div class="studyai-pills-row">
+                  <button type="button" class="studyai-pill-btn" style="${this._speakingIdx === idx ? 'background:#18181b;color:#ffffff;border-color:#18181b;' : ''}" onclick="StudyAI.speakAnswer(${idx});">
+                    <span>${this._speakingIdx === idx ? "⏹ Stop" : "🔊 Suno"}</span>
+                  </button>
+                  ${(item.suggestedChips || []).map((chip, cIdx) => `
+                    <button type="button" class="studyai-pill-btn" onclick="StudyAI.handleSuggestedChip(${idx}, ${cIdx});">
+                      <span>${escapeHtml(chip.label)}</span>
+                    </button>
+                  `).join("")}
+                </div>
               </div>
             </div>
           `}
@@ -5199,6 +5332,9 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
+              <button type="button" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" onclick="StudyAI.startVoiceCall();" title="Live Study Voice Call">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v4"/><path d="M6 6v12"/><path d="M10 3v18"/><path d="M14 8v8"/><path d="M18 5v14"/><path d="M22 10v4"/></svg>
+              </button>
               <button type="button" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" onclick="StudyAI.openChatHistory();" title="Study Chat History">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </button>
@@ -5235,7 +5371,10 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
               <button type="button" id="studyai-voice-btn" class="text-gray-500 hover:text-black p-1 cursor-pointer ${this._isListening ? "studyai-mic-active" : ""}" onclick="StudyAI.toggleVoiceInput();" title="Voice Input">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
               </button>
-              <button type="submit" style="width:36px;height:36px;border-radius:50%;background:#000000;color:#ffffff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+              <button type="button" class="active:scale-90 transition-transform" onclick="StudyAI.startVoiceCall();" title="Live Voice Tutor" style="width:34px;height:34px;border-radius:50%;background:#e4e4e7;color:#18181b;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M3 10v4"/><path d="M7.5 6v12"/><path d="M12 3v18"/><path d="M16.5 6v12"/><path d="M21 10v4"/></svg>
+              </button>
+              <button type="submit" class="active:scale-90 transition-transform" style="width:36px;height:36px;border-radius:50%;background:#000000;color:#ffffff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
               </button>
             </form>
@@ -9955,6 +10094,7 @@ Return ONLY valid raw JSON:
 
   const LumiVoiceCall = {
     isOpen: false,
+    callMode: "studio", // "studio" | "study"
     state: "idle", // "idle" | "listening" | "thinking" | "speaking"
     isMuted: false,
     currentLang: "hi-IN",
@@ -9979,12 +10119,13 @@ Return ONLY valid raw JSON:
         <div id="lumi-live-modal" class="hidden">
           <!-- Top Navigation Bar: = on left, camera slash & 3 dots on right -->
           <div class="gemini-live-top-bar">
-            <button type="button" class="gemini-live-icon-btn" id="live-menu-btn" title="Menu">
+            <button type="button" class="gemini-live-icon-btn" id="live-menu-btn" title="Close">
               <svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
                 <line x1="1" y1="2" x2="21" y2="2"></line>
                 <line x1="1" y1="12" x2="21" y2="12"></line>
               </svg>
             </button>
+            <div id="live-study-badge" class="hidden" style="padding:4px 12px;border-radius:9999px;background:rgba(56,189,248,0.16);border:1px solid rgba(56,189,248,0.4);color:#7dd3fc;font-size:12px;font-weight:700;">🎓 Study Voice Mentor</div>
             <div class="gemini-live-top-right">
               <button type="button" class="gemini-live-icon-btn" id="live-cam-toggle-btn" title="Toggle Camera">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -10172,7 +10313,11 @@ Return ONLY valid raw JSON:
 
     selectVoice(voiceId) {
       this.selectedVoice = voiceId;
-      localStorage.setItem("lumi_live_voice", voiceId);
+      if (this.callMode === "study") {
+        localStorage.setItem("studyai_live_voice", voiceId);
+      } else {
+        localStorage.setItem("lumi_live_voice", voiceId);
+      }
       this.ttsCache.clear();
       const voice = LIVE_VOICES.find((v) => v.id === voiceId);
       showToast(`Voice set to: ${voice ? voice.name : voiceId}`);
@@ -10295,16 +10440,20 @@ Return ONLY valid raw JSON:
       }
     },
 
-    open() {
+    open(mode = "studio") {
       this.init();
       this.isOpen = true;
+      this.callMode = mode === "study" ? "study" : "studio";
       this.sessionTurns = [];
       this.speechQueue = [];
       this.isPlayingSpeech = false;
+      this.isGeneratingResponse = false;
       this.state = "listening";
-      this.selectedVoice = localStorage.getItem("lumi_live_voice") || "jessica";
+      this.selectedVoice = this.callMode === "study"
+        ? (localStorage.getItem("studyai_live_voice") || "jessica")
+        : (localStorage.getItem("lumi_live_voice") || "jessica");
 
-      // Silence Android OS SpeechRecognizer chimes completely!
+      try { window.AndroidDevice?.setStatusBarColor?.("#000000", false); } catch {}
       if (window.AndroidAudio && typeof window.AndroidAudio.silenceSystemSounds === "function") {
         try { window.AndroidAudio.silenceSystemSounds(); } catch { }
       }
@@ -10313,9 +10462,20 @@ Return ONLY valid raw JSON:
       if (modal) {
         modal.classList.remove("hidden");
       }
+      const badge = document.querySelector("#live-study-badge");
+      if (badge) {
+        badge.classList.toggle("hidden", this.callMode !== "study");
+      }
 
-      this.updateUI("listening");
-      this.startListening();
+      if (this.callMode === "study") {
+        const p = (typeof StudyAI !== "undefined" && StudyAI.getProfile) ? StudyAI.getProfile() : {};
+        const greet = `Namaste ${p.name || "dost"}! Bolo aaj kya samajhna hai? Main pyaar se example dekar samjhaungi.`;
+        this.updateUI("speaking", greet);
+        this.speakCallChunk(greet);
+      } else {
+        this.updateUI("listening");
+        this.startListening();
+      }
     },
 
     close() {
@@ -10332,6 +10492,14 @@ Return ONLY valid raw JSON:
 
       const modal = document.querySelector("#lumi-live-modal");
       if (modal) modal.classList.add("hidden");
+
+      if (this.callMode === "study") {
+        try { window.AndroidDevice?.setStatusBarColor?.("#ffffff", true); } catch {}
+        if (this.sessionTurns.length > 0 && typeof StudyAI !== "undefined" && StudyAI.saveVoiceSessionTurns) {
+          StudyAI.saveVoiceSessionTurns(this.sessionTurns);
+        }
+        return;
+      }
 
       if (this.sessionTurns.length > 0) {
         try {
@@ -10552,10 +10720,23 @@ Return ONLY valid raw JSON:
         langDirective = "STRICT LANGUAGE MIRRORING: The user spoke in Hinglish (Roman script Hindi). You MUST reply in natural, brotherly Hinglish in Roman script (e.g. 'Sab theek hai bhai! Tu bata kya chal raha hai?').";
       }
 
+      const studyProfile = (this.callMode === "study" && typeof StudyAI !== "undefined" && StudyAI.getProfile)
+        ? StudyAI.getProfile()
+        : null;
+
+      const systemPrompt = this.callMode === "study"
+        ? `You are Didi (StudyAI Live Voice Mentor), speaking live on a voice call with student ${studyProfile?.name || "Dost"} (Age: ${studyProfile?.age || "student"}, Studying: ${studyProfile?.studying || "School"}, Goal: ${studyProfile?.goal || "Learning"}).
+PERSONALITY & VOICE STYLE:
+- Speak in a super sweet, affectionate, warm, encouraging tone (like a favorite elder sister/teacher who truly cares).
+- TEACH LIKE EXPLAINING TO A CHILD IN FULL DETAIL: Never give dry textbook definitions! Break every topic down step-by-step from zero, and ALWAYS explain with fun, relatable everyday Indian real-life examples (like cricket, pizza slices, pani ki tanki, cycle, chocolates, mobile battery) so the student deeply understands WHY and HOW.
+- STRICT LANGUAGE MIRRORING: ${langDirective} Match the student's spoken language/Hinglish naturally.
+- SPOKEN AUDIO RULES: Do NOT use markdown, asterisks **, hashes #, bullets -, brackets, or symbols like ^ or ≠. Write math/science expressions as natural spoken words (e.g., "x square", "not equal to zero", "V barabar I guna R"). End warmly asking if they understood or want another example.`
+        : `You are Lumi on a real-time live phone call. Speak naturally, warmly, and authentically like a close companion/brother.\nRules:\n1. STRICT LANGUAGE MIRRORING (CRITICAL): ${langDirective} You MUST always speak in the exact same language and script that the user spoke. Never switch languages.\n2. NATURAL ADAPTIVE LENGTH: If the user asks for a story, poem, or detailed explanation (e.g. 'kahani sunao', 'badi kahani', 'explain karo', 'batao'), tell the full, complete story or explanation naturally from beginning to end. If the user asks a quick casual question, keep it brief and conversational. Never cut yourself short to just one sentence when asked for a story or explanation.\n3. SPOKEN AUDIO: Do NOT use markdown symbols (no asterisks **, no bullet points -, no hashes #). Speak in clean, flowing spoken sentences so speech synthesis sounds completely natural.`;
+
       const messages = [
         {
           role: "system",
-          content: `You are Lumi on a real-time live phone call. Speak naturally, warmly, and authentically like a close companion/brother.\nRules:\n1. STRICT LANGUAGE MIRRORING (CRITICAL): ${langDirective} You MUST always speak in the exact same language and script that the user spoke. Never switch languages.\n2. NATURAL ADAPTIVE LENGTH: If the user asks for a story, poem, or detailed explanation (e.g. 'kahani sunao', 'badi kahani', 'explain karo', 'batao'), tell the full, complete story or explanation naturally from beginning to end. If the user asks a quick casual question, keep it brief and conversational. Never cut yourself short to just one sentence when asked for a story or explanation.\n3. SPOKEN AUDIO: Do NOT use markdown symbols (no asterisks **, no bullet points -, no hashes #). Speak in clean, flowing spoken sentences so speech synthesis sounds completely natural.`
+          content: systemPrompt
         }
       ];
 
@@ -10576,7 +10757,7 @@ Return ONLY valid raw JSON:
           "http://127.0.0.1:3456/api/free/chat",
           "http://10.188.22.242:3456/api/free/chat"
         ];
-        if (window.location.origin && window.location.origin.startsWith("http")) {
+        if (window.location.origin && window.location.origin.startsWith("https://")) {
           chatEndpoints.unshift(`${window.location.origin}/api/free/chat`);
         }
 
@@ -10703,7 +10884,7 @@ Return ONLY valid raw JSON:
         "http://127.0.0.1:3456/api/tts",
         "http://10.188.22.242:3456/api/tts"
       ];
-      if (window.location.origin && window.location.origin.startsWith("http")) {
+      if (window.location.origin && window.location.origin.startsWith("https://")) {
         ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
       }
       const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
@@ -10789,7 +10970,7 @@ Return ONLY valid raw JSON:
           "http://127.0.0.1:3456/api/tts",
           "http://10.188.22.242:3456/api/tts"
         ];
-        if (window.location.origin && window.location.origin.startsWith("http")) {
+        if (window.location.origin && window.location.origin.startsWith("https://")) {
           ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
         }
 
