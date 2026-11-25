@@ -3873,6 +3873,8 @@
       PROFILE: "studyai_user_profile_v2",
       BOOKS: "studyai_books_v2",
       CHATS: "studyai_chat_history_v2",
+      SESSIONS: "studyai_chat_sessions_v1",
+      ACTIVE_SESSION: "studyai_active_session_id_v1",
       READER_PAGES: "studyai_reader_pages_v2",
       SYLLABUS: "studyai_syllabus_v2",
       STATS: "studyai_stats_v2",
@@ -4388,45 +4390,189 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
       }
     },
 
-    // -------------------- CHAT HISTORY & PERSISTENCE --------------------
-    getChatHistory() {
-      if (this._chatCache) return this._chatCache;
+    // -------------------- SEPARATE MULTI-SESSION STUDY CHAT HISTORY --------------------
+    getSessions() {
+      if (this._sessionsCache) return this._sessionsCache;
+      let sessions = [];
       try {
-        const raw = localStorage.getItem(this.KEYS.CHATS);
+        const raw = localStorage.getItem(this.KEYS.SESSIONS);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            this._chatCache = parsed;
-            return this._chatCache;
-          }
+          if (Array.isArray(parsed)) sessions = parsed;
         }
       } catch (e) {}
-      this._chatCache = [];
-      return this._chatCache;
+
+      // One-time migration from legacy single chat array
+      if (!sessions.length) {
+        try {
+          const legacyRaw = localStorage.getItem(this.KEYS.CHATS);
+          if (legacyRaw) {
+            const legacy = JSON.parse(legacyRaw);
+            if (Array.isArray(legacy) && legacy.length) {
+              const firstQ = String(legacy[0].question || "Study Chat").slice(0, 34);
+              sessions.push({
+                id: `sc_${Date.now()}`,
+                title: firstQ,
+                updatedAt: Date.now(),
+                messages: legacy
+              });
+              localStorage.setItem(this.KEYS.SESSIONS, JSON.stringify(sessions));
+              localStorage.setItem(this.KEYS.ACTIVE_SESSION, sessions[0].id);
+            }
+          }
+        } catch (e) {}
+      }
+
+      this._sessionsCache = sessions;
+      return sessions;
+    },
+
+    saveSessions(sessions) {
+      this._sessionsCache = sessions.slice(0, 30);
+      const lightweight = this._sessionsCache.map(s => ({
+        ...s,
+        messages: (s.messages || []).slice(-25).map(m => {
+          const copy = { ...m };
+          if (copy.image && copy.image.length > 80000) {
+            copy.imageNote = "[Photo Attached]";
+            delete copy.image;
+          }
+          return copy;
+        })
+      }));
+      try {
+        localStorage.setItem(this.KEYS.SESSIONS, JSON.stringify(lightweight));
+      } catch (e) {}
+    },
+
+    getActiveSession() {
+      const sessions = this.getSessions();
+      const activeId = localStorage.getItem(this.KEYS.ACTIVE_SESSION);
+      let found = sessions.find(s => s.id === activeId);
+      if (!found) {
+        if (sessions.length) {
+          found = sessions[0];
+        } else {
+          found = {
+            id: `sc_${Date.now()}`,
+            title: "New Study Chat",
+            updatedAt: Date.now(),
+            messages: []
+          };
+          sessions.unshift(found);
+          this.saveSessions(sessions);
+        }
+        localStorage.setItem(this.KEYS.ACTIVE_SESSION, found.id);
+      }
+      return found;
+    },
+
+    getChatHistory() {
+      return this.getActiveSession().messages || [];
     },
 
     saveChatHistory(arr) {
-      this._chatCache = arr.slice(-25);
-      // Do not persist bulky base64 images inside localStorage to keep storage fast
-      const lightweight = this._chatCache.map(m => {
-        const copy = { ...m };
-        if (copy.image && copy.image.length > 80000) {
-          copy.imageNote = "[Photo Attached]";
-          delete copy.image;
-        }
-        return copy;
-      });
-      try {
-        localStorage.setItem(this.KEYS.CHATS, JSON.stringify(lightweight));
-      } catch (e) {}
+      const sessions = this.getSessions();
+      const active = this.getActiveSession();
+      active.messages = arr.slice(-25);
+      active.updatedAt = Date.now();
+      if ((!active.title || active.title === "New Study Chat") && active.messages.length) {
+        const q = String(active.messages[0].question || "Study Chat").trim();
+        active.title = q.length > 34 ? q.slice(0, 34) + "..." : q;
+      }
+      this.saveSessions(sessions);
     },
 
     startNewChatSession() {
       this.haptic(15);
-      this._chatCache = [];
-      localStorage.removeItem(this.KEYS.CHATS);
+      const sessions = this.getSessions();
+      // If active session is already empty, just stay on it
+      const cur = this.getActiveSession();
+      if (cur && (!cur.messages || cur.messages.length === 0)) {
+        window.location.hash = "#/study/chat";
+        render();
+        this.toast("Ready for a new study topic!");
+        return;
+      }
+      const next = {
+        id: `sc_${Date.now()}`,
+        title: "New Study Chat",
+        updatedAt: Date.now(),
+        messages: []
+      };
+      sessions.unshift(next);
+      this.saveSessions(sessions);
+      localStorage.setItem(this.KEYS.ACTIVE_SESSION, next.id);
+      window.location.hash = "#/study/chat";
       render();
-      this.toast("Fresh Study session shuru ho gaya!");
+      this.toast("✨ Naya Study Chat shuru!");
+    },
+
+    switchSession(sessionId) {
+      const sessions = this.getSessions();
+      const target = sessions.find(s => s.id === sessionId);
+      if (!target) return;
+      localStorage.setItem(this.KEYS.ACTIVE_SESSION, target.id);
+      this.closeModal();
+      window.location.hash = "#/study/chat";
+      render();
+      this.haptic(15);
+    },
+
+    deleteSession(sessionId) {
+      let sessions = this.getSessions().filter(s => s.id !== sessionId);
+      this.saveSessions(sessions);
+      if (localStorage.getItem(this.KEYS.ACTIVE_SESSION) === sessionId) {
+        localStorage.removeItem(this.KEYS.ACTIVE_SESSION);
+      }
+      this.haptic(15);
+      this.openChatHistory();
+    },
+
+    openChatHistory() {
+      this.haptic(15);
+      const sessions = this.getSessions();
+      const activeId = localStorage.getItem(this.KEYS.ACTIVE_SESSION);
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#18181b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>Study Chat History</span>
+            </div>
+            <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+          </div>
+          <div class="studyai-modal-body">
+            <button type="button" class="studyai-download-action-btn" style="margin:0 0 14px 0;justify-content:center;" onclick="StudyAI.closeModal(); StudyAI.startNewChatSession();">
+              <span>+ New Study Chat</span>
+            </button>
+            ${sessions.length === 0 ? `
+              <div style="text-align:center;padding:24px 12px;color:#6b7280;font-size:13px;">Abhi koi saved study chat nahi hai. Sawal puchna shuru karein!</div>
+            ` : `
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                ${sessions.map(s => {
+                  const isActive = s.id === activeId;
+                  const count = (s.messages || []).length;
+                  const timeStr = s.updatedAt ? new Date(s.updatedAt).toLocaleDateString() : "";
+                  return `
+                    <div class="studyai-book-browse-card" style="${isActive ? "border-color:#18181b;background:#f8fafc;" : ""}">
+                      <div style="flex:1;min-width:0;cursor:pointer;" onclick="StudyAI.switchSession('${s.id}');">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                          <span style="font-size:14px;font-weight:800;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.title || "Study Session")}</span>
+                          ${isActive ? `<span style="font-size:10px;font-weight:800;background:#18181b;color:#fff;padding:1px 7px;border-radius:999px;">Active</span>` : ""}
+                        </div>
+                        <div style="font-size:11.5px;color:#6b7280;margin-top:3px;">${count} message${count === 1 ? "" : "s"} ${timeStr ? "• " + timeStr : ""}</div>
+                      </div>
+                      <button type="button" class="studyai-pill-btn" style="padding:6px 10px;font-size:12px;font-weight:700;" onclick="StudyAI.switchSession('${s.id}');">Open</button>
+                      <button type="button" style="border:none;background:none;color:#9ca3af;cursor:pointer;padding:6px;" onclick="StudyAI.deleteSession('${s.id}');" title="Delete chat">✕</button>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            `}
+          </div>
+        </div>
+      `);
     },
 
     // -------------------- REAL GEMINI AI ENGINE --------------------
@@ -4685,7 +4831,10 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
               <span class="studyai-pro-badge" style="cursor:pointer;" onclick="StudyAI.openProfileModal();">PRO</span>
             </div>
             <div class="studyai-header-actions">
-              <button type="button" class="p-1.5 text-gray-700 hover:text-black relative" title="Study Activity & Tips" onclick="StudyAI.openNotifications();">
+              <button type="button" class="p-1.5 text-gray-700 hover:text-black active:scale-90 transition-transform" title="Study Chat History" onclick="StudyAI.openChatHistory();">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </button>
+              <button type="button" class="p-1.5 text-gray-700 hover:text-black relative active:scale-90 transition-transform" title="Study Activity & Tips" onclick="StudyAI.openNotifications();">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
                 ${stats.streakDays > 0 ? `<span class="absolute top-1.5 right-1.5 size-2 rounded-full bg-amber-400"></span>` : ""}
               </button>
@@ -4893,10 +5042,13 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
-              <button type="button" class="p-1 text-gray-700 hover:text-black" onclick="StudyAI.openDownloaderTab('my_downloads');" title="My Books">
+              <button type="button" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" onclick="StudyAI.openChatHistory();" title="Study Chat History">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </button>
+              <button type="button" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" onclick="StudyAI.openDownloaderTab('my_downloads');" title="My Books">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
               </button>
-              <button type="button" class="p-1 text-gray-700 hover:text-black" onclick="StudyAI.startNewChatSession();" title="New Session">
+              <button type="button" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" onclick="StudyAI.startNewChatSession();" title="New Session">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
             </div>
@@ -4920,7 +5072,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
               </div>
             ` : history.map((item, idx) => `
               <!-- User Query Bubble -->
-              <div class="flex justify-end items-end gap-2">
+              <div class="flex justify-end items-end gap-2 studyai-msg-in">
                 <div class="studyai-user-bubble">${item.image ? `<img src="${item.image}" style="max-width:100%;max-height:180px;border-radius:10px;margin-bottom:8px;display:block;" />` : item.imageNote ? `<div style="font-size:11.5px;color:#a1a1aa;margin-bottom:4px;">📷 ${escapeHtml(item.imageNote)}</div>` : ""}${escapeHtml(item.question)}</div>
                 <div class="size-7 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center shrink-0 overflow-hidden">
                   <svg width="20" height="20" viewBox="0 0 36 36" fill="none">
@@ -4933,7 +5085,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
 
               ${item.loading ? `
                 <!-- Live AI Thinking Skeleton -->
-                <div class="flex gap-3 items-start animate-pulse">
+                <div class="flex gap-3 items-start animate-pulse studyai-msg-in">
                   <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
                     <svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
                   </div>
@@ -4952,7 +5104,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
                 </div>
               ` : `
                 <!-- AI Mentor Response -->
-                <div class="flex gap-3 items-start">
+                <div class="flex gap-3 items-start studyai-msg-in">
                   <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
                   </div>
@@ -5609,7 +5761,7 @@ Provide 6 to 10 real chapters for this book.`;
           </div>
 
           ${tab === "browse" ? `
-            <div style="padding:0 16px;">
+            <div class="studyai-tab-panel-in" style="padding:0 16px;">
               <form onsubmit="StudyAI.submitBookSearch(event);" style="display:flex;gap:8px;margin-bottom:16px;">
                 <input type="text" id="studyai-book-search-input" class="studyai-onboard-input" placeholder="Koi bhi book likho (e.g. HC Verma, Python)..." style="flex:1;padding:10px 14px;" />
                 <button type="submit" style="padding:0 16px;border-radius:14px;background:#18181b;color:#ffffff;font-size:13px;font-weight:700;border:none;cursor:pointer;">Index AI</button>
@@ -5643,7 +5795,7 @@ Provide 6 to 10 real chapters for this book.`;
               </div>
             </div>
           ` : tab === "bulk" ? `
-            <div style="padding:0 16px;">
+            <div class="studyai-tab-panel-in" style="padding:0 16px;">
               <div style="font-size:15.5px;font-weight:800;color:#000000;margin-bottom:12px;">Smart Study Packs (${escapeHtml(profile.studying)})</div>
               <div class="studyai-download-checklist" style="padding:0;">
                 <div class="studyai-source-item ${isClassPack ? "selected" : ""}" onclick="StudyAI.toggleSource('class_pack');">
@@ -5673,7 +5825,7 @@ Provide 6 to 10 real chapters for this book.`;
               </button>
             </div>
           ` : `
-            <div style="padding:0 16px;">
+            <div class="studyai-tab-panel-in" style="padding:0 16px;">
               <div style="background:#f4f4f5;border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;color:#374151;display:flex;justify-content:space-between;">
                 <span>Saved Books: <strong>${myBooks.length}</strong></span>
                 <span>Offline Pages Cached: <strong>${cachedPagesCount}</strong></span>
@@ -5731,7 +5883,7 @@ Provide 6 to 10 real chapters for this book.`;
         this.haptic(10);
         setTimeout(() => {
           if (existing.parentNode) existing.remove();
-        }, 210);
+        }, 235);
       }
     },
 
@@ -7588,8 +7740,9 @@ Return ONLY valid raw JSON:
             </div>
 
             <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              <a href="#/study" class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] sm:text-xs font-semibold bg-sky-500/15 text-sky-400 border border-sky-500/30 hover:bg-sky-500/25 transition-all shadow-xs" title="Shift to StudyAI Pro Mode">
-                <span>🎓 StudyAI</span>
+              <a href="#/study" class="inline-flex items-center gap-1 px-2 h-7 rounded-full text-[10.5px] font-semibold bg-gradient-to-r from-sky-500/15 to-indigo-500/20 text-sky-300 border border-sky-400/35 hover:bg-sky-500/25 active:scale-90 transition-all shadow-xs shrink-0" title="Open Study Mode">
+                <svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2.7 3 6 3s6-1 6-3v-5"/></svg>
+                <span>Study</span>
               </a>
               ${renderDeviceToolsPicker()}
               ${renderModelPicker("topbar")}
@@ -10394,219 +10547,6 @@ Return ONLY valid raw JSON:
         for (const ep of chatEndpoints) {
           try {
             const ctrl = new AbortController();
-            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 25000 : 20000;
-            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-            const r = await fetch(ep, {
-              method: "POST",
-              signal: ctrl.signal,
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: "gemini-3-flash",
-                messages: messages,
-                stream: true,
-                max_tokens: 2048
-              })
-            });
-            clearTimeout(timer);
-            if (r.ok) {
-              resp = r;
-              break;
-            }
-          } catch (e) {
-            if (this.streamAbortCtrl && this.streamAbortCtrl.signal.aborted) throw e;
-          }
-        }
-
-        if (!resp || !resp.ok) throw new Error("All chat backends failed");
-
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let streamDone = false;
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") {
-              streamDone = true;
-              break;
-            }
-
-            try {
-              const parsed = JSON.parse(dataStr);
-              const delta = parsed.choices?.[0]?.delta?.content || "";
-              if (delta) {
-                const cleanDelta = delta.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<\/?think>/g, "");
-                fullAssistantReply += cleanDelta;
-                sentenceBuffer += cleanDelta;
-
-                // Ultra-fast clause chunking: split on sentence end [.?!।\n] OR if buffer has >= 4 words and hits a comma/pause [,;]
-                const words = sentenceBuffer.trim().split(/\s+/);
-                let toSpeak = "";
-                const sentenceEndMatch = sentenceBuffer.match(/^([\s\S]+?[.?!।\n])\s*([\s\S]*)$/);
-                if (sentenceEndMatch) {
-                  toSpeak = sentenceEndMatch[1].trim();
-                  sentenceBuffer = sentenceEndMatch[2];
-                } else if (words.length >= 4) {
-                  const commaMatch = sentenceBuffer.match(/^([\s\S]+?[,;])\s*([\s\S]*)$/);
-                  if (commaMatch) {
-                    toSpeak = commaMatch[1].trim();
-                    sentenceBuffer = commaMatch[2];
-                  }
-                }
-
-                if (toSpeak) {
-                  this.speakCallChunk(toSpeak);
-                }
-              }
-            } catch { }
-          }
-          if (streamDone) {
-            try { reader.cancel(); } catch { }
-            break;
-          }
-        }
-
-        if (sentenceBuffer.trim()) {
-          this.speakCallChunk(sentenceBuffer.trim());
-        }
-
-        const finalClean = fullAssistantReply.replace(/\*\*/g, "").trim();
-        if (!finalClean && this.speechQueue.length === 0) {
-          this.speakCallChunk("Haan ji, kahiye, mai sun rahi hu.");
-        }
-        this.sessionTurns.push({ role: "assistant", content: finalClean || "Haan ji, kahiye, mai sun rahi hu." });
-        this.isGeneratingResponse = false;
-
-        // If audio finished playing while LLM was streaming last chunk, check if queue is now empty
-        if (!this.isPlayingSpeech && this.speechQueue.length === 0) {
-          setTimeout(() => {
-            if (this.isOpen && !this.isPlayingSpeech && !this.isGeneratingResponse && this.speechQueue.length === 0) {
-              this.updateUI("listening", "");
-              this.startListening();
-            }
-          }, 400);
-        }
-
-      } catch (err) {
-        this.isGeneratingResponse = false;
-        if (err.name === "AbortError") return;
-        this.speakCallChunk("Haan ji, kahiye, mai sun rahi hu.");
-      }
-    },
-
-    ttsCache: new Map(),
-
-    async prefetchTTS(text, activeVoice) {
-      if (!text || this.ttsCache.has(text)) return;
-      const ttsEndpoints = [
-        "https://lumi-backend-v4-production.up.railway.app/api/tts",
-        "http://127.0.0.1:3456/api/tts",
-        "http://10.188.22.242:3456/api/tts"
-      ];
-      if (window.location.origin && window.location.origin.startsWith("http")) {
-        ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
-      }
-      const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
-      for (const ep of ttsEndpoints) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 5000);
-          const r = await fetch(ep, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: text, voice: activeVoice, elevenlabs_api_key: elKey }),
-            signal: ctrl.signal
-          });
-          clearTimeout(timer);
-          if (r.ok) {
-            const b = await r.blob();
-            if (b && b.size > 200) {
-              this.ttsCache.set(text, b);
-              break;
-            }
-          }
-        } catch { }
-      }
-    },
-
-    speakCallChunk(sentence) {
-      const clean = sentence.replace(/\*\*/g, "").replace(/[`#_*~]/g, "").trim();
-      if (!clean) return;
-
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
-      this.prefetchTTS(clean, activeVoice);
-      this.speechQueue.push(clean);
-      if (!this.isPlayingSpeech) {
-        this.playNextQueuedSpeech();
-      }
-    },
-
-    async playNextQueuedSpeech() {
-      if (!this.isOpen || this.speechQueue.length === 0) {
-        this.isPlayingSpeech = false;
-        if (this.isOpen && !this.isGeneratingResponse) {
-          setTimeout(() => {
-            if (this.isOpen && !this.isGeneratingResponse && !this.isPlayingSpeech && this.speechQueue.length === 0) {
-              this.updateUI("listening", "");
-              this.startListening();
-            }
-          }, 400);
-        }
-        return;
-      }
-
-      this.isPlayingSpeech = true;
-      this.stopListening();
-
-      const text = this.speechQueue.shift();
-      const hasHindi = /[\u0900-\u097F]/.test(text);
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
-
-      // If next items exist in queue, pre-fetch their audio now
-      if (this.speechQueue.length > 0) {
-        this.prefetchTTS(this.speechQueue[0], activeVoice);
-      }
-
-      // Safety watchdog: generous 15-second window prevents ANY freeze while allowing full TTS playback
-      let watchdog = setTimeout(() => {
-        if (this.isOpen && this.isPlayingSpeech) {
-          console.warn("Speech watchdog triggered, advancing queue");
-          this.playNextQueuedSpeech();
-        }
-      }, Math.max(15000, text.length * 500));
-
-      const clearWatchdog = () => {
-        if (watchdog) {
-          clearTimeout(watchdog);
-          watchdog = null;
-        }
-      };
-
-      let audioBlob = this.ttsCache.get(text) || null;
-      if (!audioBlob) {
-        const ttsEndpoints = [
-          "https://lumi-backend-v4-production.up.railway.app/api/tts",
-          "http://127.0.0.1:3456/api/tts",
-          "http://10.188.22.242:3456/api/tts"
-        ];
-        if (window.location.origin && window.location.origin.startsWith("http")) {
-          ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
-        }
-
-        const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
-        for (const ep of ttsEndpoints) {
-          try {
-            const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), 6000);
             const r = await fetch(ep, {
               method: "POST",
@@ -10871,8 +10811,9 @@ Return ONLY valid raw JSON:
     const wasNearBottom = chatContainer ? (chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 120) : true;
 
     const { path, query } = parseLocation();
+    const prevRoutePath = window._lastRenderedPath || "";
 
-    if (window._lastRenderedPath !== path) {
+    if (prevRoutePath !== path) {
       window._lastRenderedPath = path;
       window.scrollTo(0, 0);
     }
@@ -10926,11 +10867,6 @@ Return ONLY valid raw JSON:
       } else {
         root.innerHTML = StudyAI.renderDashboard();
       }
-      if (window.__lastStudyRoute !== path) {
-        window.__lastStudyRoute = path;
-        const vp = root.querySelector(".studyai-viewport");
-        if (vp) vp.classList.add("studyai-screen-enter");
-      }
     } else if (path === "/auth") {
       try {
         window.AndroidDevice?.setStatusBarColor?.("#000000", false);
@@ -10971,6 +10907,14 @@ Return ONLY valid raw JSON:
     } else {
       // 404 fallback to landing
       root.innerHTML = renderLanding();
+    }
+
+    if (prevRoutePath && prevRoutePath !== path && root.firstElementChild) {
+      const isPop =
+        ((prevRoutePath.startsWith("/study/") && prevRoutePath !== "/study/") && (path === "/study" || path === "/study/")) ||
+        (prevRoutePath.startsWith("/study") && path.startsWith("/chat")) ||
+        (prevRoutePath.startsWith("/settings") && (path.startsWith("/chat") || path.startsWith("/study")));
+      root.firstElementChild.classList.add(isPop ? "lumi-page-pop" : "lumi-page-push");
     }
 
     root.innerHTML += renderHtmlModal();

@@ -5396,22 +5396,22 @@ html.dark .studyai-viewport {
 @keyframes studyModalFadeIn {
   from {
     opacity: 0;
-    transform: scale(0.92) translateY(20px);
+    transform: translateY(48px) scale(0.92);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes studyModalFadeOut {
   from {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: translateY(0) scale(1);
   }
   to {
     opacity: 0;
-    transform: scale(0.92) translateY(22px);
+    transform: translateY(44px) scale(0.92);
   }
 }
 
@@ -5425,19 +5425,93 @@ html.dark .studyai-viewport {
   to { opacity: 0; }
 }
 
-@keyframes studyScreenEnter {
+@keyframes lumiPagePushIn {
   from {
-    opacity: 0.72;
-    transform: translateY(10px);
+    opacity: 0;
+    transform: translateX(36px) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0) scale(1);
   }
 }
 
-.studyai-screen-enter {
-  animation: studyScreenEnter 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+@keyframes lumiPagePopIn {
+  from {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes studyTabPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes studyMsgPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.lumi-page-push {
+  will-change: transform, opacity;
+  animation: lumiPagePushIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.lumi-page-pop {
+  will-change: transform, opacity;
+  animation: lumiPagePopIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.studyai-tab-panel-in {
+  animation: studyTabPanelIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.studyai-msg-in {
+  animation: studyMsgPopIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.studyai-grid-btn,
+.studyai-book-card,
+.studyai-pill-btn,
+.studyai-open-book-btn,
+.studyai-nav-item,
+.studyai-nav-fab,
+.studyai-tab-btn,
+.studyai-pager-btn,
+.studyai-source-item,
+.studyai-syllabus-item,
+.studyai-quiz-option {
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.studyai-grid-btn:active,
+.studyai-book-card:active,
+.studyai-pill-btn:active,
+.studyai-open-book-btn:active,
+.studyai-nav-item:active,
+.studyai-nav-fab:active,
+.studyai-tab-btn:active,
+.studyai-pager-btn:active,
+.studyai-source-item:active,
+.studyai-syllabus-item:active {
+  transform: scale(0.92) !important;
 }
 
 .studyai-user-bubble {
@@ -5469,7 +5543,7 @@ html.dark .studyai-viewport {
 }
 
 .studyai-modal-backdrop.closing {
-  animation: studyBackdropOut 0.21s ease-in forwards;
+  animation: studyBackdropOut 0.24s ease-in forwards;
   pointer-events: none;
 }
 
@@ -5484,12 +5558,12 @@ html.dark .studyai-viewport {
   flex-direction: column;
   overflow: hidden;
   will-change: transform, opacity;
-  animation: studyModalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: studyModalFadeIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
   border: 1px solid #e5e7eb;
 }
 
 .studyai-modal-backdrop.closing .studyai-modal-card {
-  animation: studyModalFadeOut 0.21s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: studyModalFadeOut 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 .studyai-modal-header {
