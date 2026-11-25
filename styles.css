@@ -4608,9 +4608,36 @@ html.dark .genui-poll-bg-fill {
   color: #111827 !important;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
+  overflow-x: clip;
   padding-bottom: 76px; /* Space for bottom nav */
   box-sizing: border-box;
+}
+
+.studyai-chat-shell {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff !important;
+  z-index: 40;
+}
+
+.studyai-chat-shell > .studyai-header {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.studyai-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: clip;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 /* Staggered Native Entry Animations */

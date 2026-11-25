@@ -4402,7 +4402,6 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
         }
       } catch (e) {}
 
-      // One-time migration from legacy single chat array
       if (!sessions.length) {
         try {
           const legacyRaw = localStorage.getItem(this.KEYS.CHATS);
@@ -4422,7 +4421,6 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
           }
         } catch (e) {}
       }
-
       this._sessionsCache = sessions;
       return sessions;
     },
@@ -4486,7 +4484,6 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
     startNewChatSession() {
       this.haptic(15);
       const sessions = this.getSessions();
-      // If active session is already empty, just stay on it
       const cur = this.getActiveSession();
       if (cur && (!cur.messages || cur.messages.length === 0)) {
         window.location.hash = "#/study/chat";
@@ -4516,6 +4513,7 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
       this.closeModal();
       window.location.hash = "#/study/chat";
       render();
+      this.scrollChatToBottom(false);
       this.haptic(15);
     },
 
@@ -4573,6 +4571,17 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
           </div>
         </div>
       `);
+    },
+
+    scrollChatToBottom(smooth = true) {
+      setTimeout(() => {
+        const sc = document.getElementById("studyai-chat-scroll");
+        if (sc) {
+          sc.scrollTo({ top: sc.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+        } else {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+        }
+      }, 60);
     },
 
     // -------------------- REAL GEMINI AI ENGINE --------------------
@@ -4645,9 +4654,7 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
       this.saveChatHistory(history);
       this.haptic(15);
       render();
-      setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-      }, 60);
+      this.scrollChatToBottom(true);
 
       try {
         const recentTurns = history.slice(-4, -1).map(h => ([
@@ -4744,9 +4751,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
       this.saveChatHistory(history);
       this.haptic(20);
       render();
-      setTimeout(() => {
-        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-      }, 60);
+      this.scrollChatToBottom(true);
     },
 
     handleSuggestedChip(msgIdx, chipIdx) {
@@ -5024,10 +5029,10 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
       const chips = this.getTopicChips();
 
       return `
-        <div class="studyai-viewport" style="padding-bottom:110px;background:#ffffff;">
+        <div class="studyai-viewport studyai-chat-shell">
           <header class="studyai-header">
             <div style="display:flex;align-items:center;gap:10px;">
-              <a href="#/study" class="p-1 text-gray-700 hover:text-black" title="Back to Study Home">
+              <a href="#/study" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" title="Back to Study Home">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
               </a>
               <div>
@@ -5054,7 +5059,8 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
             </div>
           </header>
 
-          <div id="studyai-messages-list" class="px-4 py-3 flex-1 flex flex-col gap-5">
+          <div id="studyai-chat-scroll" class="studyai-chat-scroll">
+            <div id="studyai-messages-list" class="px-4 py-3 flex flex-col gap-5">
             ${history.length === 0 ? `
               <div style="margin-top:24px;text-align:center;padding:24px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:22px;">
                 <div style="width:54px;height:54px;border-radius:16px;background:#18181b;color:#ffffff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto;">
@@ -5178,11 +5184,12 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
                 </div>
               `}
             `).join("")}
+            </div>
           </div>
 
-          <!-- Hidden Photo Input + Bottom Sticky Study Composer -->
+          <!-- Hidden Photo Input + Pinned Bottom Study Composer -->
           <input type="file" id="studyai-photo-input" accept="image/*" style="display:none;" />
-          <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)) 16px;background:#ffffff;border-top:1px solid #e5e7eb;z-index:50;">
+          <div style="flex-shrink:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)) 16px;background:#ffffff;border-top:1px solid #e5e7eb;z-index:50;">
             ${this._pendingImage ? `
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;background:#f4f4f5;border-radius:12px;">
                 <img src="${this._pendingImage}" style="width:34px;height:34px;object-fit:cover;border-radius:8px;" />
@@ -10547,6 +10554,219 @@ Return ONLY valid raw JSON:
         for (const ep of chatEndpoints) {
           try {
             const ctrl = new AbortController();
+            const timeoutMs = (ep.includes("127.0.0.1") || ep.includes("10.188.22.242")) ? 25000 : 20000;
+            const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+            const r = await fetch(ep, {
+              method: "POST",
+              signal: ctrl.signal,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                model: "gemini-3-flash",
+                messages: messages,
+                stream: true,
+                max_tokens: 2048
+              })
+            });
+            clearTimeout(timer);
+            if (r.ok) {
+              resp = r;
+              break;
+            }
+          } catch (e) {
+            if (this.streamAbortCtrl && this.streamAbortCtrl.signal.aborted) throw e;
+          }
+        }
+
+        if (!resp || !resp.ok) throw new Error("All chat backends failed");
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let streamDone = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === "[DONE]") {
+              streamDone = true;
+              break;
+            }
+
+            try {
+              const parsed = JSON.parse(dataStr);
+              const delta = parsed.choices?.[0]?.delta?.content || "";
+              if (delta) {
+                const cleanDelta = delta.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<\/?think>/g, "");
+                fullAssistantReply += cleanDelta;
+                sentenceBuffer += cleanDelta;
+
+                // Ultra-fast clause chunking: split on sentence end [.?!।\n] OR if buffer has >= 4 words and hits a comma/pause [,;]
+                const words = sentenceBuffer.trim().split(/\s+/);
+                let toSpeak = "";
+                const sentenceEndMatch = sentenceBuffer.match(/^([\s\S]+?[.?!।\n])\s*([\s\S]*)$/);
+                if (sentenceEndMatch) {
+                  toSpeak = sentenceEndMatch[1].trim();
+                  sentenceBuffer = sentenceEndMatch[2];
+                } else if (words.length >= 4) {
+                  const commaMatch = sentenceBuffer.match(/^([\s\S]+?[,;])\s*([\s\S]*)$/);
+                  if (commaMatch) {
+                    toSpeak = commaMatch[1].trim();
+                    sentenceBuffer = commaMatch[2];
+                  }
+                }
+
+                if (toSpeak) {
+                  this.speakCallChunk(toSpeak);
+                }
+              }
+            } catch { }
+          }
+          if (streamDone) {
+            try { reader.cancel(); } catch { }
+            break;
+          }
+        }
+
+        if (sentenceBuffer.trim()) {
+          this.speakCallChunk(sentenceBuffer.trim());
+        }
+
+        const finalClean = fullAssistantReply.replace(/\*\*/g, "").trim();
+        if (!finalClean && this.speechQueue.length === 0) {
+          this.speakCallChunk("Haan ji, kahiye, mai sun rahi hu.");
+        }
+        this.sessionTurns.push({ role: "assistant", content: finalClean || "Haan ji, kahiye, mai sun rahi hu." });
+        this.isGeneratingResponse = false;
+
+        // If audio finished playing while LLM was streaming last chunk, check if queue is now empty
+        if (!this.isPlayingSpeech && this.speechQueue.length === 0) {
+          setTimeout(() => {
+            if (this.isOpen && !this.isPlayingSpeech && !this.isGeneratingResponse && this.speechQueue.length === 0) {
+              this.updateUI("listening", "");
+              this.startListening();
+            }
+          }, 400);
+        }
+
+      } catch (err) {
+        this.isGeneratingResponse = false;
+        if (err.name === "AbortError") return;
+        this.speakCallChunk("Haan ji, kahiye, mai sun rahi hu.");
+      }
+    },
+
+    ttsCache: new Map(),
+
+    async prefetchTTS(text, activeVoice) {
+      if (!text || this.ttsCache.has(text)) return;
+      const ttsEndpoints = [
+        "https://lumi-backend-v4-production.up.railway.app/api/tts",
+        "http://127.0.0.1:3456/api/tts",
+        "http://10.188.22.242:3456/api/tts"
+      ];
+      if (window.location.origin && window.location.origin.startsWith("http")) {
+        ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
+      }
+      const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
+      for (const ep of ttsEndpoints) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 5000);
+          const r = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input: text, voice: activeVoice, elevenlabs_api_key: elKey }),
+            signal: ctrl.signal
+          });
+          clearTimeout(timer);
+          if (r.ok) {
+            const b = await r.blob();
+            if (b && b.size > 200) {
+              this.ttsCache.set(text, b);
+              break;
+            }
+          }
+        } catch { }
+      }
+    },
+
+    speakCallChunk(sentence) {
+      const clean = sentence.replace(/\*\*/g, "").replace(/[`#_*~]/g, "").trim();
+      if (!clean) return;
+
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
+      this.prefetchTTS(clean, activeVoice);
+      this.speechQueue.push(clean);
+      if (!this.isPlayingSpeech) {
+        this.playNextQueuedSpeech();
+      }
+    },
+
+    async playNextQueuedSpeech() {
+      if (!this.isOpen || this.speechQueue.length === 0) {
+        this.isPlayingSpeech = false;
+        if (this.isOpen && !this.isGeneratingResponse) {
+          setTimeout(() => {
+            if (this.isOpen && !this.isGeneratingResponse && !this.isPlayingSpeech && this.speechQueue.length === 0) {
+              this.updateUI("listening", "");
+              this.startListening();
+            }
+          }, 400);
+        }
+        return;
+      }
+
+      this.isPlayingSpeech = true;
+      this.stopListening();
+
+      const text = this.speechQueue.shift();
+      const hasHindi = /[\u0900-\u097F]/.test(text);
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
+
+      // If next items exist in queue, pre-fetch their audio now
+      if (this.speechQueue.length > 0) {
+        this.prefetchTTS(this.speechQueue[0], activeVoice);
+      }
+
+      // Safety watchdog: generous 15-second window prevents ANY freeze while allowing full TTS playback
+      let watchdog = setTimeout(() => {
+        if (this.isOpen && this.isPlayingSpeech) {
+          console.warn("Speech watchdog triggered, advancing queue");
+          this.playNextQueuedSpeech();
+        }
+      }, Math.max(15000, text.length * 500));
+
+      const clearWatchdog = () => {
+        if (watchdog) {
+          clearTimeout(watchdog);
+          watchdog = null;
+        }
+      };
+
+      let audioBlob = this.ttsCache.get(text) || null;
+      if (!audioBlob) {
+        const ttsEndpoints = [
+          "https://lumi-backend-v4-production.up.railway.app/api/tts",
+          "http://127.0.0.1:3456/api/tts",
+          "http://10.188.22.242:3456/api/tts"
+        ];
+        if (window.location.origin && window.location.origin.startsWith("http")) {
+          ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
+        }
+
+        const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
+        for (const ep of ttsEndpoints) {
+          try {
+            const ctrl = new AbortController();
             const timer = setTimeout(() => ctrl.abort(), 6000);
             const r = await fetch(ep, {
               method: "POST",
@@ -10914,7 +11134,11 @@ Return ONLY valid raw JSON:
         ((prevRoutePath.startsWith("/study/") && prevRoutePath !== "/study/") && (path === "/study" || path === "/study/")) ||
         (prevRoutePath.startsWith("/study") && path.startsWith("/chat")) ||
         (prevRoutePath.startsWith("/settings") && (path.startsWith("/chat") || path.startsWith("/study")));
-      root.firstElementChild.classList.add(isPop ? "lumi-page-pop" : "lumi-page-push");
+      const animEl = root.firstElementChild;
+      animEl.classList.add(isPop ? "lumi-page-pop" : "lumi-page-push");
+      setTimeout(() => {
+        animEl.classList.remove("lumi-page-pop", "lumi-page-push");
+      }, 320);
     }
 
     root.innerHTML += renderHtmlModal();
