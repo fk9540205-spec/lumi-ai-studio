@@ -621,10 +621,13 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
         target_model = raw_model or "gemini-2.5-flash"
 
         messages = data.get("messages", [])
+        fast_voice = bool(data.get("fast_voice"))
+        req_tool_choice = data.get("tool_choice", "auto")
         tools = data.get("tools") or []
         image = data.get("image")
-        messages = self._attach_live_search_context(messages, force=bool(data.get("web_search")))
-        if not tools:
+        if not fast_voice:
+            messages = self._attach_live_search_context(messages, force=bool(data.get("web_search")))
+        if not tools and not fast_voice and req_tool_choice != "none":
             tools = [{
                 "type": "function",
                 "function": {
@@ -1515,8 +1518,44 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                               tool_choice: str, stream: bool, max_tokens: int,
                               headers: dict, image: str | None = None):
         working_messages = _attach_image_to_messages(messages, image)
-        working_messages = self._attach_live_search_context(working_messages)
+        if tools and tool_choice != "none":
+            working_messages = self._attach_live_search_context(working_messages)
         working_messages = [dict(message) if isinstance(message, dict) else message for message in working_messages]
+
+        # Ultra-low-latency direct SSE streaming when no tool execution loop is requested
+        if stream and (not tools or tool_choice == "none"):
+            stream_body = {
+                "model": model,
+                "messages": working_messages,
+                "stream": True,
+                "max_tokens": max_tokens,
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(stream_body).encode("utf-8"),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=45, context=_get_ssl_context()) as resp:
+                self._start_sse()
+                saw_done = False
+                for raw_line in resp:
+                    line = raw_line.decode("utf-8", errors="ignore").strip()
+                    if not line:
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    payload = line[5:].strip()
+                    if payload == "[DONE]":
+                        saw_done = True
+                        self._send_chunk(b"data: [DONE]\n\n")
+                        break
+                    self._send_chunk((line + "\n\n").encode("utf-8"))
+                if not saw_done:
+                    self._send_chunk(b"data: [DONE]\n\n")
+                self._end_chunks()
+            return
+
         final_content = ""
         final_raw = None
 
@@ -1899,8 +1938,11 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
 
             clean_text = re.sub(r'[*_`#~]', '', text).strip()
             has_hindi = bool(re.search(r'[\u0900-\u097F]', clean_text))
+            req_lang = (data.get("lang") or "").strip().lower()
+            is_hindi_voice = raw_voice.lower() in ("kavya", "swara", "madhur", "prabhat", "aarav")
+            prefer_native_hindi = has_hindi or is_hindi_voice or req_lang.startswith("hi")
 
-            # If ElevenLabs API key is provided, route directly to real ElevenLabs
+            # If ElevenLabs API key is provided for non-Hindi voices, route to ElevenLabs
             eleven_key = os.environ.get("ELEVENLABS_API_KEY") or data.get("elevenlabs_api_key") or data.get("eleven_key") or "sk_a61c01bfdc33853091e2f7439494a00d98ac0e3872f54072"
             eleven_voice_map = {
                 "jessica": "cgSgspJ2msm6clMCkdW9",
@@ -1923,7 +1965,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 "nova": "cgSgspJ2msm6clMCkdW9",
                 "nicole": "cgSgspJ2msm6clMCkdW9",
             }
-            if eleven_key and raw_voice.lower() in eleven_voice_map:
+            if not prefer_native_hindi and eleven_key and raw_voice.lower() in eleven_voice_map:
                 try:
                     import urllib.request
                     vid = eleven_voice_map[raw_voice.lower()]
@@ -1932,7 +1974,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         el_url,
                         data=json.dumps({
                             "text": clean_text,
-                            "model_id": "eleven_multilingual_v2",
+                            "model_id": "eleven_flash_v2_5",
                             "voice_settings": {
                                 "stability": 0.45,
                                 "similarity_boost": 0.85,
@@ -1946,7 +1988,7 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                         },
                         method="POST"
                     )
-                    with urllib.request.urlopen(req, timeout=12) as resp:
+                    with urllib.request.urlopen(req, timeout=5) as resp:
                         if resp.status == 200:
                             el_bytes = resp.read()
                             if len(el_bytes) > 200:
@@ -1983,9 +2025,16 @@ class ProxyHandler(http.server.BaseHTTPRequestHandler):
                 "onyx": ("en-US-BrianMultilingualNeural", "-10Hz", "-4%"),
             }
 
-            v_cfg = voice_config.get(raw_voice.lower())
+            male_voices = {"madhur", "prabhat", "aarav", "charlie", "george", "brian", "adam", "roger", "eric", "chris", "bill", "onyx", "alloy", "callum"}
+            if has_hindi or req_lang.startswith("hi"):
+                if raw_voice.lower() in male_voices:
+                    v_cfg = voice_config.get(raw_voice.lower()) if raw_voice.lower() in ("madhur", "prabhat", "aarav") else ("hi-IN-MadhurNeural", "-2Hz", "+2%")
+                else:
+                    v_cfg = ("hi-IN-SwaraNeural", "+4Hz", "+4%") if raw_voice.lower() != "swara" else voice_config["swara"]
+            else:
+                v_cfg = voice_config.get(raw_voice.lower())
             if not v_cfg:
-                v_cfg = ("en-US-AvaMultilingualNeural", "+0Hz", "+0%")
+                v_cfg = ("hi-IN-SwaraNeural", "+4Hz", "+4%") if prefer_native_hindi else ("en-US-AvaMultilingualNeural", "+0Hz", "+0%")
             voice, pitch, rate = v_cfg
 
             cache_key = (voice, pitch, rate, clean_text)

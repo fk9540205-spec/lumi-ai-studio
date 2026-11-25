@@ -5116,14 +5116,26 @@ html.dark .studyai-viewport {
   background: #ffffff;
   border: 1.5px solid #e5e7eb;
   border-radius: 12px;
-  padding: 12px 16px;
+  padding: 12px 14px;
   margin: 8px 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
   color: #000000;
   text-align: center;
+  word-break: break-word;
+  overflow-x: auto;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.studyai-inline-code {
+  background: #e2e8f0;
+  color: #0f172a;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+  font-weight: 600;
 }
 
 /* Book Reference Box (Screen 2) */
@@ -5188,17 +5200,17 @@ html.dark .studyai-viewport {
 
 .studyai-pills-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 14px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  margin-top: 12px;
 }
 
 .studyai-pill-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
   padding: 6px 11px;
   border-radius: 9999px;
   background: #ffffff;
@@ -5208,8 +5220,28 @@ html.dark .studyai-viewport {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-  transition: all 0.15s ease;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+#studyai-primary-action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease;
+}
+
+#studyai-primary-action-btn:active {
+  transform: scale(0.9);
 }
 
 .studyai-pill-btn:hover,

@@ -4616,7 +4616,7 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
         .replace(/=/g, " equals ")
         .slice(0, 750);
 
-      const voiceId = localStorage.getItem("studyai_live_voice") || "jessica";
+      const voiceId = localStorage.getItem("studyai_live_voice") || "kavya";
       const ttsEndpoints = [
         "https://lumi-backend-v4-production.up.railway.app/api/tts",
         "http://127.0.0.1:3456/api/tts"
@@ -4636,6 +4636,7 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
             body: JSON.stringify({
               input: cleanText,
               voice: voiceId,
+              lang: /[\u0900-\u097F]/.test(cleanText) ? "hi-IN" : "en-IN",
               elevenlabs_api_key: localStorage.getItem("lumi_elevenlabs_key") || ""
             }),
             signal: ctrl.signal
@@ -5172,6 +5173,32 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
       });
     },
 
+    formatStudyRichText(str) {
+      if (!str) return "";
+      let html = escapeHtml(String(str));
+      html = html.replace(/`([^`]+)`/g, '<code class="studyai-inline-code">$1</code>');
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\n/g, '<br/>');
+      return html;
+    },
+
+    syncComposerActionBtn() {
+      const btn = document.getElementById("studyai-primary-action-btn");
+      const inp = document.getElementById("studyai-chat-input");
+      if (!btn) return;
+      const hasContent = !!((inp && inp.value.trim().length > 0) || this._pendingImage);
+      const nextMode = hasContent ? "send" : "voice";
+      if (btn.dataset.mode === nextMode) return;
+      btn.dataset.mode = nextMode;
+      btn.type = hasContent ? "submit" : "button";
+      btn.title = hasContent ? "Send Question" : "Live Study Voice Call";
+      btn.setAttribute("aria-label", hasContent ? "Send Question" : "Live Study Voice Call");
+      btn.style.background = hasContent ? "#000000" : "#18181b";
+      btn.innerHTML = hasContent
+        ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>'
+        : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M3 10v4"/><path d="M7.5 6v12"/><path d="M12 3v18"/><path d="M16.5 6v12"/><path d="M21 10v4"/></svg>';
+    },
+
     renderChatMessagesHtml(history, profile, chips, animateLastOnly = false) {
       if (!history || history.length === 0) {
         return `
@@ -5232,7 +5259,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
               </div>
               <div class="flex-1 min-w-0">
-                ${item.intro ? `<p class="text-[14px] text-gray-900 leading-relaxed mb-3 font-medium">${escapeHtml(item.intro).replace(/\n/g, "<br/>")}</p>` : ""}
+                ${item.intro ? `<p class="text-[14px] text-gray-900 leading-relaxed mb-3 font-medium">${this.formatStudyRichText(item.intro)}</p>` : ""}
 
                 ${(item.conceptTitle || item.conceptSummary || item.formula || (item.rules && item.rules.length) || item.example) ? `
                   <div class="studyai-concept-card">
@@ -5243,7 +5270,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
                     ` : ""}
                     ${item.conceptSummary ? `
                       <p class="text-[13.5px] text-gray-700 ${item.conceptTitle ? "mt-2" : ""} leading-relaxed">
-                        ${escapeHtml(item.conceptSummary).replace(/\n/g, "<br/>")}
+                        ${this.formatStudyRichText(item.conceptSummary)}
                       </p>
                     ` : ""}
 
@@ -5257,14 +5284,14 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
 
                     ${item.rules && item.rules.length ? `
                       <ul class="text-[12.5px] text-gray-700 list-disc pl-4 space-y-1 mt-2">
-                        ${item.rules.map(r => `<li>${escapeHtml(r)}</li>`).join("")}
+                        ${item.rules.map(r => `<li>${this.formatStudyRichText(r)}</li>`).join("")}
                       </ul>
                     ` : ""}
 
                     ${item.example ? `
                       <div style="font-size:12.5px;font-weight:700;color:#71717a;margin-top:12px;">Example:</div>
-                      <div class="text-[13.5px] text-black font-mono font-bold mt-1">${escapeHtml(item.example)}</div>
-                      ${item.exampleNote ? `<div class="text-[12.5px] text-gray-600 mt-1">${escapeHtml(item.exampleNote)}</div>` : ""}
+                      <div class="text-[13.5px] text-black font-semibold mt-1 leading-relaxed">${this.formatStudyRichText(item.example)}</div>
+                      ${item.exampleNote ? `<div class="text-[12.5px] text-gray-600 mt-1 leading-relaxed">${this.formatStudyRichText(item.exampleNote)}</div>` : ""}
                     ` : ""}
                   </div>
                 ` : ""}
@@ -5316,22 +5343,22 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
       return `
         <div class="studyai-viewport studyai-chat-shell">
           <header class="studyai-header">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <a href="#/study" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" title="Back to Study Home">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+              <a href="#/study" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform shrink-0" title="Back to Study Home">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
               </a>
-              <div>
+              <div style="min-width:0;flex:1;">
                 <div style="display:flex;align-items:center;gap:6px;">
                   <span style="font-weight:800;font-size:16px;color:#000000;">StudyAI</span>
                   <span class="studyai-pro-badge">PRO</span>
                 </div>
-                <div style="font-size:11.5px;color:#059669;display:flex;align-items:center;gap:4px;font-weight:600;">
-                  <span style="width:6px;height:6px;border-radius:50%;background:#059669;display:inline-block;"></span>
-                  <span>${escapeHtml(profile.studying)} • ${escapeHtml(profile.goal)}</span>
+                <div style="font-size:11.5px;color:#059669;display:flex;align-items:center;gap:4px;font-weight:600;min-width:0;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#059669;display:inline-block;flex-shrink:0;"></span>
+                  <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(profile.studying)} • ${escapeHtml(profile.goal)}</span>
                 </div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
               <button type="button" class="p-1 text-gray-700 hover:text-black active:scale-90 transition-transform" onclick="StudyAI.startVoiceCall();" title="Live Study Voice Call">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v4"/><path d="M6 6v12"/><path d="M10 3v18"/><path d="M14 8v8"/><path d="M18 5v14"/><path d="M22 10v4"/></svg>
               </button>
@@ -5363,19 +5390,19 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
                 <button type="button" onclick="StudyAI._pendingImage=null;render();" style="border:none;background:none;font-weight:800;color:#ef4444;cursor:pointer;">✕</button>
               </div>
             ` : ""}
-            <form id="studyai-chat-form" style="display:flex;align-items:center;gap:10px;background:#f3f4f6;border:1.5px solid #e5e7eb;border-radius:9999px;padding:4px 6px 4px 14px;">
-              <button type="button" id="studyai-photo-btn" class="text-gray-500 hover:text-black cursor-pointer" title="Snap or Upload Question Photo">
+            <form id="studyai-chat-form" style="display:flex;align-items:center;gap:8px;background:#f3f4f6;border:1.5px solid #e5e7eb;border-radius:9999px;padding:4px 5px 4px 12px;width:100%;box-sizing:border-box;">
+              <button type="button" id="studyai-photo-btn" class="text-gray-500 hover:text-black cursor-pointer" style="flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:4px;" title="Snap or Upload Question Photo">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               </button>
-              <input type="text" id="studyai-chat-input" placeholder="${this._isListening ? "Sun raha hoon... boliye" : "Aur kuch puchna hai..."}" style="flex:1;background:transparent;border:none;outline:none;color:#000000;font-size:14px;font-weight:500;" autocomplete="off" />
-              <button type="button" id="studyai-voice-btn" class="text-gray-500 hover:text-black p-1 cursor-pointer ${this._isListening ? "studyai-mic-active" : ""}" onclick="StudyAI.toggleVoiceInput();" title="Voice Input">
+              <input type="text" id="studyai-chat-input" placeholder="${this._isListening ? "Sun raha hoon... boliye" : "Aur kuch puchna hai..."}" style="flex:1;min-width:0;width:100%;background:transparent;border:none;outline:none;color:#000000;font-size:14px;font-weight:500;" autocomplete="off" />
+              <button type="button" id="studyai-voice-btn" class="text-gray-500 hover:text-black p-1 cursor-pointer ${this._isListening ? "studyai-mic-active" : ""}" style="flex-shrink:0;display:flex;align-items:center;justify-content:center;" onclick="StudyAI.toggleVoiceInput();" title="Voice Input">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
               </button>
-              <button type="button" class="active:scale-90 transition-transform" onclick="StudyAI.startVoiceCall();" title="Live Voice Tutor" style="width:34px;height:34px;border-radius:50%;background:#e4e4e7;color:#18181b;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M3 10v4"/><path d="M7.5 6v12"/><path d="M12 3v18"/><path d="M16.5 6v12"/><path d="M21 10v4"/></svg>
-              </button>
-              <button type="submit" class="active:scale-90 transition-transform" style="width:36px;height:36px;border-radius:50%;background:#000000;color:#ffffff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <button type="${this._pendingImage ? "submit" : "button"}" id="studyai-primary-action-btn" data-mode="${this._pendingImage ? "send" : "voice"}" onclick="if(this.dataset.mode!=='send'){StudyAI.startVoiceCall();}" title="${this._pendingImage ? "Send Question" : "Live Study Voice Call"}" style="background:${this._pendingImage ? "#000000" : "#18181b"};">
+                ${this._pendingImage
+                  ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>'
+                  : '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M3 10v4"/><path d="M7.5 6v12"/><path d="M12 3v18"/><path d="M16.5 6v12"/><path d="M21 10v4"/></svg>'
+                }
               </button>
             </form>
           </div>
@@ -5412,6 +5439,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
           if (inp && text) {
             inp.value = text;
             inp.focus();
+            StudyAI.syncComposerActionBtn();
           }
         };
         rec.onerror = () => {
@@ -10074,19 +10102,19 @@ Return ONLY valid raw JSON:
   // Exact match to frame_339.png from official user video + AI Voice Selector
   // ==========================================================================
   const LIVE_VOICES = [
-    { id: "jessica", name: "Jessica (Sweet & Playful)", provider: "ElevenLabs", desc: "Super sweet, cute, playful and most charming female voice" },
-    { id: "lily", name: "Lily (Velvety & Soothing)", provider: "ElevenLabs", desc: "Velvety, soft, gentle and soothing comforting female voice" },
+    { id: "kavya", name: "Kavya (Sweet Hindi & Hinglish)", provider: "Indic Neural", desc: "Sweet, expressive, crystal-clear native Hindi & Hinglish female voice" },
+    { id: "swara", name: "Swara (Natural Hindi)", provider: "IndicF5", desc: "Warm, fluent native Hindi & Hinglish female voice" },
+    { id: "ananya", name: "Ananya (Indian English)", provider: "Indic Neural", desc: "Modern, fluent Indian English & Hindi female voice" },
+    { id: "jessica", name: "Jessica (Sweet & Playful)", provider: "ElevenLabs", desc: "Playful expressive voice (auto-switches to Hindi for Hindi speech)" },
+    { id: "lily", name: "Lily (Velvety & Soothing)", provider: "ElevenLabs", desc: "Velvety, soft, gentle soothing female voice" },
     { id: "bella", name: "Bella (Bright & Warm)", provider: "ElevenLabs", desc: "Expressive, bright and engaging female voice" },
     { id: "charlie", name: "Charlie (Confident & Friendly)", provider: "ElevenLabs", desc: "Deep, lively and energetic conversational male voice" },
-    { id: "george", name: "George (British Storyteller)", provider: "ElevenLabs", desc: "Warm, captivating and mature storytelling British male voice" },
-    { id: "brian", name: "Brian (Deep & Resonant)", provider: "ElevenLabs", desc: "Deep, comforting and classy social tone" },
+    { id: "george", name: "George (British Storyteller)", provider: "ElevenLabs", desc: "Warm, captivating storytelling British male voice" },
+    { id: "brian", name: "Brian (Deep & Resonant)", provider: "ElevenLabs", desc: "Deep, comforting social tone" },
     { id: "adam", name: "Adam (Dominant & Firm)", provider: "ElevenLabs", desc: "Deep, articulate storytelling male voice" },
-    { id: "swara", name: "Swara", provider: "IndicF5", desc: "Natural native Hindi & Hinglish female voice" },
-    { id: "madhur", name: "Madhur", provider: "IndicF5", desc: "Natural warm Hindi & Hinglish male voice" },
-    { id: "kavya", name: "Kavya", provider: "Indic Neural", desc: "Sweet, expressive young Hindi female voice" },
+    { id: "madhur", name: "Madhur (Natural Hindi Male)", provider: "IndicF5", desc: "Natural warm Hindi & Hinglish male voice" },
     { id: "prabhat", name: "Prabhat", provider: "Indic Neural", desc: "Deep, authoritative Hindi storyteller voice" },
     { id: "aarav", name: "Aarav", provider: "Indic Neural", desc: "Energetic, youthful Hindi male voice" },
-    { id: "ananya", name: "Ananya", provider: "Indic Neural", desc: "Modern, fluent Indian English female voice" },
     { id: "nova", name: "Nova", provider: "OpenAI", desc: "Warm, natural conversational tone" },
     { id: "onyx", name: "Onyx", provider: "OpenAI", desc: "Deep, warm and grounded male voice" },
     { id: "alloy", name: "Alloy", provider: "OpenAI", desc: "Dynamic and expressive balanced voice" }
@@ -10098,7 +10126,7 @@ Return ONLY valid raw JSON:
     state: "idle", // "idle" | "listening" | "thinking" | "speaking"
     isMuted: false,
     currentLang: "hi-IN",
-    selectedVoice: localStorage.getItem("lumi_live_voice") || "jessica",
+    selectedVoice: localStorage.getItem("lumi_live_voice") || "kavya",
     previewAudio: null,
     currentlyPlayingSampleId: null,
     restartTimer: null,
@@ -10257,7 +10285,7 @@ Return ONLY valid raw JSON:
       // Temporarily stop microphone so speech recognizer doesn't capture preview clicks
       this.stopListening();
 
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
+      const activeVoice = this.selectedVoice || localStorage.getItem(this.callMode === "study" ? "studyai_live_voice" : "lumi_live_voice") || "kavya";
 
       list.innerHTML = LIVE_VOICES.map((v) => {
         const isSelected = v.id === activeVoice;
@@ -10450,8 +10478,8 @@ Return ONLY valid raw JSON:
       this.isGeneratingResponse = false;
       this.state = "listening";
       this.selectedVoice = this.callMode === "study"
-        ? (localStorage.getItem("studyai_live_voice") || "jessica")
-        : (localStorage.getItem("lumi_live_voice") || "jessica");
+        ? (localStorage.getItem("studyai_live_voice") || "kavya")
+        : (localStorage.getItem("lumi_live_voice") || "kavya");
 
       try { window.AndroidDevice?.setStatusBarColor?.("#000000", false); } catch {}
       if (window.AndroidAudio && typeof window.AndroidAudio.silenceSystemSounds === "function") {
@@ -10469,7 +10497,7 @@ Return ONLY valid raw JSON:
 
       if (this.callMode === "study") {
         const p = (typeof StudyAI !== "undefined" && StudyAI.getProfile) ? StudyAI.getProfile() : {};
-        const greet = `Namaste ${p.name || "dost"}! Bolo aaj kya samajhna hai? Main pyaar se example dekar samjhaungi.`;
+        const greet = `नमस्ते ${p.name || "दोस्त"}! बोलो आज क्या समझना है? मैं प्यार से उदाहरण देकर समझाऊँगी।`;
         this.updateUI("speaking", greet);
         this.speakCallChunk(greet);
       } else {
@@ -10592,10 +10620,11 @@ Return ONLY valid raw JSON:
             this.updateUI("listening", currentText);
 
             clearTimeout(this.silenceTimer);
-            // Give user natural breathing room (1.2 seconds) to finish their entire sentence
+            const lastRes = event.results && event.results.length ? event.results[event.results.length - 1] : null;
+            const waitMs = (lastRes && lastRes.isFinal) ? 220 : 550;
             this.silenceTimer = setTimeout(() => {
               this.submitUserSpeech();
-            }, 1200);
+            }, waitMs);
           }
         };
 
@@ -10717,7 +10746,7 @@ Return ONLY valid raw JSON:
       } else if (hasMalayalam) {
         langDirective = "STRICT LANGUAGE MIRRORING: The user spoke in Malayalam. You MUST reply in natural, fluent spoken Malayalam (മലയാളം).";
       } else if (isHinglish) {
-        langDirective = "STRICT LANGUAGE MIRRORING: The user spoke in Hinglish (Roman script Hindi). You MUST reply in natural, brotherly Hinglish in Roman script (e.g. 'Sab theek hai bhai! Tu bata kya chal raha hai?').";
+        langDirective = "STRICT LANGUAGE MIRRORING: The user spoke Hindi/Hinglish. You MUST write ALL Hindi words in clean Devanagari script ONLY (e.g. 'अरे बिल्कुल दोस्त, चलो इसे मज़ेदार उदाहरण से समझते हैं!') and keep only common English technical/modern words like Python, if-else, laptop, traffic light in English. NEVER write Hindi words in Roman/English letters like 'samjha', 'kya', 'hai' because Devanagari gives crystal-clear native Indian Hindi pronunciation.";
       }
 
       const studyProfile = (this.callMode === "study" && typeof StudyAI !== "undefined" && StudyAI.getProfile)
@@ -10728,10 +10757,11 @@ Return ONLY valid raw JSON:
         ? `You are Didi (StudyAI Live Voice Mentor), speaking live on a voice call with student ${studyProfile?.name || "Dost"} (Age: ${studyProfile?.age || "student"}, Studying: ${studyProfile?.studying || "School"}, Goal: ${studyProfile?.goal || "Learning"}).
 PERSONALITY & VOICE STYLE:
 - Speak in a super sweet, affectionate, warm, encouraging tone (like a favorite elder sister/teacher who truly cares).
-- TEACH LIKE EXPLAINING TO A CHILD IN FULL DETAIL: Never give dry textbook definitions! Break every topic down step-by-step from zero, and ALWAYS explain with fun, relatable everyday Indian real-life examples (like cricket, pizza slices, pani ki tanki, cycle, chocolates, mobile battery) so the student deeply understands WHY and HOW.
-- STRICT LANGUAGE MIRRORING: ${langDirective} Match the student's spoken language/Hinglish naturally.
-- SPOKEN AUDIO RULES: Do NOT use markdown, asterisks **, hashes #, bullets -, brackets, or symbols like ^ or ≠. Write math/science expressions as natural spoken words (e.g., "x square", "not equal to zero", "V barabar I guna R"). End warmly asking if they understood or want another example.`
-        : `You are Lumi on a real-time live phone call. Speak naturally, warmly, and authentically like a close companion/brother.\nRules:\n1. STRICT LANGUAGE MIRRORING (CRITICAL): ${langDirective} You MUST always speak in the exact same language and script that the user spoke. Never switch languages.\n2. NATURAL ADAPTIVE LENGTH: If the user asks for a story, poem, or detailed explanation (e.g. 'kahani sunao', 'badi kahani', 'explain karo', 'batao'), tell the full, complete story or explanation naturally from beginning to end. If the user asks a quick casual question, keep it brief and conversational. Never cut yourself short to just one sentence when asked for a story or explanation.\n3. SPOKEN AUDIO: Do NOT use markdown symbols (no asterisks **, no bullet points -, no hashes #). Speak in clean, flowing spoken sentences so speech synthesis sounds completely natural.`;
+- FAST LIVE OPENER: Start your VERY FIRST 3 to 5 words with a quick warm reaction followed by a comma (e.g. "अरे बिल्कुल जयू," or "बहुत बढ़िया सवाल है,"), then immediately continue smoothly into your full detailed explanation so live voice starts with zero awkward pause!
+- TEACH LIKE EXPLAINING TO A CHILD IN FULL DETAIL: Never give dry textbook definitions! Break every topic down step-by-step from zero, and ALWAYS explain with fun, relatable everyday Indian real-life examples (like cricket, pizza slices, पानी की टंकी, cycle, chocolates, mobile battery) so the student deeply understands WHY and HOW.
+- ${langDirective} Use simple everyday spoken Hindi in Devanagari script with natural English tech terms when needed—never stiff Sanskrit words and never Romanized Hindi.
+- SPOKEN AUDIO RULES: Do NOT use markdown, asterisks **, hashes #, bullets -, brackets, or symbols like ^ or ≠. Write math/science expressions as natural spoken words (e.g., "एक्स स्क्वेयर", "V बराबर I गुणा R"). End warmly asking if they understood or want another example.`
+        : `You are Lumi on a real-time live phone call. Speak naturally, warmly, and authentically like a close companion.\nRules:\n1. ${langDirective} Always write Hindi in clean Devanagari script (never Romanized Hindi) so Hindi speech sounds crystal-clear and natural.\n2. FAST LIVE OPENER: Start with a short 3-5 word warm phrase followed by a comma, then continue naturally.\n3. NATURAL ADAPTIVE LENGTH: If asked for a story, poem, or explanation, give it fully; otherwise keep casual chat crisp.\n4. SPOKEN AUDIO: Do NOT use markdown symbols (no asterisks **, bullets -, hashes #).`;
 
       const messages = [
         {
@@ -10774,8 +10804,11 @@ PERSONALITY & VOICE STYLE:
               body: JSON.stringify({
                 model: "gemini-3-flash",
                 messages: messages,
+                tools: [],
+                tool_choice: "none",
+                fast_voice: true,
                 stream: true,
-                max_tokens: 2048
+                max_tokens: 1536
               })
             });
             clearTimeout(timer);
@@ -10794,6 +10827,7 @@ PERSONALITY & VOICE STYLE:
         const decoder = new TextDecoder();
         let buffer = "";
         let streamDone = false;
+        let hasFlushedFirst = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -10820,22 +10854,29 @@ PERSONALITY & VOICE STYLE:
                 fullAssistantReply += cleanDelta;
                 sentenceBuffer += cleanDelta;
 
-                // Ultra-fast clause chunking: split on sentence end [.?!।\n] OR if buffer has >= 4 words and hits a comma/pause [,;]
-                const words = sentenceBuffer.trim().split(/\s+/);
+                // Ultra-fast clause chunking: flush first clause ASAP so live audio begins immediately
+                const words = sentenceBuffer.trim().split(/\s+/).filter(Boolean);
                 let toSpeak = "";
                 const sentenceEndMatch = sentenceBuffer.match(/^([\s\S]+?[.?!।\n])\s*([\s\S]*)$/);
                 if (sentenceEndMatch) {
                   toSpeak = sentenceEndMatch[1].trim();
                   sentenceBuffer = sentenceEndMatch[2];
-                } else if (words.length >= 4) {
-                  const commaMatch = sentenceBuffer.match(/^([\s\S]+?[,;])\s*([\s\S]*)$/);
+                } else if (words.length >= (hasFlushedFirst ? 5 : 2)) {
+                  const commaMatch = sentenceBuffer.match(/^([\s\S]+?[,;:])\s+([\s\S]*)$/);
                   if (commaMatch) {
                     toSpeak = commaMatch[1].trim();
                     sentenceBuffer = commaMatch[2];
+                  } else if (!hasFlushedFirst && words.length >= 6) {
+                    const lastSp = sentenceBuffer.lastIndexOf(" ");
+                    if (lastSp > 8) {
+                      toSpeak = sentenceBuffer.slice(0, lastSp).trim();
+                      sentenceBuffer = sentenceBuffer.slice(lastSp + 1);
+                    }
                   }
                 }
 
                 if (toSpeak) {
+                  hasFlushedFirst = true;
                   this.speakCallChunk(toSpeak);
                 }
               }
@@ -10865,7 +10906,7 @@ PERSONALITY & VOICE STYLE:
               this.updateUI("listening", "");
               this.startListening();
             }
-          }, 400);
+          }, 150);
         }
 
       } catch (err) {
@@ -10876,46 +10917,66 @@ PERSONALITY & VOICE STYLE:
     },
 
     ttsCache: new Map(),
+    ttsInFlight: new Map(),
 
-    async prefetchTTS(text, activeVoice) {
-      if (!text || this.ttsCache.has(text)) return;
+    prefetchTTS(text, activeVoice, langHint = "") {
+      if (!text) return Promise.resolve(null);
+      const cacheKey = `${activeVoice}::${text}`;
+      if (this.ttsCache.has(cacheKey)) {
+        return Promise.resolve(this.ttsCache.get(cacheKey));
+      }
+      if (this.ttsInFlight.has(cacheKey)) {
+        return this.ttsInFlight.get(cacheKey);
+      }
+
+      const detectedLang = langHint || (/[\u0900-\u097F]/.test(text) ? "hi-IN" : "en-IN");
       const ttsEndpoints = [
         "https://lumi-backend-v4-production.up.railway.app/api/tts",
-        "http://127.0.0.1:3456/api/tts",
-        "http://10.188.22.242:3456/api/tts"
+        "http://127.0.0.1:3456/api/tts"
       ];
       if (window.location.origin && window.location.origin.startsWith("https://")) {
         ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
       }
-      const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
-      for (const ep of ttsEndpoints) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 5000);
-          const r = await fetch(ep, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input: text, voice: activeVoice, elevenlabs_api_key: elKey }),
-            signal: ctrl.signal
-          });
-          clearTimeout(timer);
-          if (r.ok) {
-            const b = await r.blob();
-            if (b && b.size > 200) {
-              this.ttsCache.set(text, b);
-              break;
+
+      const p = (async () => {
+        const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
+        for (const ep of ttsEndpoints) {
+          try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 6000);
+            const r = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ input: text, voice: activeVoice, lang: detectedLang, elevenlabs_api_key: elKey }),
+              signal: ctrl.signal
+            });
+            clearTimeout(timer);
+            if (r.ok) {
+              const b = await r.blob();
+              if (b && b.size > 200) {
+                if (this.ttsCache.size > 80) this.ttsCache.clear();
+                this.ttsCache.set(cacheKey, b);
+                return b;
+              }
             }
-          }
-        } catch { }
-      }
+          } catch { }
+        }
+        return null;
+      })().finally(() => {
+        this.ttsInFlight.delete(cacheKey);
+      });
+
+      this.ttsInFlight.set(cacheKey, p);
+      return p;
     },
 
     speakCallChunk(sentence) {
       const clean = sentence.replace(/\*\*/g, "").replace(/[`#_*~]/g, "").trim();
       if (!clean) return;
 
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
-      this.prefetchTTS(clean, activeVoice);
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "kavya";
+      const hasHindi = /[\u0900-\u097F]/.test(clean);
+      this.prefetchTTS(clean, activeVoice, hasHindi ? "hi-IN" : (this.callMode === "study" ? "hi-IN" : "en-IN"));
       this.speechQueue.push(clean);
       if (!this.isPlayingSpeech) {
         this.playNextQueuedSpeech();
@@ -10931,7 +10992,7 @@ PERSONALITY & VOICE STYLE:
               this.updateUI("listening", "");
               this.startListening();
             }
-          }, 400);
+          }, 150);
         }
         return;
       }
@@ -10941,11 +11002,15 @@ PERSONALITY & VOICE STYLE:
 
       const text = this.speechQueue.shift();
       const hasHindi = /[\u0900-\u097F]/.test(text);
-      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "jessica";
+      const activeVoice = this.selectedVoice || localStorage.getItem("lumi_live_voice") || "kavya";
+      const langHint = hasHindi ? "hi-IN" : (this.callMode === "study" ? "hi-IN" : "en-IN");
 
-      // If next items exist in queue, pre-fetch their audio now
+      // Pre-fetch next 2 queued chunks concurrently while current one prepares/plays
       if (this.speechQueue.length > 0) {
-        this.prefetchTTS(this.speechQueue[0], activeVoice);
+        this.prefetchTTS(this.speechQueue[0], activeVoice, langHint);
+      }
+      if (this.speechQueue.length > 1) {
+        this.prefetchTTS(this.speechQueue[1], activeVoice, langHint);
       }
 
       // Safety watchdog: generous 15-second window prevents ANY freeze while allowing full TTS playback
@@ -10963,40 +11028,8 @@ PERSONALITY & VOICE STYLE:
         }
       };
 
-      let audioBlob = this.ttsCache.get(text) || null;
-      if (!audioBlob) {
-        const ttsEndpoints = [
-          "https://lumi-backend-v4-production.up.railway.app/api/tts",
-          "http://127.0.0.1:3456/api/tts",
-          "http://10.188.22.242:3456/api/tts"
-        ];
-        if (window.location.origin && window.location.origin.startsWith("https://")) {
-          ttsEndpoints.unshift(`${window.location.origin}/api/tts`);
-        }
-
-        const elKey = localStorage.getItem("lumi_elevenlabs_key") || "";
-        for (const ep of ttsEndpoints) {
-          try {
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 6000);
-            const r = await fetch(ep, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ input: text, voice: activeVoice, elevenlabs_api_key: elKey }),
-              signal: ctrl.signal
-            });
-            clearTimeout(timer);
-            if (r.ok) {
-              const b = await r.blob();
-              if (b && b.size > 200) {
-                audioBlob = b;
-                this.ttsCache.set(text, b);
-                break;
-              }
-            }
-          } catch { }
-        }
-      }
+      // Await the ALREADY-STARTED in-flight promise (zero duplicate fetch!)
+      const audioBlob = await this.prefetchTTS(text, activeVoice, langHint);
 
       if (!this.isOpen) {
         clearWatchdog();
@@ -13714,6 +13747,11 @@ PERSONALITY & VOICE STYLE:
 
     // 4. Study Chat Composer Form + Photo Homework Solver
     const studyChatForm = document.querySelector("#studyai-chat-form");
+    const studyChatInput = document.querySelector("#studyai-chat-input");
+    if (studyChatInput) {
+      studyChatInput.addEventListener("input", () => StudyAI.syncComposerActionBtn());
+      StudyAI.syncComposerActionBtn();
+    }
     if (studyChatForm) {
       studyChatForm.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -13723,6 +13761,7 @@ PERSONALITY & VOICE STYLE:
         if (q || img) {
           if (input) input.value = "";
           StudyAI._pendingImage = null;
+          StudyAI.syncComposerActionBtn();
           StudyAI.ask(q, img);
         }
       });
