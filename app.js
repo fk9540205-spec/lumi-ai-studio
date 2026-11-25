@@ -962,6 +962,7 @@
       setTimeout(() => el.remove(), 250);
     }, 3500);
   }
+  window.showToast = showToast;
 
   function escapeHtml(str) {
     return String(str || "")
@@ -3868,262 +3869,775 @@
   // ==========================================================================
 
   const StudyAI = {
+    KEYS: {
+      PROFILE: "studyai_user_profile_v2",
+      BOOKS: "studyai_books_v2",
+      CHATS: "studyai_chat_history_v2",
+      READER_PAGES: "studyai_reader_pages_v2",
+      SYLLABUS: "studyai_syllabus_v2",
+      STATS: "studyai_stats_v2",
+      SAVED_NOTES: "studyai_saved_notes_v2",
+      TOPIC_CHIPS: "studyai_topic_chips_v2"
+    },
+
+    // Voice recognition instance
+    _recognition: null,
+    _isListening: false,
+    _pendingImage: null,
+    _onboardDraft: null,
+    _bootstrapping: false,
+
     // Current Reader State
     readerState: {
-      bookTitle: "NCERT Mathematics",
-      classLevel: "Class 10",
-      chapterNum: 4,
-      chapterTitle: "Quadratic Equations",
-      page: 64,
-      totalPages: 166,
-      subSection: "4.1 Introduction"
+      bookId: null,
+      bookTitle: "",
+      classLevel: "",
+      chapterNum: 1,
+      chapterTitle: "",
+      page: 1,
+      totalPages: 24,
+      loading: false,
+      loadingKey: null
     },
 
     // Downloader State
     downloaderState: {
-      activeTab: "bulk", // "browse" | "bulk" | "my_downloads"
-      selectedSources: ["ncert", "mp_board"],
-      downloadProgress: null
+      activeTab: "browse", // "browse" | "bulk" | "my_downloads"
+      selectedSources: ["class_pack"],
+      searchQuery: "",
+      downloadingIds: {}
     },
 
-    // Chat History
-    chatHistory: [
-      {
-        question: "Quadratic Equation kya hota hai? Bachhe ke jaise samjhao, book ke reference ke sath.",
-        intro: "Bilkul! Chalo ise bahut simple tarike se samajhte hain, jaise teacher class mein samjhate hain. 😊",
-        conceptTitle: "Quadratic Equation (द्विघात समीकरण)",
-        conceptSummary: "Ye ek aisa equation hota hai jisme variable (x) ki sabse badi power 2 hoti hai.",
-        formula: "ax² + bx + c = 0",
-        rules: [
-          "yahan a, b, c real numbers hote hain",
-          "aur a ≠ 0 hota hai"
-        ],
-        example: "x² - 5x + 6 = 0",
-        exampleNote: "Yahan x ki power 2 hai, isliye ye quadratic equation hai.",
-        bookRef: {
-          bookTitle: "NCERT Mathematics - Class 10",
-          chapterTitle: "Chapter 4: Quadratic Equations",
-          pages: "Page: 64 – 66"
+    toast(msg) {
+      try {
+        if (typeof window.showToast === "function") {
+          window.showToast(msg);
+          return;
         }
-      }
-    ],
+      } catch (e) {}
+      const t = document.createElement("div");
+      t.className = "toast";
+      t.style.cssText = "position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:#18181b;color:#fff;padding:10px 18px;border-radius:9999px;font-size:13px;font-weight:600;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,0.25);";
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => {
+        t.style.opacity = "0";
+        t.style.transition = "opacity 0.2s";
+        setTimeout(() => t.remove(), 220);
+      }, 2800);
+    },
 
-    // Core Books Database
-    books: [
-      {
-        id: "ncert_math_10",
-        title: "NCERT Maths",
-        fullTitle: "NCERT Mathematics - Class 10",
-        classLevel: "Class 10",
-        coverColor: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
-        shortCode: "MATH",
-        status: "Indexed",
-        size: "48 MB",
-        chaptersCount: 15
-      },
-      {
-        id: "ncert_science_10",
-        title: "NCERT Science",
-        fullTitle: "NCERT Science - Class 10",
-        classLevel: "Class 10",
-        coverColor: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
-        shortCode: "SCI",
-        status: "Indexed",
-        size: "62 MB",
-        chaptersCount: 16
-      },
-      {
-        id: "ncert_english_10",
-        title: "First Flight",
-        fullTitle: "NCERT First Flight English - Class 10",
-        classLevel: "Class 10",
-        coverColor: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
-        shortCode: "ENG",
-        status: "Indexed",
-        size: "34 MB",
-        chaptersCount: 11
-      },
-      {
-        id: "mp_board_math_10",
-        title: "MP Board Ganit",
-        fullTitle: "MP Board Ganit Class 10 (Hindi Medium)",
-        classLevel: "Class 10",
-        coverColor: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-        shortCode: "गणित",
-        status: "Indexed",
-        size: "54 MB",
-        chaptersCount: 15
-      }
-    ],
+    haptic(ms = 15) {
+      try {
+        if (window.AndroidDevice && window.AndroidDevice.vibrate) {
+          window.AndroidDevice.vibrate(ms);
+        } else if (navigator.vibrate) {
+          navigator.vibrate(ms);
+        }
+      } catch (e) {}
+    },
 
-    // RAG Matcher for any user study question
-    findBookReference(query) {
-      if (!query) {
-        return {
-          bookTitle: "NCERT Mathematics",
-          classLevel: "Class 10",
-          chapterNum: 4,
-          chapterTitle: "Quadratic Equations",
-          startPage: 64,
-          endPage: 66,
-          totalPages: 166
-        };
-      }
-      const q = query.toLowerCase();
-      if (q.includes("quadratic") || q.includes("dwighat") || q.includes("द्विघात") || q.includes("equation") || q.includes("ax^2")) {
-        return {
-          bookTitle: "NCERT Mathematics",
-          classLevel: "Class 10",
-          chapterNum: 4,
-          chapterTitle: "Quadratic Equations",
-          startPage: 64,
-          endPage: 66,
-          totalPages: 166
-        };
-      }
-      if (q.includes("trig") || q.includes("sin") || q.includes("cos") || q.includes("tan")) {
-        return {
-          bookTitle: "NCERT Mathematics",
-          classLevel: "Class 10",
-          chapterNum: 8,
-          chapterTitle: "Introduction to Trigonometry",
-          startPage: 161,
-          endPage: 165,
-          totalPages: 166
-        };
-      }
-      if (q.includes("light") || q.includes("reflection") || q.includes("refraction") || q.includes("prakash") || q.includes("lens")) {
-        return {
-          bookTitle: "NCERT Science",
-          classLevel: "Class 10",
-          chapterNum: 9,
-          chapterTitle: "Light – Reflection and Refraction",
-          startPage: 161,
-          endPage: 164,
-          totalPages: 244
-        };
-      }
-      if (q.includes("electricity") || q.includes("ohm") || q.includes("current") || q.includes("voltage") || q.includes("vidyut")) {
-        return {
-          bookTitle: "NCERT Science",
-          classLevel: "Class 10",
-          chapterNum: 11,
-          chapterTitle: "Electricity",
-          startPage: 205,
-          endPage: 208,
-          totalPages: 244
-        };
-      }
+    // -------------------- USER STUDY PROFILE & ONBOARDING --------------------
+    getProfile() {
+      try {
+        const raw = localStorage.getItem(this.KEYS.PROFILE);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") return parsed;
+        }
+      } catch (e) {}
       return {
-        bookTitle: "NCERT Mathematics",
-        classLevel: "Class 10",
-        chapterNum: 4,
-        chapterTitle: "Quadratic Equations",
-        startPage: 64,
-        endPage: 66,
-        totalPages: 166
+        setupDone: false,
+        name: localStorage.getItem("lumi_user_nickname") || "",
+        age: "",
+        studying: "",
+        goal: "",
+        board: "NCERT / CBSE"
       };
     },
 
-    ask(query) {
-      if (!query || !query.trim()) return;
-      const q = query.trim();
-      const ref = this.findBookReference(q);
-      const qLower = q.toLowerCase();
-      let answerItem;
-
-      if (qLower.includes("trig") || qLower.includes("sin") || qLower.includes("cos") || qLower.includes("tan")) {
-        answerItem = {
-          question: q,
-          intro: "Chalo Trigonometry ko bilkul basic right-angled triangle aur angles ke sath samajhte hain! 📐",
-          conceptTitle: "Trigonometric Ratios (त्रिकोणमितीय अनुपात)",
-          conceptSummary: "Trigonometry right-angled triangle ki sides ke ratio aur angles ke relation ko study karti hai.",
-          formula: "sin θ = Opposite / Hypotenuse,  cos θ = Adjacent / Hypotenuse",
-          rules: ["sin²θ + cos²θ = 1", "tan θ = sin θ / cos θ", "sec²θ - tan²θ = 1"],
-          example: "sin(30°) = 1/2,  cos(60°) = 1/2,  tan(45°) = 1",
-          exampleNote: "Hamesha right-angled triangle (90°) par lagta hai.",
-          bookRef: {
-            bookTitle: ref.bookTitle,
-            chapterTitle: `Chapter ${ref.chapterNum}: ${ref.chapterTitle}`,
-            pages: `Page: ${ref.startPage} – ${ref.endPage}`
-          }
-        };
-      } else if (qLower.includes("light") || qLower.includes("reflection") || qLower.includes("refraction") || qLower.includes("prakash") || qLower.includes("lens")) {
-        answerItem = {
-          question: q,
-          intro: "Prakash (Light) ek form of energy hai jo dekhne me madad karti hai! Chalo textbook se dekhte hain: 💡",
-          conceptTitle: "Reflection of Light (प्रकाश का परावर्तन)",
-          conceptSummary: "Jab light rays kisi smooth ya polished surface (jaise mirror) se takrakar usi medium me wapas aati hain.",
-          formula: "Angle of Incidence (∠i) = Angle of Reflection (∠r)",
-          rules: ["Incident ray, normal aur reflected ray ek hi plane me hote hain", "Mirror formula: 1/f = 1/v + 1/u"],
-          example: "Concave mirror real aur inverted image banata hai, Convex hamesha virtual & erect.",
-          exampleNote: "f = R/2 (Focal length radius of curvature ka aadha hota hai).",
-          bookRef: {
-            bookTitle: ref.bookTitle,
-            chapterTitle: `Chapter ${ref.chapterNum}: ${ref.chapterTitle}`,
-            pages: `Page: ${ref.startPage} – ${ref.endPage}`
-          }
-        };
-      } else if (qLower.includes("cricket") || qLower.includes("pizza") || qLower.includes("simple") || qLower.includes("aasan")) {
-        answerItem = {
-          question: q,
-          intro: "Lo bhai! Bilkul mast Cricket aur Sixer ke real-life example se samjho: 🏏",
-          conceptTitle: "Cricket Shot & Parabolic Path",
-          conceptSummary: "Jab batsman six marta hai, toh ball hawa me ek curve banati hai jisko Parabola bolte hain. Is curve ki equation hoti hai: h = -5t² + 20t + 1.",
-          formula: "Ball ki trajectory = ax² + bx + c",
-          rules: ["t² ki highest power 2 hai, isliye ye quadratic equation hai", "Highest point aur boundary distance quadratic formula se nikalti hai"],
-          example: "Agar ball 60 meter dur jaake giregi, toh quadratic equation solve karke exact landing time mil jata hai!",
-          exampleNote: "Isliye games programming aur drone flying me ye math roz use hota hai.",
-          bookRef: {
-            bookTitle: "NCERT Mathematics - Class 10",
-            chapterTitle: "Chapter 4: Quadratic Equations",
-            pages: "Page: 64 – 66"
-          }
-        };
-      } else if (qLower.includes("quiz") || qLower.includes("test")) {
-        answerItem = {
-          question: q,
-          intro: "Yeh lo tumhara 3-Question Rapid Fire Quiz! Check karo apni taiyari: 🎯",
-          conceptTitle: "Class 10 Board Exam Concept Check",
-          conceptSummary: "Q1. Kya (x + 1)² = 2(x - 3) quadratic equation hai?\nQ2. ax² + bx + c = 0 me Discriminant (D) ka formula kya hai?\nQ3. Agar D > 0 ho toh roots kaise honge (Real ya Imaginary)?",
-          formula: "Discriminant: D = b² - 4ac",
-          rules: ["D > 0: Two distinct real roots", "D = 0: Two equal real roots", "D < 0: No real roots"],
-          example: "Answer reply karo ya Notes me save karo!",
-          exampleNote: "Tip: Pehle bracket expand karein, standard form me layein fir answer karein.",
-          bookRef: {
-            bookTitle: "NCERT Mathematics - Class 10",
-            chapterTitle: "Chapter 4: Quadratic Equations",
-            pages: "Page: 64 – 66"
-          }
-        };
-      } else {
-        answerItem = {
-          question: q,
-          intro: `Zaroor! ${ref.bookTitle} (${ref.classLevel}) ke Chapter ${ref.chapterNum} ke exact concept se samjho: 📚`,
-          conceptTitle: `${ref.chapterTitle} (${ref.classLevel})`,
-          conceptSummary: `Aapka sawaal "${q}" seedha ${ref.bookTitle} ke syllabus aur standard board guidelines se covered hai.`,
-          formula: "Core Syllabus Concept: ax² + bx + c = 0",
-          rules: ["Textbook definition aur syllabus ke mutabiq step-by-step reasoning", "Board exam presentation style point-by-point"],
-          example: "NCERT Example Problem 1, Page " + ref.startPage,
-          exampleNote: "Har formula aur reason likhne se board me full marks milte hain.",
-          bookRef: {
-            bookTitle: ref.bookTitle,
-            chapterTitle: `Chapter ${ref.chapterNum}: ${ref.chapterTitle}`,
-            pages: `Page: ${ref.startPage} – ${ref.endPage}`
-          }
-        };
+    saveProfile(profile) {
+      const merged = { ...this.getProfile(), ...profile, setupDone: true };
+      localStorage.setItem(this.KEYS.PROFILE, JSON.stringify(merged));
+      if (merged.name && merged.name.trim()) {
+        localStorage.setItem("lumi_user_nickname", merged.name.trim());
       }
-
-      this.chatHistory.push(answerItem);
-      this.readerState.bookTitle = ref.bookTitle;
-      this.readerState.classLevel = ref.classLevel;
-      this.readerState.chapterNum = ref.chapterNum;
-      this.readerState.chapterTitle = ref.chapterTitle;
-      this.readerState.page = ref.startPage;
-      this.readerState.totalPages = ref.totalPages;
+      return merged;
     },
 
-    // 5-Tab Bottom Navigation Bar
+    selectOnboardChip(field, value) {
+      this.haptic(10);
+      if (!this._onboardDraft) {
+        this._onboardDraft = { ...this.getProfile() };
+      }
+      // Preserve currently typed DOM inputs before re-rendering
+      const nameEl = document.getElementById("onboard-name");
+      const ageEl = document.getElementById("onboard-age");
+      const studyEl = document.getElementById("onboard-studying");
+      const goalEl = document.getElementById("onboard-goal");
+      if (nameEl) this._onboardDraft.name = nameEl.value;
+      if (ageEl) this._onboardDraft.age = ageEl.value;
+      if (studyEl) this._onboardDraft.studying = studyEl.value;
+      if (goalEl) this._onboardDraft.goal = goalEl.value;
+
+      this._onboardDraft[field] = value;
+      render();
+    },
+
+    submitOnboarding(e) {
+      if (e) e.preventDefault();
+      const draft = this._onboardDraft || this.getProfile();
+      const name = (document.getElementById("onboard-name")?.value ?? draft.name ?? "").trim() || "Student";
+      const age = (document.getElementById("onboard-age")?.value ?? draft.age ?? "").trim() || "16";
+      const studying = (document.getElementById("onboard-studying")?.value ?? draft.studying ?? "").trim();
+      const goal = (document.getElementById("onboard-goal")?.value ?? draft.goal ?? "").trim();
+      const board = draft.board || "NCERT / CBSE";
+
+      if (!studying || !goal) {
+        this.toast("Please batayein ki aap abhi kya padhte hain aur kya banna chahte hain!");
+        return;
+      }
+
+      const isChanged =
+        draft._prevStudying !== studying ||
+        draft._prevGoal !== goal ||
+        draft._prevBoard !== board;
+
+      this.saveProfile({ name, age, studying, goal, board });
+      this._onboardDraft = null;
+      this.haptic(25);
+
+      if (isChanged || !localStorage.getItem(this.KEYS.BOOKS)) {
+        // Seed immediate tailored placeholders only until AI responds, or refresh cleanly
+        localStorage.removeItem(this.KEYS.TOPIC_CHIPS);
+        localStorage.removeItem(this.KEYS.SYLLABUS);
+        this.bootstrapCurriculumWithAI();
+      }
+
+      if (window.location.hash === "#/study/onboarding") {
+        window.location.hash = "#/study";
+      }
+      this.closeModal();
+      render();
+      this.toast(`✔ Profile saved! AI ab ${studying} aur ${goal} ke hisab se tayyar hai.`);
+    },
+
+    renderOnboarding(isEdit = false) {
+      if (!this._onboardDraft) {
+        const p = this.getProfile();
+        this._onboardDraft = {
+          ...p,
+          _prevStudying: p.studying,
+          _prevGoal: p.goal,
+          _prevBoard: p.board
+        };
+      }
+      const d = this._onboardDraft;
+      const ageOptions = ["13", "15", "16", "18", "20", "22+"];
+      const studyOptions = [
+        "Class 8", "Class 9", "Class 10",
+        "Class 11 Science", "Class 12 PCM", "Class 12 PCB",
+        "College / B.Tech", "Commerce / CA", "Govt Exam / UPSC"
+      ];
+      const goalOptions = [
+        "Software Engineer", "IIT-JEE Engineer", "Doctor (NEET)",
+        "IAS / UPSC Officer", "Board Topper (95%+)", "CA / Finance",
+        "Defense (NDA)", "Business / Startup"
+      ];
+      const boardOptions = [
+        "NCERT / CBSE", "MP Board", "UP / State Board", "ICSE", "College / Self-Study"
+      ];
+
+      return `
+        <div class="studyai-viewport" style="padding-bottom:40px;background:#ffffff;">
+          <header class="studyai-header">
+            <div class="studyai-brand">
+              ${isEdit ? `
+                <a href="#/study" onclick="StudyAI._onboardDraft=null;" class="p-1 -ml-1 text-gray-700 hover:text-black">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                </a>
+              ` : `
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+              `}
+              <span>StudyAI</span>
+              <span class="studyai-pro-badge">PRO</span>
+            </div>
+            <button type="button" id="study-to-studio-pill" class="studyai-pill-btn" style="padding:6px 12px;font-size:12px;">
+              ⚡ Studio Mode
+            </button>
+          </header>
+
+          <div style="padding:14px 18px 8px 18px;">
+            <div style="background:#18181b;color:#ffffff;border-radius:20px;padding:18px 18px;margin-bottom:20px;">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#a1a1aa;">Personalized Setup</div>
+              <h1 style="font-size:21px;font-weight:800;margin:4px 0 6px 0;line-height:1.25;">Apne baare me batao 🎓</h1>
+              <p style="font-size:13px;color:#d4d4d8;margin:0;line-height:1.45;">
+                Aapki umra, padhai aur career goal ke hisab se StudyAI khud books, syllabus, notes aur explanation customize karega.
+              </p>
+            </div>
+
+            <form onsubmit="StudyAI.submitOnboarding(event);" style="display:flex;flex-direction:column;gap:20px;">
+              <!-- Name & Age -->
+              <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px;">
+                <div>
+                  <label style="display:block;font-size:13px;font-weight:800;color:#18181b;margin-bottom:6px;">Tumhara Naam</label>
+                  <input type="text" id="onboard-name" class="studyai-onboard-input" placeholder="Jaise: Javed" value="${escapeHtml(d.name || "")}" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:13px;font-weight:800;color:#18181b;margin-bottom:6px;">Age (Umra)</label>
+                  <input type="number" id="onboard-age" min="8" max="60" class="studyai-onboard-input" placeholder="16" value="${escapeHtml(d.age || "")}" />
+                </div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:-10px;">
+                ${ageOptions.map(a => `
+                  <button type="button" class="studyai-onboard-chip ${String(d.age) === a.replace("+", "") ? "active" : ""}" onclick="StudyAI.selectOnboardChip('age', '${a.replace("+", "")}')">${a} yrs</button>
+                `).join("")}
+              </div>
+
+              <!-- Studying -->
+              <div>
+                <label style="display:block;font-size:13.5px;font-weight:800;color:#18181b;margin-bottom:6px;">Abhi kya padh rahe ho? *</label>
+                <input type="text" id="onboard-studying" class="studyai-onboard-input" placeholder="Jaise: Class 10, B.Tech CSE, NEET..." value="${escapeHtml(d.studying || "")}" required />
+                <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;">
+                  ${studyOptions.map(s => `
+                    <button type="button" class="studyai-onboard-chip ${d.studying === s ? "active" : ""}" onclick="StudyAI.selectOnboardChip('studying', '${s}')">${escapeHtml(s)}</button>
+                  `).join("")}
+                </div>
+              </div>
+
+              <!-- Goal -->
+              <div>
+                <label style="display:block;font-size:13.5px;font-weight:800;color:#18181b;margin-bottom:6px;">Aage kya banna hai? (Goal) *</label>
+                <input type="text" id="onboard-goal" class="studyai-onboard-input" placeholder="Jaise: Software Engineer, Doctor, IAS..." value="${escapeHtml(d.goal || "")}" required />
+                <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;">
+                  ${goalOptions.map(g => `
+                    <button type="button" class="studyai-onboard-chip ${d.goal === g ? "active" : ""}" onclick="StudyAI.selectOnboardChip('goal', '${g}')">${escapeHtml(g)}</button>
+                  `).join("")}
+                </div>
+              </div>
+
+              <!-- Board / Track -->
+              <div>
+                <label style="display:block;font-size:13.5px;font-weight:800;color:#18181b;margin-bottom:8px;">Board / Curriculum</label>
+                <div style="display:flex;flex-wrap:wrap;gap:7px;">
+                  ${boardOptions.map(b => `
+                    <button type="button" class="studyai-onboard-chip ${d.board === b ? "active" : ""}" onclick="StudyAI.selectOnboardChip('board', '${b}')">${escapeHtml(b)}</button>
+                  `).join("")}
+                </div>
+              </div>
+
+              <button type="submit" class="studyai-download-action-btn" style="margin:6px 0 0 0;justify-content:center;padding:15px 18px;font-size:15px;">
+                <span>${isEdit ? "Update Profile & Sync AI" : "Start Studying with AI →"}</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      `;
+    },
+
+    // -------------------- REAL PERSISTED STATS --------------------
+    getStats() {
+      const today = new Date().toISOString().slice(0, 10);
+      let stats = {
+        streakDays: 0,
+        lastActiveDate: "",
+        questionsAsked: 0,
+        quizHistory: [],
+        subjectHits: {}
+      };
+      try {
+        const raw = localStorage.getItem(this.KEYS.STATS);
+        if (raw) stats = { ...stats, ...JSON.parse(raw) };
+      } catch (e) {}
+
+      // Auto check streak day progression
+      if (stats.lastActiveDate !== today) {
+        if (!stats.lastActiveDate) {
+          stats.streakDays = 1;
+        } else {
+          const prev = new Date(stats.lastActiveDate);
+          const cur = new Date(today);
+          const diffDays = Math.round((cur - prev) / (1000 * 60 * 60 * 24));
+          if (diffDays === 1) {
+            stats.streakDays = (stats.streakDays || 0) + 1;
+          } else if (diffDays > 1) {
+            stats.streakDays = 1;
+          }
+        }
+        stats.lastActiveDate = today;
+        localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+      }
+      return stats;
+    },
+
+    trackActivity(type, meta = {}) {
+      const stats = this.getStats();
+      const today = new Date().toISOString().slice(0, 10);
+      stats.lastActiveDate = today;
+      if (type === "question") {
+        stats.questionsAsked = (stats.questionsAsked || 0) + 1;
+        if (meta.subject) {
+          stats.subjectHits[meta.subject] = (stats.subjectHits[meta.subject] || 0) + 1;
+        }
+      } else if (type === "quiz") {
+        stats.quizHistory = Array.isArray(stats.quizHistory) ? stats.quizHistory : [];
+        stats.quizHistory.unshift({
+          topic: meta.topic || "Practice Quiz",
+          score: meta.score || 0,
+          total: meta.total || 5,
+          date: today
+        });
+        stats.quizHistory = stats.quizHistory.slice(0, 25);
+        stats.questionsAsked = (stats.questionsAsked || 0) + (meta.total || 5);
+      }
+      localStorage.setItem(this.KEYS.STATS, JSON.stringify(stats));
+      return stats;
+    },
+
+    // -------------------- REAL PERSISTED BOOKS & CATALOG --------------------
+    getBooks() {
+      try {
+        const raw = localStorage.getItem(this.KEYS.BOOKS);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) return list;
+        }
+      } catch (e) {}
+      return [];
+    },
+
+    saveBooks(list) {
+      localStorage.setItem(this.KEYS.BOOKS, JSON.stringify(list));
+    },
+
+    getTopicChips() {
+      try {
+        const raw = localStorage.getItem(this.KEYS.TOPIC_CHIPS);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr) && arr.length > 0) return arr;
+        }
+      } catch (e) {}
+      const p = this.getProfile();
+      const s = (p.studying || "").toLowerCase();
+      const g = (p.goal || "").toLowerCase();
+      if (s.includes("12") || g.includes("jee") || g.includes("neet")) {
+        return [
+          { label: "Electrostatics Gauss Law", prompt: `Explain Gauss Law (${p.studying}) with derivation and example` },
+          { label: "Organic Reaction Mechanisms", prompt: `Key Organic Chemistry named reactions for ${p.goal}` },
+          { label: "Calculus Integration Basics", prompt: `Integration rules and shortcuts for ${p.studying}` },
+          { label: `${p.goal} Strategy`, prompt: `${p.studying} ke sath ${p.goal} crack karne ka roadmap batao` }
+        ];
+      }
+      if (s.includes("college") || s.includes("tech") || g.includes("software")) {
+        return [
+          { label: "DSA Arrays & Linked List", prompt: "DSA me Array vs Linked List aur Time Complexity samjhao" },
+          { label: "OOPs Concepts", prompt: "OOPs ke 4 pillars real-world examples ke sath samjhao" },
+          { label: "DBMS Normalization", prompt: "1NF, 2NF, 3NF normalization interview perspective se samjhao" },
+          { label: "Career Roadmap", prompt: `${p.studying} ke baad ${p.goal} banne ka step-by-step roadmap batao` }
+        ];
+      }
+      if (s.includes("upsc") || g.includes("ias") || g.includes("govt")) {
+        return [
+          { label: "Indian Constitution Preamble", prompt: "Indian Constitution Preamble aur Fundamental Rights samjhao" },
+          { label: "Modern History Timeline", prompt: "1857 se 1947 tak Modern History ke important events batao" },
+          { label: "Monsoon & Climate", prompt: "Indian Monsoon system geography ke hisab se samjhao" },
+          { label: `${p.goal} Strategy`, prompt: `${p.goal} ki preparation shuru karne ka practical plan batao` }
+        ];
+      }
+      return [
+        { label: "Quadratic Equations", prompt: `Quadratic Equations (${p.studying || "Class 10"}) easy explanation with example` },
+        { label: "Light & Reflection", prompt: `Light Reflection & Refraction mirror formula (${p.studying || "Class 10"})` },
+        { label: "Chemical Equations", prompt: `Chemical Reactions and balancing equations (${p.studying || "Class 10"})` },
+        { label: `${p.goal || "Career"} Roadmap`, prompt: `Main abhi ${p.studying || "school"} me hoon aur ${p.goal || "topper"} banna hai, roadmap batao` }
+      ];
+    },
+
+    getRecommendedCatalog() {
+      const p = this.getProfile();
+      const s = (p.studying || "Class 10").toLowerCase();
+      const g = (p.goal || "").toLowerCase();
+      const board = p.board || "NCERT";
+      if (s.includes("12") || s.includes("11") || g.includes("jee") || g.includes("neet")) {
+        return [
+          { id: "phy_11_12", title: "NCERT Physics", fullTitle: `Physics (${p.studying})`, classLevel: p.studying, shortCode: "PHY", coverColor: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" },
+          { id: "chem_11_12", title: "NCERT Chemistry", fullTitle: `Chemistry (${p.studying})`, classLevel: p.studying, shortCode: "CHEM", coverColor: "linear-gradient(135deg, #10b981 0%, #047857 100%)" },
+          { id: "math_bio_12", title: g.includes("neet") || s.includes("pcb") ? "NCERT Biology" : "NCERT Maths", fullTitle: g.includes("neet") || s.includes("pcb") ? `Biology (${p.studying})` : `Mathematics (${p.studying})`, classLevel: p.studying, shortCode: g.includes("neet") ? "BIO" : "MATH", coverColor: "linear-gradient(135deg, #f97316 0%, #c2410c 100%)" },
+          { id: "ref_jee_neet", title: g.includes("neet") ? "MTG Fingertips Bio" : "HC Verma Physics", fullTitle: g.includes("neet") ? "NCERT at your Fingertips Biology" : "Concepts of Physics by HC Verma", classLevel: p.goal || "Competitive", shortCode: "REF", coverColor: "linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)" }
+        ];
+      }
+      if (s.includes("college") || s.includes("tech") || g.includes("software")) {
+        return [
+          { id: "dsa_book", title: "DSA Mastery", fullTitle: "Data Structures & Algorithms", classLevel: "Computer Science", shortCode: "DSA", coverColor: "linear-gradient(135deg, #0f172a 0%, #334155 100%)" },
+          { id: "os_book", title: "Operating Systems", fullTitle: "Operating System Concepts", classLevel: "CS Core", shortCode: "OS", coverColor: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" },
+          { id: "dbms_book", title: "DBMS & SQL", fullTitle: "Database Management Systems", classLevel: "CS Core", shortCode: "SQL", coverColor: "linear-gradient(135deg, #10b981 0%, #047857 100%)" },
+          { id: "sys_design", title: "System Design", fullTitle: "Scalable System Design Primer", classLevel: "Engineering", shortCode: "SYS", coverColor: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" }
+        ];
+      }
+      if (s.includes("upsc") || g.includes("ias")) {
+        return [
+          { id: "polity_lax", title: "Indian Polity", fullTitle: "Indian Polity (M. Laxmikanth)", classLevel: "UPSC / GS-2", shortCode: "POL", coverColor: "linear-gradient(135deg, #dc2626 0%, #991b1b 100%)" },
+          { id: "modern_his", title: "Modern India", fullTitle: "A Brief History of Modern India", classLevel: "UPSC / GS-1", shortCode: "HIS", coverColor: "linear-gradient(135deg, #d97706 0%, #92400e 100%)" },
+          { id: "geo_ncert", title: "Indian Geography", fullTitle: "NCERT Fundamentals of Geography", classLevel: "UPSC / GS-1", shortCode: "GEO", coverColor: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)" },
+          { id: "econ_ind", title: "Indian Economy", fullTitle: "Indian Economy Key Concepts", classLevel: "UPSC / GS-3", shortCode: "ECO", coverColor: "linear-gradient(135deg, #059669 0%, #065f46 100%)" }
+        ];
+      }
+      return [
+        { id: "math_gen", title: `${board.split("/")[0].trim()} Maths`, fullTitle: `Mathematics (${p.studying || "Class 10"})`, classLevel: p.studying || "Class 10", shortCode: "MATH", coverColor: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)" },
+        { id: "sci_gen", title: `${board.split("/")[0].trim()} Science`, fullTitle: `Science (${p.studying || "Class 10"})`, classLevel: p.studying || "Class 10", shortCode: "SCI", coverColor: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)" },
+        { id: "sst_gen", title: "Social Science", fullTitle: `History, Civics & Geo (${p.studying || "Class 10"})`, classLevel: p.studying || "Class 10", shortCode: "SST", coverColor: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
+        { id: "eng_gen", title: "English Grammar", fullTitle: `English & Literature (${p.studying || "Class 10"})`, classLevel: p.studying || "Class 10", shortCode: "ENG", coverColor: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)" }
+      ];
+    },
+
+    async bootstrapCurriculumWithAI() {
+      if (this._bootstrapping) return;
+      this._bootstrapping = true;
+      const p = this.getProfile();
+      try {
+        const prompt = `A student just set up their StudyAI profile:
+- Age: ${p.age}
+- Currently Studying: ${p.studying}
+- Career Goal: ${p.goal}
+- Board/Curriculum: ${p.board}
+
+Return ONLY valid raw JSON customizing their workspace:
+{
+  "chips": [
+    {"label": "Short 2-3 word topic 1", "prompt": "Clear study question for topic 1"},
+    {"label": "Short 2-3 word topic 2", "prompt": "Clear study question for topic 2"},
+    {"label": "Short 2-3 word topic 3", "prompt": "Clear study question for topic 3"},
+    {"label": "Goal Roadmap", "prompt": "Main ${p.studying} me hoon aur ${p.goal} banna hai, step by step plan batao"}
+  ],
+  "books": [
+    {
+      "id": "book_1",
+      "title": "Short Book Title",
+      "fullTitle": "Full Textbook Name",
+      "classLevel": "${p.studying}",
+      "shortCode": "SUBJ",
+      "chapters": [
+        {"num": 1, "title": "Chapter 1 Title", "startPage": 1, "endPage": 18, "summary": "Brief focus"},
+        {"num": 2, "title": "Chapter 2 Title", "startPage": 19, "endPage": 36, "summary": "Brief focus"},
+        {"num": 3, "title": "Chapter 3 Title", "startPage": 37, "endPage": 54, "summary": "Brief focus"}
+      ]
+    }
+  ],
+  "syllabus": [
+    {"id": "syl_1", "name": "Topic/Chapter 1", "subject": "Subject Name", "done": false}
+  ]
+}
+Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 real syllabus chapters tailored to ${p.studying} (${p.board}) and ${p.goal}. Return raw JSON only.`;
+
+        const aiText = await this.fetchAI([
+          { role: "system", content: "You return strictly valid JSON curriculum configs for students. No markdown blocks." },
+          { role: "user", content: prompt }
+        ]);
+
+        if (aiText) {
+          const m = aiText.trim().match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = JSON.parse(m[0]);
+            if (Array.isArray(parsed.chips) && parsed.chips.length) {
+              localStorage.setItem(this.KEYS.TOPIC_CHIPS, JSON.stringify(parsed.chips));
+            }
+            if (Array.isArray(parsed.books) && parsed.books.length) {
+              const colors = [
+                "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+                "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)"
+              ];
+              const existing = this.getBooks();
+              const existingTitles = new Set(existing.map(b => b.fullTitle.toLowerCase()));
+              const formatted = parsed.books.map((b, i) => ({
+                id: b.id || `ai_book_${Date.now()}_${i}`,
+                title: b.title || "Textbook",
+                fullTitle: b.fullTitle || b.title || "Textbook",
+                classLevel: b.classLevel || p.studying,
+                coverColor: colors[i % colors.length],
+                shortCode: (b.shortCode || "BOOK").slice(0, 5).toUpperCase(),
+                status: "AI Indexed",
+                chaptersCount: Array.isArray(b.chapters) ? b.chapters.length : 5,
+                chapters: Array.isArray(b.chapters) ? b.chapters : []
+              }));
+              const merged = [...existing];
+              formatted.forEach(fb => {
+                if (!existingTitles.has(fb.fullTitle.toLowerCase())) {
+                  merged.push(fb);
+                }
+              });
+              this.saveBooks(merged);
+            }
+            if (Array.isArray(parsed.syllabus) && parsed.syllabus.length) {
+              const syl = parsed.syllabus.map((s, i) => ({
+                id: s.id || `syl_${i}`,
+                name: s.name || s.title || `Chapter ${i + 1}`,
+                subject: s.subject || "Core",
+                done: false
+              }));
+              localStorage.setItem(this.KEYS.SYLLABUS, JSON.stringify(syl));
+            }
+            render();
+          }
+        }
+      } catch (e) {
+        console.warn("Curriculum bootstrap error:", e);
+      } finally {
+        this._bootstrapping = false;
+      }
+    },
+
+    // -------------------- CHAT HISTORY & PERSISTENCE --------------------
+    getChatHistory() {
+      if (this._chatCache) return this._chatCache;
+      try {
+        const raw = localStorage.getItem(this.KEYS.CHATS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            this._chatCache = parsed;
+            return this._chatCache;
+          }
+        }
+      } catch (e) {}
+      this._chatCache = [];
+      return this._chatCache;
+    },
+
+    saveChatHistory(arr) {
+      this._chatCache = arr.slice(-25);
+      // Do not persist bulky base64 images inside localStorage to keep storage fast
+      const lightweight = this._chatCache.map(m => {
+        const copy = { ...m };
+        if (copy.image && copy.image.length > 80000) {
+          copy.imageNote = "[Photo Attached]";
+          delete copy.image;
+        }
+        return copy;
+      });
+      try {
+        localStorage.setItem(this.KEYS.CHATS, JSON.stringify(lightweight));
+      } catch (e) {}
+    },
+
+    startNewChatSession() {
+      this.haptic(15);
+      this._chatCache = [];
+      localStorage.removeItem(this.KEYS.CHATS);
+      render();
+      this.toast("Fresh Study session shuru ho gaya!");
+    },
+
+    // -------------------- REAL GEMINI AI ENGINE --------------------
+    async fetchAI(messages, modelName = "gemini-2.5-flash", imageDataUrl = null) {
+      const candidateEndpoints = [
+        "https://lumi-backend-v4-production.up.railway.app/api/free/chat",
+        "http://127.0.0.1:3456/api/free/chat",
+        "http://localhost:3456/api/free/chat"
+      ];
+      if (window.location.origin && window.location.origin.startsWith("https://")) {
+        candidateEndpoints.unshift(`${window.location.origin}/api/free/chat`);
+      }
+
+      for (const ep of candidateEndpoints) {
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 25000);
+          const payload = {
+            model: modelName,
+            messages: messages,
+            stream: false,
+            max_tokens: 3000
+          };
+          if (imageDataUrl) {
+            payload.image = imageDataUrl;
+          }
+          const resp = await fetch(ep, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: ctrl.signal
+          });
+          clearTimeout(tid);
+          if (resp && resp.ok) {
+            const data = await resp.json();
+            const content = data?.choices?.[0]?.message?.content;
+            if (content) return content;
+          }
+        } catch (e) {
+          // try next endpoint
+        }
+      }
+      return null;
+    },
+
+    async ask(query, imageDataUrl = null) {
+      if ((!query || !query.trim()) && !imageDataUrl) return;
+      const q = (query || "Is photo me jo question hai usko step-by-step solve karke samjhao.").trim();
+      const profile = this.getProfile();
+      const history = this.getChatHistory();
+      this.trackActivity("question");
+
+      const msgItem = {
+        question: q,
+        image: imageDataUrl || null,
+        loading: true,
+        intro: "Soch raha hoon aur concepts check kar raha hoon... 🧠",
+        conceptTitle: "",
+        conceptSummary: "",
+        formulaLabel: "",
+        formula: "",
+        rules: [],
+        example: "",
+        exampleNote: "",
+        bookRef: null,
+        suggestedChips: []
+      };
+
+      history.push(msgItem);
+      this.saveChatHistory(history);
+      this.haptic(15);
+      render();
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }, 60);
+
+      try {
+        const recentTurns = history.slice(-4, -1).map(h => ([
+          { role: "user", content: h.question },
+          { role: "assistant", content: `${h.intro || ""} ${h.conceptTitle || ""}: ${h.conceptSummary || ""}` }
+        ])).flat();
+
+        const sysPrompt = `You are StudyAI (powered by Google Gemini), a brilliant, warm personal mentor & teacher speaking in natural Hinglish/English matching the student's message.
+
+STUDENT PROFILE:
+- Name: ${profile.name || "Dost"}
+- Age: ${profile.age || "Student"} years
+- Currently Studying: ${profile.studying || "School/College"}
+- Career Goal: ${profile.goal || "Academic Excellence"}
+- Board/Curriculum: ${profile.board || "NCERT / CBSE"}
+
+RESPONSE RULES:
+1. Tailor depth, tone, analogies, and examples to the student's age (${profile.age || "teen"}) and goal (${profile.goal || "learning"}).
+2. Return ONLY a valid raw JSON object matching this exact schema (NO markdown codeblocks):
+{
+  "intro": "Warm opening line responding directly to the user",
+  "conceptTitle": "Short clear card heading (optional: empty string for brief/casual messages)",
+  "conceptSummary": "Main clear step-by-step explanation",
+  "formulaLabel": "Optional short label like 'Formula:', 'Key Rule:', or 'Syntax:' (empty if none)",
+  "formula": "Key equation/formula/code snippet if directly relevant, else empty string",
+  "rules": ["Important bullet point 1", "Important bullet point 2"],
+  "example": "Practical worked example or numerical if helpful, else empty string",
+  "exampleNote": "Brief takeaway about the example, else empty string",
+  "bookRef": null,
+  "suggestedChips": [
+    {"label": "Contextual follow-up 1 (max 24 chars)", "action": "ask", "payload": "Full follow-up question prompt"},
+    {"label": "Contextual follow-up 2 (max 24 chars)", "action": "ask", "payload": "Full follow-up question prompt"},
+    {"label": "Contextual action 3 (max 24 chars)", "action": "quiz", "payload": "Exact topic name for quiz or notes"}
+  ]
+}
+
+CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
+- Greetings / Casual Chat ("hi", "hello", "hey", "kaise ho", "thanks"): Give a short, warm reply ONLY in "intro" and set "conceptTitle": "", "conceptSummary": "", "formula": "", "rules": [], "example": "", "bookRef": null so the UI stays super crisp and conversational!
+- bookRef: ONLY set bookRef to {"bookTitle": "...", "chapterTitle": "...", "pages": "Page: XX – YY"} when the query GENUINELY asks about an academic textbook/syllabus topic or concept that maps to a textbook chapter! Set "bookRef": null for greetings, career advice, study timetable, general curiosity, coding, motivation, or casual follow-ups!
+- suggestedChips: YOU must dynamically invent 3 smart, contextual next-step buttons tailored strictly to what we just discussed! Never use generic canned labels like "Okay, Samajh gaya!". Each chip's "action" must be one of "ask", "quiz", or "notes".`;
+
+        const aiResponse = await this.fetchAI([
+          { role: "system", content: sysPrompt },
+          ...recentTurns,
+          { role: "user", content: q }
+        ], "gemini-2.5-flash", imageDataUrl);
+
+        if (aiResponse) {
+          let parsed = null;
+          try {
+            const cleanText = aiResponse.trim();
+            const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              parsed = JSON.parse(jsonMatch[0]);
+            }
+          } catch (e) {
+            console.warn("Chat JSON parse fallback:", e);
+          }
+
+          if (parsed && (parsed.intro || parsed.conceptSummary)) {
+            msgItem.loading = false;
+            msgItem.intro = parsed.intro || "";
+            msgItem.conceptTitle = parsed.conceptTitle || "";
+            msgItem.conceptSummary = parsed.conceptSummary || "";
+            msgItem.formulaLabel = parsed.formulaLabel || "Key Formula:";
+            msgItem.formula = parsed.formula || "";
+            msgItem.rules = Array.isArray(parsed.rules) ? parsed.rules.filter(Boolean) : [];
+            msgItem.example = parsed.example || "";
+            msgItem.exampleNote = parsed.exampleNote || "";
+            msgItem.bookRef = (parsed.bookRef && parsed.bookRef.bookTitle && parsed.bookRef.chapterTitle) ? parsed.bookRef : null;
+            msgItem.suggestedChips = Array.isArray(parsed.suggestedChips) ? parsed.suggestedChips.slice(0, 3) : [];
+          } else {
+            msgItem.loading = false;
+            msgItem.intro = aiResponse;
+            msgItem.conceptTitle = "";
+            msgItem.conceptSummary = "";
+            msgItem.suggestedChips = [
+              { label: "Aur Detail Me Samjhao", action: "ask", payload: `${q} ko aur detail me example ke sath samjhao` },
+              { label: "Practice Quiz Lo", action: "quiz", payload: q.slice(0, 45) }
+            ];
+          }
+        } else {
+          msgItem.loading = false;
+          msgItem.intro = "AI server abhi unreachable hai. Internet check karke dobara try karein.";
+          msgItem.suggestedChips = [
+            { label: "Retry Question", action: "ask", payload: q }
+          ];
+        }
+      } catch (err) {
+        msgItem.loading = false;
+        msgItem.intro = "Connection error hua. Dobara koshish karein.";
+      }
+
+      this.saveChatHistory(history);
+      this.haptic(20);
+      render();
+      setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      }, 60);
+    },
+
+    handleSuggestedChip(msgIdx, chipIdx) {
+      const history = this.getChatHistory();
+      const item = history[msgIdx];
+      const chip = item?.suggestedChips?.[chipIdx];
+      if (!chip) return;
+      this.haptic(15);
+      if (chip.action === "quiz") {
+        this.openQuiz("rapid", chip.payload || item.conceptTitle || item.question);
+      } else if (chip.action === "notes") {
+        this.openNotes(chip.payload || item.conceptTitle || item.question);
+      } else {
+        this.ask(chip.payload || chip.label);
+      }
+    },
+
+    openBookFromRef(msgIdx) {
+      const history = this.getChatHistory();
+      const ref = history[msgIdx]?.bookRef;
+      if (!ref) return;
+      const pageMatch = String(ref.pages || "").match(/\d+/);
+      const startPage = pageMatch ? parseInt(pageMatch[0], 10) : 1;
+      const chapNumMatch = String(ref.chapterTitle || "").match(/\d+/);
+      const chapNum = chapNumMatch ? parseInt(chapNumMatch[0], 10) : 1;
+      this.openBook(ref.bookTitle, ref.chapterTitle, startPage, chapNum);
+    },
+
+    askTopicChip(idx) {
+      const chips = this.getTopicChips();
+      const chip = chips[idx];
+      if (!chip) return;
+      window.location.hash = "#/study/chat";
+      this.ask(chip.prompt || chip.label);
+    },
+
+    // -------------------- SCREEN 1: DASHBOARD --------------------
     renderBottomNav(activeTab = "home") {
       return `
         <nav class="studyai-bottom-nav">
@@ -4131,43 +4645,51 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="${activeTab === "home" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             <span>Home</span>
           </a>
-          <a href="#/study/downloader" class="studyai-nav-item ${activeTab === "library" ? "active" : ""}">
+          <button type="button" class="studyai-nav-item ${activeTab === "library" ? "active" : ""}" onclick="StudyAI.openDownloaderTab('my_downloads');">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="${activeTab === "library" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
             <span>Library</span>
-          </a>
+          </button>
           <a href="#/study/chat" class="studyai-nav-fab" title="Ask StudyAI">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </a>
-          <a href="#/study/downloader" class="studyai-nav-item ${activeTab === "downloads" ? "active" : ""}">
+          <button type="button" class="studyai-nav-item ${activeTab === "downloads" ? "active" : ""}" onclick="StudyAI.openDownloaderTab('browse');">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="${activeTab === "downloads" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>Downloads</span>
-          </a>
-          <a href="#/settings" class="studyai-nav-item ${activeTab === "you" ? "active" : ""}">
+            <span>Books Hub</span>
+          </button>
+          <button type="button" class="studyai-nav-item ${activeTab === "you" ? "active" : ""}" onclick="StudyAI.openProfileModal();">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="${activeTab === "you" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <span>You</span>
-          </a>
+          </button>
         </nav>
       `;
     },
 
-    // SCREEN 1: Study Home Dashboard (#/study)
     renderDashboard() {
-      const nickname = localStorage.getItem("lumi_user_nickname") || "Javed";
+      const profile = this.getProfile();
+      if (!profile.setupDone) {
+        return this.renderOnboarding(false);
+      }
+
+      const nickname = profile.name || localStorage.getItem("lumi_user_nickname") || "Dost";
+      const books = this.getBooks();
+      const chips = this.getTopicChips();
+      const stats = this.getStats();
+
       return `
         <div class="studyai-viewport">
-          <!-- Top Header matching reference Screen 1 -->
+          <!-- Top Header -->
           <header class="studyai-header">
             <div class="studyai-brand">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
               <span>StudyAI</span>
-              <span class="studyai-pro-badge" style="cursor:pointer;" onclick="showToast('⚡ StudyAI Pro Active • Grounded in NCERT & State Board text');" title="StudyAI Pro">PRO</span>
+              <span class="studyai-pro-badge" style="cursor:pointer;" onclick="StudyAI.openProfileModal();">PRO</span>
             </div>
             <div class="studyai-header-actions">
-              <button type="button" class="p-1.5 text-gray-700 hover:text-black relative" title="Notifications" onclick="showToast('🔔 All NCERT books indexed and up-to-date.');">
+              <button type="button" class="p-1.5 text-gray-700 hover:text-black relative" title="Study Activity & Tips" onclick="StudyAI.openNotifications();">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-                <span class="absolute top-1.5 right-1.5 size-2 rounded-full bg-amber-400"></span>
+                ${stats.streakDays > 0 ? `<span class="absolute top-1.5 right-1.5 size-2 rounded-full bg-amber-400"></span>` : ""}
               </button>
-              <a href="#/settings" class="studyai-avatar" title="Account & Settings (Click to switch to Studio or configure)">
+              <a href="#/settings" class="studyai-avatar" title="Account & Settings">
                 <svg width="34" height="34" viewBox="0 0 100 100" fill="none">
                   <circle cx="50" cy="50" r="50" fill="#f4f4f5"/>
                   <circle cx="50" cy="52" rx="28" ry="26" fill="#fde68a"/>
@@ -4182,61 +4704,50 @@
             </div>
           </header>
 
-          <!-- Greetings -->
+          <!-- Personalized Greeting & Study Profile Pill -->
           <div class="studyai-greeting-wrap">
             <div class="studyai-greeting">Hi ${escapeHtml(nickname)} <svg width="24" height="24" viewBox="0 0 36 36" style="display:inline-block;vertical-align:-4px;"><path fill="#FFDC5D" d="M30.5 17.1c-.4-.7-1.3-1-2-.5l-1.6 1v-7c0-.8-.7-1.5-1.5-1.5s-1.5.7-1.5 1.5v4.5l-.6-.3c-.7-.4-1.6-.2-2 .5s-.2 1.6.5 2l.6.3v1l-2-1.1c-.7-.4-1.6-.2-2 .5s-.2 1.6.5 2l2.9 1.7.1.1.2.2 4.1 2.4c3.1 1.8 7.1.7 8.9-2.4 1.8-3.1.8-7.1-2.4-8.9l-2.3-1.3-.1-.1.1-.7z"/><path fill="#FFAC33" d="M10.9 32.5C7.1 30.3 5.8 25.4 8 21.6l6.2-10.8c2.2-3.8 7.1-5.1 10.9-2.9.7.4 1.3 1.3.9 2s-1.3 1-2 .5c-2.7-1.5-6.1-.6-7.7 2.1L9.6 23.8c-1.5 2.7-.6 6.1 2.1 7.7.7.4 1 1.3.5 2-.4.7-1.3 1-2 .5z"/><path fill="#FFDC5D" d="M12.9 28.2c-2.7-1.5-3.6-5-2.1-7.7l6.6-11.5c1.5-2.7 5-3.6 7.7-2.1.8.5 1.1 1.5.6 2.3s-1.5 1.1-2.3.6c-1.6-.9-3.6-.4-4.5 1.2l-6.6 11.5c-.9 1.6-.4 3.6 1.2 4.5.8.5 1.1 1.5.6 2.3s-1.5 1.1-2.3.6l-1.9-1.1z"/></svg></div>
-            <div class="studyai-subgreeting">Your AI Study Companion</div>
+            <div class="studyai-subgreeting">Your Personal AI Mentor</div>
+            <button type="button" class="studyai-profile-pill" onclick="StudyAI.openProfileModal();">
+              <span>🎓 ${escapeHtml(profile.studying)} • 🎯 ${escapeHtml(profile.goal)}</span>
+              <span style="opacity:0.55;">✎</span>
+            </button>
           </div>
 
-          <!-- Hero Welcome Card (Deep Charcoal Black Card with Anime Mascot) -->
+          <!-- Hero Welcome Card -->
           <div class="studyai-hero-card">
             <div class="studyai-hero-content">
-              <div class="studyai-tagline">Ask • Learn • Practice<br/>From Real Books <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:inline-block;vertical-align:-2px;" xmlns="http://www.w3.org/2000/svg"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" fill="#3b82f6" fill-opacity="0.25" stroke="#93c5fd" stroke-width="2"/><path d="M6 6h10M6 10h10M6 14h6" stroke="#bfdbfe" stroke-width="2" stroke-linecap="round"/></svg></div>
+              <div class="studyai-tagline">Ask • Learn • Practice<br/>For ${escapeHtml(profile.goal || "Success")} <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:inline-block;vertical-align:-2px;" xmlns="http://www.w3.org/2000/svg"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" fill="#3b82f6" fill-opacity="0.25" stroke="#93c5fd" stroke-width="2"/><path d="M6 6h10M6 10h10M6 14h6" stroke="#bfdbfe" stroke-width="2" stroke-linecap="round"/></svg></div>
               <div class="studyai-pill-row">
-                <span class="studyai-pill-tag">NCERT • State Board • More</span>
+                <span class="studyai-pill-tag">${escapeHtml(profile.board || "NCERT")} • ${escapeHtml(profile.studying || "Smart AI")}</span>
               </div>
             </div>
             <div class="studyai-hero-illustration">
-              <!-- High-Fidelity Manga Student Vector Illustration matching Reference Screen 1 -->
               <svg width="115" height="115" viewBox="0 0 130 130" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Outer glow circle -->
                 <circle cx="65" cy="65" r="62" fill="#27272a" stroke="#3f3f46" stroke-width="1.5"/>
-                <!-- Background Anime Hair Silhouette -->
                 <path d="M30 65C25 40 40 22 65 22C90 22 105 40 100 65C96 55 90 45 80 40C75 38 68 40 65 40C62 40 55 38 50 40C40 45 34 55 30 65Z" fill="#09090b"/>
                 <path d="M28 60C22 75 32 95 38 100C34 90 32 78 35 68Z" fill="#09090b"/>
                 <path d="M102 60C108 75 98 95 92 100C96 90 98 78 95 68Z" fill="#09090b"/>
-                <!-- Anime Face Shape -->
                 <path d="M42 54C42 46 52 46 65 46C78 46 88 46 88 54C88 72 78 86 65 89C52 86 42 72 42 54Z" fill="#ffedd5"/>
-                <!-- Shadow under bangs -->
                 <path d="M43 54C48 58 56 60 65 60C74 60 82 58 87 54C82 50 74 48 65 48C56 48 48 50 43 54Z" fill="#fed7aa" opacity="0.6"/>
-                <!-- Expressive Anime Eyes (Looking slightly left/thoughtful) -->
                 <ellipse cx="53" cy="62" rx="5" ry="6.5" fill="#18181b"/>
                 <ellipse cx="77" cy="62" rx="5" ry="6.5" fill="#18181b"/>
-                <!-- Catchlights in eyes -->
                 <circle cx="54.5" cy="60" r="2" fill="#ffffff"/>
                 <circle cx="51.5" cy="64.5" r="1.2" fill="#ffffff"/>
                 <circle cx="78.5" cy="60" r="2" fill="#ffffff"/>
                 <circle cx="75.5" cy="64.5" r="1.2" fill="#ffffff"/>
-                <!-- Double Eyelids & Eyebrows -->
                 <path d="M47 54C50 52 56 53 58 55" stroke="#09090b" stroke-width="2" stroke-linecap="round"/>
                 <path d="M72 55C74 53 80 52 83 54" stroke="#09090b" stroke-width="2" stroke-linecap="round"/>
-                <!-- Subtle anime blush -->
                 <ellipse cx="48" cy="69" rx="3.5" ry="1.8" fill="#fda4af" opacity="0.7"/>
                 <ellipse cx="82" cy="69" rx="3.5" ry="1.8" fill="#fda4af" opacity="0.7"/>
-                <!-- Anime Nose & Smile -->
                 <path d="M64 66L63 69H65" stroke="#ea580c" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M60 74C63 76 67 76 70 74" stroke="#9a3412" stroke-width="2" stroke-linecap="round"/>
-                <!-- Manga Hair Spikes / Bangs Front -->
                 <path d="M38 50C44 46 50 56 54 48C56 58 64 54 66 48C68 56 76 50 78 54C82 48 88 52 92 48C88 58 84 62 82 60C78 64 72 60 68 62C64 58 60 62 56 60C50 64 44 60 38 50Z" fill="#18181b"/>
-                <!-- Over-Ear Headphones -->
                 <path d="M32 58C30 40 45 28 65 28C85 28 100 40 98 58" stroke="#38bdf8" stroke-width="4.5" stroke-linecap="round"/>
                 <rect x="27" y="52" width="10" height="20" rx="5" fill="#0284c7" stroke="#e0f2fe" stroke-width="1.5"/>
                 <rect x="93" y="52" width="10" height="20" rx="5" fill="#0284c7" stroke="#e0f2fe" stroke-width="1.5"/>
-                <!-- White Zip-Up Hoodie & Collar -->
                 <path d="M36 118C38 98 50 94 65 94C80 94 92 98 94 118H36Z" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
-                <!-- Inner Dark T-shirt V-Neck -->
                 <path d="M57 94L65 106L73 94" fill="#0f172a"/>
-                <!-- Hoodie Drawstrings & Zipper -->
                 <line x1="65" y1="106" x2="65" y2="120" stroke="#94a3b8" stroke-width="2"/>
                 <line x1="53" y1="96" x2="52" y2="114" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
                 <line x1="77" y1="96" x2="78" y2="114" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round"/>
@@ -4244,15 +4755,21 @@
             </div>
           </div>
 
-          <!-- Universal Study Search Bar matching reference -->
+          <!-- Universal Study Search Bar -->
           <form id="studyai-search-form" class="studyai-search-box">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             <input type="text" id="studyai-search-input" class="studyai-search-input" placeholder="Kuch bhi pucho..." autocomplete="off" />
           </form>
 
-          <!-- 8 Quick Action Grid Tiles (2 Rows x 4 Cols) -->
+          <!-- Personalized Quick Topic Chips -->
+          <div class="studyai-search-suggestions">
+            ${chips.map((c, idx) => `
+              <span class="studyai-chip" onclick="StudyAI.askTopicChip(${idx});">${escapeHtml(c.label)}</span>
+            `).join("")}
+          </div>
+
+          <!-- 8 Quick Action Grid Tiles -->
           <div class="studyai-grid">
-            <!-- 1. Ask AI -->
             <a href="#/study/chat" class="studyai-grid-btn">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
@@ -4260,74 +4777,67 @@
               <span class="studyai-grid-label">Ask AI</span>
             </a>
 
-            <!-- 2. Books -->
-            <a href="#/study/downloader" class="studyai-grid-btn">
+            <button type="button" class="studyai-grid-btn" onclick="StudyAI.openDownloaderTab('browse');">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
               </div>
               <span class="studyai-grid-label">Books</span>
-            </a>
+            </button>
 
-            <!-- 3. Notes -->
-            <div class="studyai-grid-btn" onclick="showToast('Notes: Generating chapter summaries from indexed books.')">
+            <button type="button" class="studyai-grid-btn" onclick="StudyAI.openNotes();">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
               </div>
               <span class="studyai-grid-label">Notes</span>
-            </div>
+            </button>
 
-            <!-- 4. Quiz -->
-            <div class="studyai-grid-btn" onclick="StudyAI.ask('Mujhe Class 10 Maths Chapter 4 Quadratic Equations ka 5 question wala Quiz do.'); window.location.hash='#/study/chat'; render();">
+            <button type="button" class="studyai-grid-btn" onclick="StudyAI.openQuiz('rapid');">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               </div>
               <span class="studyai-grid-label">Quiz</span>
-            </div>
+            </button>
 
-            <!-- 5. Tests -->
-            <div class="studyai-grid-btn" onclick="StudyAI.ask('Class 10 Science Chapter 1 Chemical Reactions ka mock test start karo.'); window.location.hash='#/study/chat'; render();">
+            <button type="button" class="studyai-grid-btn" onclick="StudyAI.openQuiz('mock_test');">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
               </div>
               <span class="studyai-grid-label">Tests</span>
-            </div>
+            </button>
 
-            <!-- 6. Download Books -->
-            <a href="#/study/downloader" class="studyai-grid-btn">
+            <button type="button" class="studyai-grid-btn" onclick="StudyAI.openDownloaderTab('bulk');">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               </div>
               <span class="studyai-grid-label">Download Books</span>
-            </a>
+            </button>
 
-            <!-- 7. Syllabus -->
-            <div class="studyai-grid-btn" onclick="showToast('CBSE & State Board Class 10-12 Syllabus fully mapped.');">
+            <button type="button" class="studyai-grid-btn" onclick="StudyAI.openSyllabus();">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
               </div>
               <span class="studyai-grid-label">Syllabus</span>
-            </div>
+            </button>
 
-            <!-- 8. Progress -->
-            <div class="studyai-grid-btn" onclick="showToast('Mastery: 4 Chapters completed • 18 Practice Problems solved.');">
+            <button type="button" class="studyai-grid-btn" onclick="StudyAI.openProgress();">
               <div class="studyai-grid-icon-wrap">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
               </div>
               <span class="studyai-grid-label">Progress</span>
-            </div>
+            </button>
           </div>
 
           <!-- Section: My Books (Local) -->
           <div class="studyai-section-header">
             <span class="studyai-section-title">My Books (Local)</span>
-            <a href="#/study/downloader" class="studyai-section-link">View All →</a>
+            <button type="button" class="studyai-section-link" style="background:none;border:none;cursor:pointer;" onclick="StudyAI.openDownloaderTab('browse');">Add Books →</button>
           </div>
 
           <div class="studyai-books-scroll">
-            ${this.books.map(b => `
-              <div class="studyai-book-card" onclick="window.location.hash='#/study/reader'">
-                <div class="studyai-book-thumb" style="background:${b.coverColor};">
-                  <div style="font-size:7px;font-weight:900;letter-spacing:0.05em;color:rgba(255,255,255,0.85);text-transform:uppercase;">${escapeHtml(b.shortCode)}</div>
+            ${books.length > 0 ? books.map((b, idx) => `
+              <div class="studyai-book-card" onclick="StudyAI.openBookChapters(${idx});">
+                <div class="studyai-book-thumb" style="background:${b.coverColor || 'linear-gradient(135deg,#18181b,#3f3f46)'};">
+                  <div style="font-size:7px;font-weight:900;letter-spacing:0.05em;color:rgba(255,255,255,0.85);text-transform:uppercase;">${escapeHtml(b.shortCode || "BOOK")}</div>
                   <div style="font-size:8px;font-weight:800;color:#ffffff;line-height:1.1;margin-top:auto;">${escapeHtml(b.title)}</div>
                 </div>
                 <div class="studyai-book-info">
@@ -4335,27 +4845,37 @@
                   <div class="studyai-book-class">${escapeHtml(b.classLevel)}</div>
                   <div class="studyai-book-badge">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    <span>${b.status}</span>
+                    <span>${b.chapters ? b.chapters.length + " Chapters" : "Indexed"}</span>
                   </div>
                 </div>
-                <button type="button" class="text-gray-400 p-1 hover:text-black" onclick="event.stopPropagation();showToast('${escapeHtml(b.fullTitle)} — ${b.chaptersCount} chapters indexed.');">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
               </div>
-            `).join("")}
+            `).join("") : `
+              <div style="width:100%;padding:16px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <div>
+                  <div style="font-size:13.5px;font-weight:800;color:#18181b;">${this._bootstrapping ? "AI aapki books prepare kar raha hai..." : "Apni Books Download Karein"}</div>
+                  <div style="font-size:12px;color:#6b7280;margin-top:2px;">${escapeHtml(profile.studying)} ke liye books add karein</div>
+                </div>
+                <button type="button" class="studyai-open-book-btn" onclick="StudyAI.openDownloaderTab('browse');">Browse Books</button>
+              </div>
+            `}
           </div>
 
-          <!-- Bottom Navigation -->
           ${this.renderBottomNav("home")}
         </div>
       `;
     },
 
-    // SCREEN 2: Book-Grounded Study Chat (#/study/chat)
-    renderChat(threadId) {
+    // -------------------- SCREEN 2: AI CHAT MENTOR --------------------
+    renderChat() {
+      const profile = this.getProfile();
+      if (!profile.setupDone) {
+        return this.renderOnboarding(false);
+      }
+      const history = this.getChatHistory();
+      const chips = this.getTopicChips();
+
       return `
-        <div class="studyai-viewport" style="padding-bottom:120px;background:#ffffff;">
-          <!-- Chat Header -->
+        <div class="studyai-viewport" style="padding-bottom:110px;background:#ffffff;">
           <header class="studyai-header">
             <div style="display:flex;align-items:center;gap:10px;">
               <a href="#/study" class="p-1 text-gray-700 hover:text-black" title="Back to Study Home">
@@ -4366,30 +4886,42 @@
                   <span style="font-weight:800;font-size:16px;color:#000000;">StudyAI</span>
                   <span class="studyai-pro-badge">PRO</span>
                 </div>
-                <div style="font-size:11.5px;color:#059669;display:flex;align-items:center;gap:4px;font-weight:500;">
+                <div style="font-size:11.5px;color:#059669;display:flex;align-items:center;gap:4px;font-weight:600;">
                   <span style="width:6px;height:6px;border-radius:50%;background:#059669;display:inline-block;"></span>
-                  <span>Using: NCERT (Class 10)</span>
+                  <span>${escapeHtml(profile.studying)} • ${escapeHtml(profile.goal)}</span>
                 </div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:12px;">
-              <a href="#/study/reader" class="p-1 text-gray-700 hover:text-black" title="Open Textbook Reference">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <button type="button" class="p-1 text-gray-700 hover:text-black" onclick="StudyAI.openDownloaderTab('my_downloads');" title="My Books">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-              </a>
-              <button type="button" class="p-1 text-gray-700 hover:text-black" onclick="StudyAI.chatHistory=[]; StudyAI.chatHistory.push({question: 'Quadratic Equation kya hota hai? Bachhe ke jaise samjhao, book ke reference ke sath.', intro: 'Bilkul! Chalo ise bahut simple tarike se samajhte hain, jaise teacher class mein samjhate hain. 😊', conceptTitle: 'Quadratic Equation (द्विघात समीकरण)', conceptSummary: 'Ye ek aisa equation hota hai jisme variable (x) ki sabse badi power 2 hoti hai.', formula: 'ax² + bx + c = 0', rules: ['yahan a, b, c real numbers hote hain', 'aur a ≠ 0 hota hai'], example: 'x² - 5x + 6 = 0', exampleNote: 'Yahan x ki power 2 hai, isliye ye quadratic equation hai.', bookRef: {bookTitle: 'NCERT Mathematics - Class 10', chapterTitle: 'Chapter 4: Quadratic Equations', pages: 'Page: 64 – 66'}}); render(); showToast('New study session started!');" title="New Session">
+              </button>
+              <button type="button" class="p-1 text-gray-700 hover:text-black" onclick="StudyAI.startNewChatSession();" title="New Session">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>
             </div>
           </header>
 
-          <!-- Chat Conversation Container -->
           <div id="studyai-messages-list" class="px-4 py-3 flex-1 flex flex-col gap-5">
-            ${this.chatHistory.map((item) => `
+            ${history.length === 0 ? `
+              <div style="margin-top:24px;text-align:center;padding:24px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:22px;">
+                <div style="width:54px;height:54px;border-radius:16px;background:#18181b;color:#ffffff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto;">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+                </div>
+                <h2 style="font-size:18px;font-weight:800;color:#000000;margin:0 0 6px 0;">Namaste ${escapeHtml(profile.name || "Dost")}! 👋</h2>
+                <p style="font-size:13.5px;color:#475569;margin:0 0 18px 0;line-height:1.5;">
+                  Main tumhara personal AI study mentor hoon (<strong>${escapeHtml(profile.studying)}</strong> • Goal: <strong>${escapeHtml(profile.goal)}</strong>). Koi bhi doubt, homework photo, ya topic pucho!
+                </p>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+                  ${chips.map((c, idx) => `
+                    <button type="button" class="studyai-pill-btn" style="font-weight:700;" onclick="StudyAI.askTopicChip(${idx});">${escapeHtml(c.label)}</button>
+                  `).join("")}
+                </div>
+              </div>
+            ` : history.map((item, idx) => `
               <!-- User Query Bubble -->
               <div class="flex justify-end items-end gap-2">
-                <div class="user-msg-bubble rounded-2xl px-4 py-3 max-w-[82%] text-[14px] leading-relaxed" style="background:#27272a;color:#ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-                  ${escapeHtml(item.question)}
-                </div>
+                <div class="studyai-user-bubble">${item.image ? `<img src="${item.image}" style="max-width:100%;max-height:180px;border-radius:10px;margin-bottom:8px;display:block;" />` : item.imageNote ? `<div style="font-size:11.5px;color:#a1a1aa;margin-bottom:4px;">📷 ${escapeHtml(item.imageNote)}</div>` : ""}${escapeHtml(item.question)}</div>
                 <div class="size-7 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center shrink-0 overflow-hidden">
                   <svg width="20" height="20" viewBox="0 0 36 36" fill="none">
                     <circle cx="18" cy="18" r="18" fill="#e2e8f0"/>
@@ -4399,113 +4931,119 @@
                 </div>
               </div>
 
-              <!-- AI Teacher Response with exact styling from Screen 2 -->
-              <div class="flex gap-3 items-start">
-                <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-[14px] text-gray-900 leading-relaxed mb-3 font-medium">
-                    ${escapeHtml(item.intro)}
-                  </p>
-
-                  <!-- Concept Card -->
-                  <div class="studyai-concept-card">
-                    <div class="studyai-concept-title">
-                      <span>${escapeHtml(item.conceptTitle)}</span>
-                    </div>
-                    <p class="text-[13.5px] text-gray-700 mt-2 leading-relaxed">
-                      ${escapeHtml(item.conceptSummary).replace(/\n/g, "<br/>")}
-                    </p>
-
-                    ${item.formula ? `
-                      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
-                        <span style="font-size:12.5px;font-weight:700;color:#71717a;">General Form:</span>
-                        <!-- Lightbulb sticker -->
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+              ${item.loading ? `
+                <!-- Live AI Thinking Skeleton -->
+                <div class="flex gap-3 items-start animate-pulse">
+                  <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                    <svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[14px] text-gray-800 leading-relaxed mb-3 font-semibold">${escapeHtml(item.intro)}</p>
+                    <div class="studyai-concept-card" style="background:#f8fafc;border:1.5px dashed #cbd5e1;padding:16px;">
+                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                        <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
+                        <span style="font-size:12.5px;font-weight:700;color:#2563eb;">Gemini AI Analyzing (${escapeHtml(profile.studying)})</span>
                       </div>
-                      <div class="studyai-formula-box">
-                        ${escapeHtml(item.formula)}
-                      </div>
-                    ` : ''}
-
-                    ${item.rules && item.rules.length ? `
-                      <ul class="text-[12.5px] text-gray-700 list-disc pl-4 space-y-1 mt-2">
-                        ${item.rules.map(r => `<li>${escapeHtml(r)}</li>`).join("")}
-                      </ul>
-                    ` : ''}
-
-                    ${item.example ? `
-                      <div style="font-size:12.5px;font-weight:700;color:#71717a;margin-top:12px;">Example:</div>
-                      <div class="text-[14px] text-black font-mono font-bold mt-1">${escapeHtml(item.example)}</div>
-                      <div class="text-[12.5px] text-gray-600 mt-1">${escapeHtml(item.exampleNote || "")}</div>
-                    ` : ''}
-
-                    <!-- Anime Student Mascot Pointing Sticker matching Screen 2 -->
-                    <div style="position:absolute;bottom:10px;right:12px;opacity:0.95;">
-                      <svg width="48" height="48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="32" cy="32" r="30" fill="#f4f4f5" stroke="#e4e4e7" stroke-width="1.5"/>
-                        <circle cx="32" cy="30" r="15" fill="#fed7aa"/>
-                        <!-- Anime boy hair spikes -->
-                        <path d="M18 26C16 16 26 12 32 12C38 12 48 16 46 26C42 22 38 20 32 20C26 20 22 22 18 26Z" fill="#18181b"/>
-                        <ellipse cx="27" cy="28" rx="2.5" ry="3.5" fill="#18181b"/>
-                        <ellipse cx="37" cy="28" rx="2.5" ry="3.5" fill="#18181b"/>
-                        <circle cx="28" cy="27" r="1" fill="#ffffff"/>
-                        <circle cx="38" cy="27" r="1" fill="#ffffff"/>
-                        <path d="M30 35C31 36.5 33 36.5 34 35" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round"/>
-                        <!-- White hoodie & pointing hand -->
-                        <path d="M20 54C22 42 26 40 32 40C38 40 42 42 44 54H20Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1"/>
-                        <path d="M42 44L48 38L50 40L45 47" fill="#fed7aa" stroke="#18181b" stroke-width="1.2"/>
-                      </svg>
+                      <div style="height:14px;width:75%;background:#e2e8f0;border-radius:6px;margin-bottom:8px;"></div>
+                      <div style="height:12px;width:90%;background:#e2e8f0;border-radius:6px;margin-bottom:8px;"></div>
+                      <div style="height:12px;width:55%;background:#e2e8f0;border-radius:6px;"></div>
                     </div>
                   </div>
+                </div>
+              ` : `
+                <!-- AI Mentor Response -->
+                <div class="flex gap-3 items-start">
+                  <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    ${item.intro ? `<p class="text-[14px] text-gray-900 leading-relaxed mb-3 font-medium">${escapeHtml(item.intro).replace(/\n/g, "<br/>")}</p>` : ""}
 
-                  <!-- Book Reference Box -->
-                  ${item.bookRef ? `
-                    <div class="studyai-book-ref-box">
-                      <div class="studyai-book-ref-info">
-                        <div class="studyai-book-ref-title">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/></svg>
-                          <span>${escapeHtml(item.bookRef.bookTitle)}</span>
+                    ${(item.conceptTitle || item.conceptSummary || item.formula || (item.rules && item.rules.length) || item.example) ? `
+                      <div class="studyai-concept-card">
+                        ${item.conceptTitle ? `
+                          <div class="studyai-concept-title">
+                            <span>${escapeHtml(item.conceptTitle)}</span>
+                          </div>
+                        ` : ""}
+                        ${item.conceptSummary ? `
+                          <p class="text-[13.5px] text-gray-700 ${item.conceptTitle ? "mt-2" : ""} leading-relaxed">
+                            ${escapeHtml(item.conceptSummary).replace(/\n/g, "<br/>")}
+                          </p>
+                        ` : ""}
+
+                        ${item.formula ? `
+                          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+                            <span style="font-size:12.5px;font-weight:700;color:#71717a;">${escapeHtml(item.formulaLabel || "Key Formula:")}</span>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+                          </div>
+                          <div class="studyai-formula-box">${escapeHtml(item.formula)}</div>
+                        ` : ""}
+
+                        ${item.rules && item.rules.length ? `
+                          <ul class="text-[12.5px] text-gray-700 list-disc pl-4 space-y-1 mt-2">
+                            ${item.rules.map(r => `<li>${escapeHtml(r)}</li>`).join("")}
+                          </ul>
+                        ` : ""}
+
+                        ${item.example ? `
+                          <div style="font-size:12.5px;font-weight:700;color:#71717a;margin-top:12px;">Example:</div>
+                          <div class="text-[13.5px] text-black font-mono font-bold mt-1">${escapeHtml(item.example)}</div>
+                          ${item.exampleNote ? `<div class="text-[12.5px] text-gray-600 mt-1">${escapeHtml(item.exampleNote)}</div>` : ""}
+                        ` : ""}
+                      </div>
+                    ` : ""}
+
+                    <!-- Optional Textbook Reference Box (ONLY when genuinely applicable) -->
+                    ${item.bookRef && item.bookRef.bookTitle ? `
+                      <div class="studyai-book-ref-box">
+                        <div class="studyai-book-ref-info">
+                          <div class="studyai-book-ref-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/></svg>
+                            <span>${escapeHtml(item.bookRef.bookTitle)}</span>
+                          </div>
+                          <div class="studyai-book-ref-chapter">${escapeHtml(item.bookRef.chapterTitle)}</div>
+                          ${item.bookRef.pages ? `<div class="studyai-book-ref-pages">${escapeHtml(item.bookRef.pages)}</div>` : ""}
                         </div>
-                        <div class="studyai-book-ref-chapter">${escapeHtml(item.bookRef.chapterTitle)}</div>
-                        <div class="studyai-book-ref-pages">${escapeHtml(item.bookRef.pages)}</div>
+                        <button type="button" class="studyai-open-book-btn" onclick="StudyAI.openBookFromRef(${idx});">
+                          <span>Open Book</span>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        </button>
                       </div>
-                      <a href="#/study/reader" class="studyai-open-book-btn">
-                        <span>Open Book</span>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                      </a>
-                    </div>
-                  ` : ''}
+                    ` : ""}
 
-                  <!-- Quick Action Pills -->
-                  <div class="studyai-pills-row">
-                    <button type="button" class="studyai-pill-btn" onclick="showToast('Great! Concept marked as understood.');">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      <span>Okay, Samajh gaya!</span>
-                    </button>
-                    <button type="button" class="studyai-pill-btn" onclick="StudyAI.ask('Ise aur bhi aasan real-life cricket ya pizza example se samjhao.'); render();">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-                      <span>Aur Simple</span>
-                    </button>
-                    <button type="button" class="studyai-pill-btn" onclick="showToast('Revision notes created in your library!');">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      <span>Notes Banao</span>
-                    </button>
+                    <!-- AI-Decided Contextual Follow-Up Chips -->
+                    ${item.suggestedChips && item.suggestedChips.length ? `
+                      <div class="studyai-pills-row">
+                        ${item.suggestedChips.map((chip, cIdx) => `
+                          <button type="button" class="studyai-pill-btn" onclick="StudyAI.handleSuggestedChip(${idx}, ${cIdx});">
+                            <span>${escapeHtml(chip.label)}</span>
+                          </button>
+                        `).join("")}
+                      </div>
+                    ` : ""}
                   </div>
                 </div>
-              </div>
+              `}
             `).join("")}
           </div>
 
-          <!-- Bottom Sticky Study Composer -->
+          <!-- Hidden Photo Input + Bottom Sticky Study Composer -->
+          <input type="file" id="studyai-photo-input" accept="image/*" style="display:none;" />
           <div style="position:fixed;bottom:0;left:0;right:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px)) 16px;background:#ffffff;border-top:1px solid #e5e7eb;z-index:50;">
+            ${this._pendingImage ? `
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;background:#f4f4f5;border-radius:12px;">
+                <img src="${this._pendingImage}" style="width:34px;height:34px;object-fit:cover;border-radius:8px;" />
+                <span style="font-size:12px;font-weight:700;color:#18181b;flex:1;">Photo attached • Sawal type karein ya send dabaye</span>
+                <button type="button" onclick="StudyAI._pendingImage=null;render();" style="border:none;background:none;font-weight:800;color:#ef4444;cursor:pointer;">✕</button>
+              </div>
+            ` : ""}
             <form id="studyai-chat-form" style="display:flex;align-items:center;gap:10px;background:#f3f4f6;border:1.5px solid #e5e7eb;border-radius:9999px;padding:4px 6px 4px 14px;">
-              <button type="button" class="text-gray-500 hover:text-black cursor-pointer" onclick="showToast('📸 Photo Solver: Snap homework question to get instant step-by-step book solution.');" title="Upload textbook photo">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <button type="button" id="studyai-photo-btn" class="text-gray-500 hover:text-black cursor-pointer" title="Snap or Upload Question Photo">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               </button>
-              <input type="text" id="studyai-chat-input" placeholder="Aur kuch puchna hai..." style="flex:1;background:transparent;border:none;outline:none;color:#000000;font-size:14px;font-weight:500;" autocomplete="off" />
-              <button type="button" class="text-gray-500 hover:text-black p-1 cursor-pointer" onclick="showToast('🎤 Voice Dictation: Speak your question.');">
+              <input type="text" id="studyai-chat-input" placeholder="${this._isListening ? "Sun raha hoon... boliye" : "Aur kuch puchna hai..."}" style="flex:1;background:transparent;border:none;outline:none;color:#000000;font-size:14px;font-weight:500;" autocomplete="off" />
+              <button type="button" id="studyai-voice-btn" class="text-gray-500 hover:text-black p-1 cursor-pointer ${this._isListening ? "studyai-mic-active" : ""}" onclick="StudyAI.toggleVoiceInput();" title="Voice Input">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
               </button>
               <button type="submit" style="width:36px;height:36px;border-radius:50%;background:#000000;color:#ffffff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;">
@@ -4517,251 +5055,353 @@
       `;
     },
 
-    // SCREEN 3: Book Reference & Reader (#/study/reader)
+    toggleVoiceInput() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        this.toast("Voice input ke liye mic permission check karein ya text type karein.");
+        return;
+      }
+      if (this._isListening && this._recognition) {
+        this._recognition.stop();
+        this._isListening = false;
+        render();
+        return;
+      }
+      try {
+        const rec = new SR();
+        rec.lang = "en-IN";
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        this._recognition = rec;
+        this._isListening = true;
+        render();
+
+        rec.onresult = (ev) => {
+          const text = ev?.results?.[0]?.[0]?.transcript || "";
+          this._isListening = false;
+          render();
+          const inp = document.getElementById("studyai-chat-input");
+          if (inp && text) {
+            inp.value = text;
+            inp.focus();
+          }
+        };
+        rec.onerror = () => {
+          this._isListening = false;
+          render();
+          this.toast("Voice capture nahi ho paya, type karke pucho.");
+        };
+        rec.onend = () => {
+          this._isListening = false;
+          render();
+        };
+        rec.start();
+      } catch (e) {
+        this._isListening = false;
+        render();
+        this.toast("Mic unavailable.");
+      }
+    },
+
+    // -------------------- SCREEN 3: REAL AI BOOK READER --------------------
+    getCachedReaderPages() {
+      try {
+        const raw = localStorage.getItem(this.KEYS.READER_PAGES);
+        if (raw) return JSON.parse(raw) || {};
+      } catch (e) {}
+      return {};
+    },
+
+    setCachedReaderPage(key, pageObj) {
+      const map = this.getCachedReaderPages();
+      map[key] = pageObj;
+      const keys = Object.keys(map);
+      if (keys.length > 30) {
+        delete map[keys[0]];
+      }
+      try {
+        localStorage.setItem(this.KEYS.READER_PAGES, JSON.stringify(map));
+      } catch (e) {}
+    },
+
+    openBook(bookTitle, chapterTitle, page = 1, chapterNum = 1, totalPages = 40) {
+      const profile = this.getProfile();
+      this.readerState = {
+        bookTitle: bookTitle || `${profile.board || "NCERT"} Textbook`,
+        classLevel: profile.studying || "Class 10",
+        chapterNum: chapterNum || 1,
+        chapterTitle: chapterTitle || "Core Concepts",
+        page: page || 1,
+        totalPages: totalPages || 40,
+        loading: false,
+        loadingKey: null
+      };
+      window.location.hash = "#/study/reader";
+      render();
+      this.loadCurrentReaderPage();
+    },
+
+    openBookChapters(bookIdx) {
+      const books = this.getBooks();
+      const b = books[bookIdx];
+      if (!b) return;
+      this.haptic(15);
+      const chapters = Array.isArray(b.chapters) && b.chapters.length ? b.chapters : [
+        { num: 1, title: `${b.title} Introduction`, startPage: 1, endPage: 16 }
+      ];
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/></svg>
+              <span>${escapeHtml(b.title)}</span>
+            </div>
+            <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+          </div>
+          <div class="studyai-modal-body">
+            <div style="font-size:12.5px;color:#6b7280;margin-bottom:12px;">${escapeHtml(b.fullTitle)} • Select chapter to read:</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${chapters.map((ch, cIdx) => `
+                <button type="button" class="studyai-book-browse-card" style="text-align:left;width:100%;cursor:pointer;" onclick="StudyAI.closeModal(); StudyAI.openBook('${escapeHtml(b.fullTitle).replace(/'/g, "\\'")}', '${escapeHtml(ch.title).replace(/'/g, "\\'")}', ${ch.startPage || (cIdx * 15 + 1)}, ${ch.num || cIdx + 1}, ${Math.max(40, (ch.endPage || 20) + 20)});">
+                  <div style="width:34px;height:34px;border-radius:10px;background:#18181b;color:#ffffff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;shrink:0;">${ch.num || cIdx + 1}</div>
+                  <div style="flex:1;">
+                    <div style="font-size:13.5px;font-weight:800;color:#111827;">${escapeHtml(ch.title)}</div>
+                    <div style="font-size:11.5px;color:#6b7280;">Page ${ch.startPage || (cIdx * 15 + 1)} – ${ch.endPage || (cIdx * 15 + 15)}</div>
+                  </div>
+                  <span style="font-size:12px;font-weight:700;color:#2563eb;">Read →</span>
+                </button>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      `);
+    },
+
+    async loadCurrentReaderPage() {
+      const rs = this.readerState;
+      const key = `${rs.bookTitle}::${rs.chapterTitle}::${rs.page}`;
+      const cache = this.getCachedReaderPages();
+      if (cache[key]) {
+        rs.loading = false;
+        render();
+        return;
+      }
+      if (rs.loading && rs.loadingKey === key) return;
+      rs.loading = true;
+      rs.loadingKey = key;
+      render();
+
+      const profile = this.getProfile();
+      try {
+        const prompt = `Generate authentic textbook page content for:
+- Book: ${rs.bookTitle}
+- Class/Level: ${profile.studying || rs.classLevel} (${profile.board || "NCERT"})
+- Chapter ${rs.chapterNum}: ${rs.chapterTitle}
+- Page Number: ${rs.page}
+
+Return ONLY valid raw JSON matching this schema:
+{
+  "subSection": "Section number & heading (e.g. ${rs.chapterNum}.1 Core Principle)",
+  "paragraphs": ["Clear textbook explanation paragraph 1", "Clear textbook explanation paragraph 2"],
+  "highlightFormula": "Important definition or formula on this page (or empty)",
+  "examples": ["(i) Worked example 1", "(ii) Worked example 2"],
+  "calloutNote": "Helpful textbook Note box tip",
+  "takeaways": ["Key takeaway 1", "Key takeaway 2", "Key takeaway 3", "Key takeaway 4"]
+}`;
+
+        const aiText = await this.fetchAI([
+          { role: "system", content: "You generate structured textbook reference pages in raw JSON only." },
+          { role: "user", content: prompt }
+        ]);
+        if (aiText) {
+          const m = aiText.trim().match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = JSON.parse(m[0]);
+            this.setCachedReaderPage(key, parsed);
+          }
+        }
+      } catch (e) {
+        console.warn("Reader page fetch error:", e);
+      } finally {
+        rs.loading = false;
+        rs.loadingKey = null;
+        render();
+      }
+    },
+
+    changeReaderPage(delta) {
+      const next = this.readerState.page + delta;
+      if (next < 1 || next > (this.readerState.totalPages || 200)) return;
+      this.readerState.page = next;
+      this.haptic(10);
+      this.loadCurrentReaderPage();
+    },
+
+    saveReaderTakeaways() {
+      const rs = this.readerState;
+      const key = `${rs.bookTitle}::${rs.chapterTitle}::${rs.page}`;
+      const pageData = this.getCachedReaderPages()[key];
+      if (!pageData) return;
+      const saved = this.getSavedNotes();
+      saved.unshift({
+        id: `reader_${Date.now()}`,
+        chapterTitle: `${rs.chapterTitle} (p. ${rs.page})`,
+        book: rs.bookTitle,
+        sections: [{
+          title: pageData.subSection || rs.chapterTitle,
+          formula: pageData.highlightFormula || "",
+          content: (pageData.takeaways || []).join("\n• "),
+          examTip: pageData.calloutNote || ""
+        }],
+        savedAt: new Date().toLocaleDateString()
+      });
+      localStorage.setItem(this.KEYS.SAVED_NOTES, JSON.stringify(saved.slice(0, 20)));
+      this.haptic(20);
+      this.toast("✔ Page takeaways offline Notes Library me save ho gaye!");
+    },
+
+    practiceCurrentReaderPage() {
+      const rs = this.readerState;
+      window.location.hash = "#/study/chat";
+      this.ask(`${rs.bookTitle} - ${rs.chapterTitle} (Page ${rs.page}) par 3 exam-oriented practice questions with solution do.`);
+    },
+
     renderReader() {
-      const page = this.readerState.page || 64;
-      const total = this.readerState.totalPages || 166;
+      const books = this.getBooks();
+      if (!this.readerState.bookTitle) {
+        const firstBook = books[0];
+        if (firstBook) {
+          this.readerState.bookTitle = firstBook.fullTitle;
+          this.readerState.classLevel = firstBook.classLevel;
+          this.readerState.chapterNum = firstBook.chapters?.[0]?.num || 1;
+          this.readerState.chapterTitle = firstBook.chapters?.[0]?.title || firstBook.title;
+          this.readerState.page = firstBook.chapters?.[0]?.startPage || 1;
+        } else {
+          const p = this.getProfile();
+          this.readerState.bookTitle = `${p.board || "NCERT"} ${p.studying || "Study"} Guide`;
+          this.readerState.chapterTitle = p.goal ? `${p.goal} Core Concepts` : "Chapter 1";
+          this.readerState.page = 1;
+        }
+      }
+
+      const rs = this.readerState;
+      const key = `${rs.bookTitle}::${rs.chapterTitle}::${rs.page}`;
+      const pageData = this.getCachedReaderPages()[key];
+      if (!pageData && !rs.loading) {
+        setTimeout(() => this.loadCurrentReaderPage(), 20);
+      }
+
       return `
         <div class="studyai-viewport" style="background:#ffffff;padding-bottom:120px;">
-          <!-- Reader Header matching Reference Screen 3 -->
           <header class="studyai-header">
             <div style="display:flex;align-items:center;gap:12px;">
-              <a href="#/study/chat" class="p-1 text-gray-700 hover:text-black" title="Back to Chat">
+              <a href="#/study/chat" class="p-1 text-gray-700 hover:text-black" title="Back">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
               </a>
-              <span style="font-weight:800;font-size:17px;color:#000000;">Book Reference</span>
+              <div style="min-width:0;">
+                <div style="font-weight:800;font-size:16px;color:#000000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(rs.bookTitle)}</div>
+              </div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span class="studyai-page-badge" style="float:none;">p. ${page}</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="studyai-page-badge" style="float:none;">p. ${rs.page}</span>
             </div>
           </header>
 
-          <!-- Book Reference Simulated Page (Matching Screen 3) -->
+          <!-- Real AI Textbook Page -->
           <div class="studyai-reader-page">
             <div style="background:#ede9fe;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
-              <div style="font-size:13px;font-weight:700;color:#4338ca;letter-spacing:0.02em;">Chapter ${this.readerState.chapterNum || 4}</div>
-              <h2 style="font-size:20px;font-weight:800;color:#312e81;margin:3px 0 0 0;letter-spacing:-0.01em;">${escapeHtml(this.readerState.chapterTitle || "Quadratic Equations")}</h2>
+              <div style="font-size:12.5px;font-weight:700;color:#4338ca;">Chapter ${rs.chapterNum || 1}</div>
+              <h2 style="font-size:19px;font-weight:800;color:#312e81;margin:3px 0 0 0;">${escapeHtml(rs.chapterTitle)}</h2>
             </div>
 
-            <div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:8px;">${escapeHtml(this.readerState.subSection || "4.1 Introduction")}</div>
-            <p style="font-size:13.5px;color:#374151;margin-bottom:12px;line-height:1.65;">
-              A quadratic equation is a second degree equation in one variable. It can be written in the form <span style="font-family:monospace;font-weight:800;color:#000000;">ax² + bx + c = 0</span>, where a, b and c are real numbers and <span style="font-family:monospace;font-weight:800;color:#000000;">a ≠ 0</span>.
-            </p>
+            ${!pageData ? `
+              <div class="animate-pulse" style="padding:12px 0;">
+                <div style="font-size:13px;font-weight:700;color:#2563eb;margin-bottom:12px;">📖 Gemini AI textbook page ${rs.page} load kar raha hai...</div>
+                <div style="height:14px;width:55%;background:#e2e8f0;border-radius:6px;margin-bottom:10px;"></div>
+                <div style="height:12px;width:95%;background:#f1f5f9;border-radius:6px;margin-bottom:8px;"></div>
+                <div style="height:12px;width:90%;background:#f1f5f9;border-radius:6px;margin-bottom:8px;"></div>
+                <div style="height:12px;width:75%;background:#f1f5f9;border-radius:6px;margin-bottom:16px;"></div>
+                <div style="height:56px;width:100%;background:#fef3c7;border-radius:10px;"></div>
+              </div>
+            ` : `
+              <div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:8px;">${escapeHtml(pageData.subSection || rs.chapterTitle)}</div>
+              ${(pageData.paragraphs || []).map(para => `
+                <p style="font-size:13.5px;color:#374151;margin-bottom:12px;line-height:1.65;">${escapeHtml(para)}</p>
+              `).join("")}
 
-            <div style="font-size:13px;color:#4b5563;margin-bottom:6px;font-weight:600;">For example:</div>
-            <div style="font-size:13.5px;color:#111827;font-family:monospace;margin-left:8px;display:flex;flex-direction:column;gap:5px;">
-              <div>(i) x² - 5x + 6 = 0</div>
-              <div>(ii) 2x² + 3x - 9 = 0</div>
-              <div>(iii) x² + 4x = 0</div>
-            </div>
+              ${pageData.highlightFormula ? `
+                <div class="studyai-formula-box" style="margin:10px 0 14px 0;background:#f8fafc;">${escapeHtml(pageData.highlightFormula)}</div>
+              ` : ""}
 
-            <!-- Note Callout Box matching Screen 3 -->
-            <div class="studyai-reader-callout">
-              <strong style="color:#b45309;font-weight:800;">Note :</strong> The term quadratic comes from 'quadra' meaning square, because the highest power of the variable is 2.
-            </div>
+              ${pageData.examples && pageData.examples.length ? `
+                <div style="font-size:13px;color:#4b5563;margin-bottom:6px;font-weight:700;">Examples:</div>
+                <div style="font-size:13px;color:#111827;font-family:monospace;margin-left:6px;display:flex;flex-direction:column;gap:5px;margin-bottom:12px;">
+                  ${pageData.examples.map(ex => `<div>${escapeHtml(ex)}</div>`).join("")}
+                </div>
+              ` : ""}
+
+              ${pageData.calloutNote ? `
+                <div class="studyai-reader-callout">
+                  <strong style="color:#b45309;font-weight:800;">Note :</strong> ${escapeHtml(pageData.calloutNote)}
+                </div>
+              ` : ""}
+            `}
           </div>
 
-          <!-- Page Navigation Controls -->
+          <!-- Real Page Controls -->
           <div class="studyai-page-pager">
-            <button type="button" class="studyai-pager-btn" id="reader-prev-page" title="Previous Page">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <button type="button" class="studyai-pager-btn" onclick="StudyAI.changeReaderPage(-1);" title="Previous Page">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
             </button>
-            <span style="font-size:14px;font-weight:800;color:#000000;font-family:var(--font-mono);">${page} / ${total}</span>
-            <button type="button" class="studyai-pager-btn" id="reader-next-page" title="Next Page">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            <span style="font-size:14px;font-weight:800;color:#000000;font-family:var(--font-mono);">Page ${rs.page}</span>
+            <button type="button" class="studyai-pager-btn" onclick="StudyAI.changeReaderPage(1);" title="Next Page">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
             </button>
-            <button type="button" class="studyai-pager-btn" onclick="showToast('Search within Chapter 4 activated.');" title="Search in book">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            </button>
-            <button type="button" class="studyai-pager-btn" onclick="showToast('Fullscreen book view.');" title="Fullscreen">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+            <button type="button" class="studyai-pager-btn" onclick="StudyAI.openDownloaderTab('my_downloads');" title="Switch Book">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/></svg>
             </button>
           </div>
 
-          <!-- "Is page se kya samjhen?" Takeaways Summary Card -->
-          <div class="studyai-takeaways-card">
-            <div style="font-size:16px;font-weight:800;color:#000000;margin-bottom:12px;">
-              <span>Is page se kya samjhen?</span>
-            </div>
+          <!-- Takeaways Card -->
+          ${pageData && pageData.takeaways && pageData.takeaways.length ? `
+            <div class="studyai-takeaways-card">
+              <div style="font-size:16px;font-weight:800;color:#000000;margin-bottom:12px;">Is page se kya samjhen?</div>
+              ${pageData.takeaways.map(tk => `
+                <div class="studyai-takeaway-item">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#22c55e;color:#ffffff;flex-shrink:0;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  </span>
+                  <span>${escapeHtml(tk)}</span>
+                </div>
+              `).join("")}
 
-            <div class="studyai-takeaway-item">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#22c55e;color:#ffffff;flex-shrink:0;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </span>
-              <span>Quadratic equation ki definition</span>
+              <div style="display:flex;gap:10px;margin-top:16px;">
+                <button type="button" class="studyai-open-book-btn" style="flex:1;justify-content:center;padding:10px 14px;" onclick="StudyAI.saveReaderTakeaways();">
+                  <span>Notes me save karein</span>
+                </button>
+                <button type="button" class="studyai-pill-btn" style="padding:10px 14px;font-weight:700;" onclick="StudyAI.practiceCurrentReaderPage();">
+                  <span>Practice Questions</span>
+                </button>
+              </div>
             </div>
-            <div class="studyai-takeaway-item">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#22c55e;color:#ffffff;flex-shrink:0;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </span>
-              <span>General form: <code style="color:#000000;font-weight:700;">ax² + bx + c = 0</code></span>
-            </div>
-            <div class="studyai-takeaway-item">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#22c55e;color:#ffffff;flex-shrink:0;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </span>
-              <span><code style="color:#000000;font-weight:700;">a ≠ 0</code> hona zaroori hai</span>
-            </div>
-            <div class="studyai-takeaway-item">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#22c55e;color:#ffffff;flex-shrink:0;">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </span>
-              <span>Kuch examples (x² - 5x + 6 = 0, etc.)</span>
-            </div>
+          ` : ""}
 
-            <div style="display:flex;gap:10px;margin-top:16px;">
-              <button type="button" class="studyai-open-book-btn" style="flex:1;justify-content:center;padding:10px 14px;" onclick="showToast('Page takeaways saved into revision notes!');">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                <span>Notes me save karein</span>
-              </button>
-              <button type="button" class="studyai-pill-btn" style="padding:10px 14px;font-weight:700;" onclick="StudyAI.ask('Is page 64 ke topic par 3 practice questions puchho.'); window.location.hash='#/study/chat'; render();">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span>Practice Questions</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Bottom Navigation -->
-          ${this.renderBottomNav("home")}
+          ${this.renderBottomNav("library")}
         </div>
       `;
     },
 
-    // SCREEN 4: Book Downloader & Offline Manager (#/study/downloader)
-    renderDownloader() {
-      const isNCERT = this.downloaderState.selectedSources.includes("ncert");
-      const isMP = this.downloaderState.selectedSources.includes("mp_board");
-      const isState = this.downloaderState.selectedSources.includes("other_state");
-      const isRef = this.downloaderState.selectedSources.includes("ref_books");
-      const isComp = this.downloaderState.selectedSources.includes("comp_exams");
+    // -------------------- SCREEN 4: REAL BOOK DOWNLOADER & LIBRARY --------------------
+    openDownloaderTab(tab = "browse") {
+      this.downloaderState.activeTab = tab;
+      window.location.hash = "#/study/downloader";
+      render();
+    },
 
-      let totalGB = 0;
-      if (isNCERT) totalGB += 8.2;
-      if (isMP) totalGB += 4.1;
-      if (isState) totalGB += 14.6;
-      if (isRef) totalGB += 6.5;
-      if (isComp) totalGB += 11.2;
-
-      return `
-        <div class="studyai-viewport" style="padding-bottom:100px;background:#ffffff;">
-          <!-- Downloader Header matching Reference Screen 4 -->
-          <header class="studyai-header">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <a href="#/study" class="p-1 text-gray-700 hover:text-black" title="Back to Study Home">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-              </a>
-              <span style="font-weight:800;font-size:17px;color:#000000;">Book Downloader</span>
-            </div>
-            <button type="button" class="p-1 text-gray-700 hover:text-black" onclick="showToast('Active downloads: 2 books remaining in queue.');" title="Download queue">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            </button>
-          </header>
-
-          <!-- Downloader Tabs (Segmented Control) -->
-          <div class="studyai-downloader-tabs">
-            <button type="button" class="studyai-tab-btn ${this.downloaderState.activeTab === "browse" ? "active" : ""}" onclick="StudyAI.setDownloaderTab('browse');">
-              Browse
-            </button>
-            <button type="button" class="studyai-tab-btn ${this.downloaderState.activeTab === "bulk" ? "active" : ""}" onclick="StudyAI.setDownloaderTab('bulk');">
-              Bulk Download
-            </button>
-            <button type="button" class="studyai-tab-btn ${this.downloaderState.activeTab === "my_downloads" ? "active" : ""}" onclick="StudyAI.setDownloaderTab('my_downloads');">
-              My Downloads
-            </button>
-          </div>
-
-          <!-- Hero Collection Banner matching Reference Screen 4 -->
-          <div style="margin:0 16px 16px 16px;background:#ffffff;border:1.5px solid #e4e4e7;border-radius:20px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,0.02);">
-            <div style="display:flex;align-items:center;gap:14px;">
-              <div style="width:46px;height:46px;border-radius:12px;background:#f4f4f5;color:#000000;display:flex;align-items:center;justify-content:center;">
-                <!-- Stack of 3 Isometric Books SVG -->
-                <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="#18181b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 9L16 4L27 9L16 14L5 9Z" fill="#e4e4e7"/>
-                  <path d="M5 15L16 20L27 15"/>
-                  <path d="M5 21L16 26L27 21"/>
-                </svg>
-              </div>
-              <div>
-                <div style="font-size:14.5px;font-weight:800;color:#000000;">Download Complete Book Collection</div>
-                <div style="font-size:12px;color:#6b7280;margin-top:2px;">NCERT • State Board • Popular Books</div>
-              </div>
-            </div>
-            <button type="button" class="size-9 rounded-full bg-black text-white flex items-center justify-center cursor-pointer shadow-sm" onclick="StudyAI.triggerBulkDownload('${totalGB.toFixed(1)}');">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            </button>
-          </div>
-
-          <!-- Select Book Sources Section -->
-          <div style="padding:0 16px;">
-            <div style="font-size:16px;font-weight:800;color:#000000;margin-bottom:12px;">Select Book Sources</div>
-
-            <div class="studyai-download-checklist" style="padding:0;">
-              <!-- Source 1: NCERT -->
-              <div class="studyai-source-item ${isNCERT ? 'selected' : ''}" onclick="StudyAI.toggleSource('ncert');">
-                <div class="studyai-checkbox">
-                  ${isNCERT ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
-                </div>
-                <div style="flex:1;">
-                  <div style="font-size:14px;font-weight:700;color:#000000;">NCERT (Class 1 – 12)</div>
-                  <div style="font-size:12px;color:#6b7280;margin-top:1px;">~ 8.2 GB | 648 Books</div>
-                </div>
-              </div>
-
-              <!-- Source 2: MP Board -->
-              <div class="studyai-source-item ${isMP ? 'selected' : ''}" onclick="StudyAI.toggleSource('mp_board');">
-                <div class="studyai-checkbox">
-                  ${isMP ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
-                </div>
-                <div style="flex:1;">
-                  <div style="font-size:14px;font-weight:700;color:#000000;">MP Board (Class 1 – 12)</div>
-                  <div style="font-size:12px;color:#6b7280;margin-top:1px;">~ 4.1 GB | 312 Books</div>
-                </div>
-              </div>
-
-              <!-- Source 3: Other State Boards -->
-              <div class="studyai-source-item ${isState ? 'selected' : ''}" onclick="StudyAI.toggleSource('other_state');">
-                <div class="studyai-checkbox">
-                  ${isState ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
-                </div>
-                <div style="flex:1;">
-                  <div style="font-size:14px;font-weight:700;color:#000000;">Other State Boards</div>
-                  <div style="font-size:12px;color:#6b7280;margin-top:1px;">(UP, Bihar, Rajasthan, etc.)</div>
-                </div>
-              </div>
-
-              <!-- Source 4: Popular Reference Books -->
-              <div class="studyai-source-item ${isRef ? 'selected' : ''}" onclick="StudyAI.toggleSource('ref_books');">
-                <div class="studyai-checkbox">
-                  ${isRef ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
-                </div>
-                <div style="flex:1;">
-                  <div style="font-size:14px;font-weight:700;color:#000000;">Popular Reference Books</div>
-                  <div style="font-size:12px;color:#6b7280;margin-top:1px;">(HC Verma, RD Sharma, etc.)</div>
-                </div>
-              </div>
-
-              <!-- Source 5: Competitive -->
-              <div class="studyai-source-item ${isComp ? 'selected' : ''}" onclick="StudyAI.toggleSource('comp_exams');">
-                <div class="studyai-checkbox">
-                  ${isComp ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ''}
-                </div>
-                <div style="flex:1;">
-                  <div style="font-size:14px;font-weight:700;color:#000000;">Competitive (JEE, NEET, UPSC)</div>
-                  <div style="font-size:12px;color:#6b7280;margin-top:1px;">(NCERT + Extra)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Sticky Bottom Action Button -->
-          <div class="studyai-download-sticky-bar">
-            <button type="button" class="studyai-download-action-btn" onclick="StudyAI.triggerBulkDownload('${totalGB.toFixed(1)}');">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span>Download Selected (${totalGB > 0 ? totalGB.toFixed(1) + ' GB' : '0 GB'})</span>
-            </button>
-          </div>
-        </div>
-      `;
+    setDownloaderTab(tab) {
+      this.downloaderState.activeTab = tab;
+      this.haptic(10);
+      render();
     },
 
     toggleSource(src) {
@@ -4774,20 +5414,868 @@
       render();
     },
 
-    setDownloaderTab(tab) {
-      this.downloaderState.activeTab = tab;
+    async downloadAndIndexBook(title, classLevel = "", shortCode = "BOOK") {
+      const cleanTitle = (title || "").trim();
+      if (!cleanTitle) return;
+      const profile = this.getProfile();
+      const cls = classLevel || profile.studying || "Study";
+      const key = cleanTitle.toLowerCase();
+
+      if (this.downloaderState.downloadingIds[key]) return;
+      this.downloaderState.downloadingIds[key] = true;
+      this.haptic(15);
+      render();
+
+      try {
+        const prompt = `Create an authentic, complete textbook chapter index for "${cleanTitle}" (${cls} - ${profile.board || "NCERT"}).
+Return ONLY valid raw JSON:
+{
+  "shortCode": "4 letter subject code",
+  "chapters": [
+    {"num": 1, "title": "Exact Chapter 1 Name", "startPage": 1, "endPage": 16},
+    {"num": 2, "title": "Exact Chapter 2 Name", "startPage": 17, "endPage": 34}
+  ]
+}
+Provide 6 to 10 real chapters for this book.`;
+
+        const aiText = await this.fetchAI([
+          { role: "system", content: "Return strictly raw JSON with real book chapters." },
+          { role: "user", content: prompt }
+        ]);
+
+        let chapters = [{ num: 1, title: `${cleanTitle} Overview`, startPage: 1, endPage: 20 }];
+        let code = shortCode;
+        if (aiText) {
+          const m = aiText.trim().match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = JSON.parse(m[0]);
+            if (Array.isArray(parsed.chapters) && parsed.chapters.length) chapters = parsed.chapters;
+            if (parsed.shortCode) code = String(parsed.shortCode).slice(0, 5).toUpperCase();
+          }
+        }
+
+        const colors = [
+          "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+          "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+          "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+          "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)"
+        ];
+        const books = this.getBooks();
+        const existingIdx = books.findIndex(b => b.fullTitle.toLowerCase() === key || b.title.toLowerCase() === key);
+        const bookObj = {
+          id: `book_${Date.now()}`,
+          title: cleanTitle.slice(0, 22),
+          fullTitle: cleanTitle,
+          classLevel: cls,
+          coverColor: colors[books.length % colors.length],
+          shortCode: code,
+          status: "AI Indexed",
+          chaptersCount: chapters.length,
+          chapters: chapters
+        };
+        if (existingIdx >= 0) {
+          books[existingIdx] = bookObj;
+        } else {
+          books.unshift(bookObj);
+        }
+        this.saveBooks(books);
+        this.haptic(25);
+        this.toast(`✔ "${cleanTitle}" (${chapters.length} chapters) download & index ho gayi!`);
+      } catch (e) {
+        this.toast("Book index nahi ho payi, network check karein.");
+      } finally {
+        delete this.downloaderState.downloadingIds[key];
+        render();
+      }
+    },
+
+    removeBook(idx) {
+      const books = this.getBooks();
+      const removed = books.splice(idx, 1);
+      this.saveBooks(books);
+      this.haptic(15);
+      render();
+      if (removed[0]) this.toast(`Removed ${removed[0].title} from local library.`);
+    },
+
+    submitBookSearch(e) {
+      if (e) e.preventDefault();
+      const inp = document.getElementById("studyai-book-search-input");
+      const q = (inp?.value || "").trim();
+      if (!q) return;
+      this.downloadAndIndexBook(q);
+      if (inp) inp.value = "";
+    },
+
+    async triggerBulkDownload() {
+      const sources = this.downloaderState.selectedSources;
+      if (!sources.length) {
+        this.toast("Kam se kam ek Book Pack select karein.");
+        return;
+      }
+      this.haptic(20);
+      const profile = this.getProfile();
+      const catalog = this.getRecommendedCatalog();
+
+      const targets = [];
+      if (sources.includes("class_pack")) {
+        catalog.slice(0, 3).forEach(b => targets.push({ title: b.fullTitle, cls: b.classLevel, code: b.shortCode }));
+      }
+      if (sources.includes("ref_pack")) {
+        targets.push({ title: `${profile.studying || "Class 10"} Most Important PYQs & Practice`, cls: "Reference", code: "PYQ" });
+      }
+      if (sources.includes("goal_pack")) {
+        targets.push({ title: `${profile.goal || "Competitive"} Complete Master Guide`, cls: profile.goal || "Exam Prep", code: "GOAL" });
+      }
+
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title">
+              <span>AI Indexing &amp; Downloading Books</span>
+            </div>
+            <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+          </div>
+          <div class="studyai-modal-body" style="padding:24px 20px;">
+            <div style="text-align:center;margin-bottom:16px;">
+              <div id="dl-icon" style="font-size:38px;margin-bottom:6px;">📚</div>
+              <h3 id="dl-title" style="font-size:17px;font-weight:800;margin:0;">Fetching Real Chapter Structures...</h3>
+              <p id="dl-subtitle" style="font-size:12.5px;color:#6b7280;margin:4px 0 0 0;">Total ${targets.length} books selected for ${escapeHtml(profile.studying || "you")}</p>
+            </div>
+            <div class="studyai-progress-track" style="height:10px;">
+              <div id="dl-progress-bar" class="studyai-progress-fill" style="width:10%;background:#2563eb;"></div>
+            </div>
+            <div id="dl-status-line" style="margin-top:14px;padding:10px 14px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;font-size:12px;color:#334155;">
+              Starting Gemini Book Indexer...
+            </div>
+          </div>
+        </div>
+      `);
+
+      for (let i = 0; i < targets.length; i++) {
+        const t = targets[i];
+        const statusEl = document.getElementById("dl-status-line");
+        const barEl = document.getElementById("dl-progress-bar");
+        if (statusEl) statusEl.textContent = `Indexing (${i + 1}/${targets.length}): ${t.title}...`;
+        if (barEl) barEl.style.width = Math.round(((i + 0.4) / targets.length) * 100) + "%";
+        await this.downloadAndIndexBook(t.title, t.cls, t.code);
+        if (barEl) barEl.style.width = Math.round(((i + 1) / targets.length) * 100) + "%";
+      }
+
+      const iconEl = document.getElementById("dl-icon");
+      const titleEl = document.getElementById("dl-title");
+      const statusEl = document.getElementById("dl-status-line");
+      if (iconEl) iconEl.textContent = "✅";
+      if (titleEl) titleEl.textContent = "All Books Indexed Locally!";
+      if (statusEl) {
+        statusEl.style.background = "#ecfdf5";
+        statusEl.style.color = "#065f46";
+        statusEl.textContent = `✔ ${targets.length} books with real chapters ready offline in My Downloads!`;
+      }
+      this.downloaderState.activeTab = "my_downloads";
       render();
     },
 
-    triggerBulkDownload(sizeGB) {
-      if (parseFloat(sizeGB) <= 0) {
-        showToast("Please select at least one book source.");
+    renderDownloader() {
+      const profile = this.getProfile();
+      if (!profile.setupDone) {
+        return this.renderOnboarding(false);
+      }
+      const tab = this.downloaderState.activeTab;
+      const myBooks = this.getBooks();
+      const catalog = this.getRecommendedCatalog();
+      const cachedPagesCount = Object.keys(this.getCachedReaderPages()).length;
+      const isClassPack = this.downloaderState.selectedSources.includes("class_pack");
+      const isRefPack = this.downloaderState.selectedSources.includes("ref_pack");
+      const isGoalPack = this.downloaderState.selectedSources.includes("goal_pack");
+
+      return `
+        <div class="studyai-viewport" style="padding-bottom:100px;background:#ffffff;">
+          <header class="studyai-header">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <a href="#/study" class="p-1 text-gray-700 hover:text-black" title="Back">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+              </a>
+              <span style="font-weight:800;font-size:17px;color:#000000;">Books &amp; Library</span>
+            </div>
+            <span style="font-size:12px;font-weight:700;color:#059669;">${myBooks.length} Indexed</span>
+          </header>
+
+          <!-- Segmented Tabs -->
+          <div class="studyai-downloader-tabs">
+            <button type="button" class="studyai-tab-btn ${tab === "browse" ? "active" : ""}" onclick="StudyAI.setDownloaderTab('browse');">Browse</button>
+            <button type="button" class="studyai-tab-btn ${tab === "bulk" ? "active" : ""}" onclick="StudyAI.setDownloaderTab('bulk');">Pack Setup</button>
+            <button type="button" class="studyai-tab-btn ${tab === "my_downloads" ? "active" : ""}" onclick="StudyAI.setDownloaderTab('my_downloads');">My Books (${myBooks.length})</button>
+          </div>
+
+          ${tab === "browse" ? `
+            <div style="padding:0 16px;">
+              <form onsubmit="StudyAI.submitBookSearch(event);" style="display:flex;gap:8px;margin-bottom:16px;">
+                <input type="text" id="studyai-book-search-input" class="studyai-onboard-input" placeholder="Koi bhi book likho (e.g. HC Verma, Python)..." style="flex:1;padding:10px 14px;" />
+                <button type="submit" style="padding:0 16px;border-radius:14px;background:#18181b;color:#ffffff;font-size:13px;font-weight:700;border:none;cursor:pointer;">Index AI</button>
+              </form>
+
+              <div style="font-size:15px;font-weight:800;color:#000000;margin-bottom:10px;">Recommended for ${escapeHtml(profile.studying || "You")}</div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                ${catalog.map(b => {
+                  const key = b.fullTitle.toLowerCase();
+                  const isDl = !!this.downloaderState.downloadingIds[key];
+                  const alreadyIdx = myBooks.findIndex(mb => mb.fullTitle.toLowerCase() === key || mb.title.toLowerCase() === b.title.toLowerCase());
+                  return `
+                    <div class="studyai-book-browse-card">
+                      <div class="studyai-book-thumb" style="background:${b.coverColor};width:44px;height:56px;">
+                        <div style="font-size:8px;font-weight:900;color:#fff;">${escapeHtml(b.shortCode)}</div>
+                      </div>
+                      <div style="flex:1;min-width:0;">
+                        <div style="font-size:14px;font-weight:800;color:#111827;">${escapeHtml(b.fullTitle)}</div>
+                        <div style="font-size:12px;color:#6b7280;margin-top:2px;">${escapeHtml(b.classLevel)}</div>
+                      </div>
+                      ${alreadyIdx >= 0 ? `
+                        <button type="button" class="studyai-open-book-btn" onclick="StudyAI.openBookChapters(${alreadyIdx});">Read</button>
+                      ` : `
+                        <button type="button" class="studyai-pill-btn" style="background:#18181b;color:#fff;font-weight:700;" onclick="StudyAI.downloadAndIndexBook('${escapeHtml(b.fullTitle).replace(/'/g, "\\'")}', '${escapeHtml(b.classLevel).replace(/'/g, "\\'")}', '${b.shortCode}');">
+                          ${isDl ? "Indexing..." : "Download"}
+                        </button>
+                      `}
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            </div>
+          ` : tab === "bulk" ? `
+            <div style="padding:0 16px;">
+              <div style="font-size:15.5px;font-weight:800;color:#000000;margin-bottom:12px;">Smart Study Packs (${escapeHtml(profile.studying)})</div>
+              <div class="studyai-download-checklist" style="padding:0;">
+                <div class="studyai-source-item ${isClassPack ? "selected" : ""}" onclick="StudyAI.toggleSource('class_pack');">
+                  <div class="studyai-checkbox">${isClassPack ? "✓" : ""}</div>
+                  <div style="flex:1;">
+                    <div style="font-size:14px;font-weight:700;color:#000;">Core ${escapeHtml(profile.studying)} Textbooks</div>
+                    <div style="font-size:12px;color:#6b7280;">AI indexes real chapters for 3 main subjects</div>
+                  </div>
+                </div>
+                <div class="studyai-source-item ${isRefPack ? "selected" : ""}" onclick="StudyAI.toggleSource('ref_pack');">
+                  <div class="studyai-checkbox">${isRefPack ? "✓" : ""}</div>
+                  <div style="flex:1;">
+                    <div style="font-size:14px;font-weight:700;color:#000;">Previous Year &amp; Practice Pack</div>
+                    <div style="font-size:12px;color:#6b7280;">Most asked board/exam topic chapters</div>
+                  </div>
+                </div>
+                <div class="studyai-source-item ${isGoalPack ? "selected" : ""}" onclick="StudyAI.toggleSource('goal_pack');">
+                  <div class="studyai-checkbox">${isGoalPack ? "✓" : ""}</div>
+                  <div style="flex:1;">
+                    <div style="font-size:14px;font-weight:700;color:#000;">${escapeHtml(profile.goal)} Prep Pack</div>
+                    <div style="font-size:12px;color:#6b7280;">Career-focused master guide &amp; key modules</div>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="studyai-download-action-btn" style="margin:20px 0 0 0;justify-content:center;" onclick="StudyAI.triggerBulkDownload();">
+                <span>Download &amp; Index Selected Packs</span>
+              </button>
+            </div>
+          ` : `
+            <div style="padding:0 16px;">
+              <div style="background:#f4f4f5;border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;color:#374151;display:flex;justify-content:space-between;">
+                <span>Saved Books: <strong>${myBooks.length}</strong></span>
+                <span>Offline Pages Cached: <strong>${cachedPagesCount}</strong></span>
+              </div>
+              ${myBooks.length === 0 ? `
+                <div style="text-align:center;padding:30px 16px;background:#f8fafc;border-radius:16px;border:1.5px dashed #cbd5e1;">
+                  <div style="font-size:15px;font-weight:800;color:#111827;margin-bottom:6px;">Abhi koi book saved nahi hai</div>
+                  <p style="font-size:12.5px;color:#6b7280;margin-bottom:14px;">Browse tab me jaakar apni favourite book AI se index karein.</p>
+                  <button type="button" class="studyai-open-book-btn" style="margin:0 auto;" onclick="StudyAI.setDownloaderTab('browse');">Browse Books</button>
+                </div>
+              ` : `
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  ${myBooks.map((b, idx) => `
+                    <div class="studyai-book-browse-card">
+                      <div class="studyai-book-thumb" style="background:${b.coverColor || '#18181b'};width:44px;height:56px;">
+                        <div style="font-size:8px;font-weight:900;color:#fff;">${escapeHtml(b.shortCode || "BOOK")}</div>
+                      </div>
+                      <div style="flex:1;min-width:0;" onclick="StudyAI.openBookChapters(${idx});">
+                        <div style="font-size:14px;font-weight:800;color:#111827;">${escapeHtml(b.fullTitle)}</div>
+                        <div style="font-size:12px;color:#059669;font-weight:600;margin-top:2px;">${b.chapters ? b.chapters.length : 1} Chapters Indexed</div>
+                      </div>
+                      <button type="button" class="studyai-open-book-btn" onclick="StudyAI.openBookChapters(${idx});">Open</button>
+                      <button type="button" style="border:none;background:none;color:#9ca3af;cursor:pointer;padding:6px;" onclick="StudyAI.removeBook(${idx});" title="Delete">✕</button>
+                    </div>
+                  `).join("")}
+                </div>
+              `}
+            </div>
+          `}
+
+          ${this.renderBottomNav(tab === "my_downloads" ? "library" : "downloads")}
+        </div>
+      `;
+    },
+
+    // -------------------- MODALS: QUIZ, NOTES, SYLLABUS, PROGRESS, PROFILE --------------------
+    showModal(modalHtml) {
+      const old = document.getElementById("studyai-modal-wrap");
+      if (old) old.remove();
+      const wrap = document.createElement("div");
+      wrap.id = "studyai-modal-wrap";
+      wrap.className = "studyai-modal-backdrop";
+      wrap.innerHTML = modalHtml;
+      wrap.addEventListener("click", (e) => {
+        if (e.target === wrap) StudyAI.closeModal();
+      });
+      document.body.appendChild(wrap);
+      this.haptic(15);
+    },
+
+    closeModal() {
+      const existing = document.getElementById("studyai-modal-wrap");
+      if (existing && !existing.classList.contains("closing")) {
+        existing.classList.add("closing");
+        this.haptic(10);
+        setTimeout(() => {
+          if (existing.parentNode) existing.remove();
+        }, 210);
+      }
+    },
+
+    async openQuiz(mode = "rapid", topic = null) {
+      this.haptic(20);
+      const profile = this.getProfile();
+      const history = this.getChatHistory();
+      const isTest = mode === "test" || mode === "mock_test";
+      const topicClean = (topic && topic.trim())
+        ? topic.trim()
+        : (history.length
+          ? (history[history.length - 1].conceptTitle || history[history.length - 1].question)
+          : `${profile.studying || "Class 10"} ${profile.goal || ""}`);
+
+      this.showModal(`
+        <div class="studyai-modal-card" style="text-align:center;padding:36px 20px;">
+          <div style="width:60px;height:60px;border-radius:18px;background:#ede9fe;color:#7c3aed;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="animate-spin"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+          </div>
+          <h3 style="font-size:18px;font-weight:800;color:#000000;margin:0 0 6px 0;">Gemini AI Quiz Tayyar Kar Raha Hai...</h3>
+          <p style="font-size:13px;color:#6b7280;margin:0 0 20px 0;line-height:1.5;"><strong>${escapeHtml(profile.studying || "Student")}</strong> level ke 5 live questions ban rahe hain:<br/><strong style="color:#1e293b;">${escapeHtml(topicClean)}</strong></p>
+          <div class="studyai-progress-track" style="height:6px;max-width:240px;margin:0 auto;">
+            <div class="studyai-progress-fill" style="width:75%;background:linear-gradient(90deg, #7c3aed, #2563eb);"></div>
+          </div>
+        </div>
+      `);
+
+      let questions = [];
+      try {
+        const sysPrompt = `You are an examiner for ${profile.studying || "Class 10"} (${profile.board || "CBSE"}, goal: ${profile.goal || "topper"}).
+Generate 5 high-yield multiple-choice questions on topic: "${topicClean}".
+Return ONLY a valid raw JSON array of 5 objects:
+[{"q": "Question?", "options": ["A", "B", "C", "D"], "correct": 0, "exp": "Short clear explanation"}]`;
+
+        const aiText = await this.fetchAI([
+          { role: "system", content: sysPrompt },
+          { role: "user", content: `Generate 5 MCQ questions on ${topicClean}` }
+        ]);
+
+        if (aiText) {
+          const match = aiText.trim().match(/\[[\s\S]*\]/);
+          if (match) {
+            const parsed = JSON.parse(match[0]);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              questions = parsed.map(item => ({
+                q: item.q || "Question",
+                options: Array.isArray(item.options) && item.options.length >= 2 ? item.options : ["A", "B", "C", "D"],
+                correct: typeof item.correct === "number" ? item.correct : 0,
+                exp: item.exp || "Based on standard curriculum concepts."
+              }));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Quiz fetch failed:", e);
+      }
+
+      if (!questions.length) {
+        this.showModal(`
+          <div class="studyai-modal-card" style="text-align:center;padding:30px 20px;">
+            <div style="font-size:38px;margin-bottom:10px;">⚠️</div>
+            <h3 style="font-size:17px;font-weight:800;margin-bottom:6px;">Quiz Generate Nahi Ho Paya</h3>
+            <p style="font-size:13px;color:#6b7280;margin-bottom:18px;">Live AI server se connection nahi ban paya. Network check karke dobara try karein.</p>
+            <button type="button" class="studyai-download-action-btn" style="margin:0 auto;" onclick="StudyAI.openQuiz('${mode}');">Retry Quiz</button>
+          </div>
+        `);
         return;
       }
-      showToast(`⚡ Starting bulk download of ${sizeGB} GB. Books will be indexed locally.`);
-      setTimeout(() => {
-        showToast("✔ NCERT Class 10 Mathematics indexed and ready for offline search!");
-      }, 1500);
+
+      let currentIdx = 0;
+      let score = 0;
+      let answered = false;
+
+      const renderQuestion = () => {
+        const item = questions[currentIdx];
+        const progressPercent = Math.round((currentIdx / questions.length) * 100);
+        return `
+          <div class="studyai-modal-card">
+            <div class="studyai-modal-header">
+              <div class="studyai-modal-title">
+                <span>${isTest ? "Mock Test" : "Rapid Quiz"}</span>
+                <span class="studyai-pro-badge" style="font-size:10px;padding:2px 6px;">AI LIVE</span>
+              </div>
+              <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+            </div>
+            <div class="studyai-modal-body">
+              <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#6b7280;margin-bottom:6px;">
+                <span>Question ${currentIdx + 1} of ${questions.length}</span>
+                <span>Score: ${score}</span>
+              </div>
+              <div class="studyai-progress-track">
+                <div class="studyai-progress-fill" style="width:${progressPercent}%;"></div>
+              </div>
+              <div style="font-size:15.5px;font-weight:800;color:#000000;margin:16px 0 18px 0;line-height:1.45;">${escapeHtml(item.q)}</div>
+              <div class="quiz-options-list" style="display:flex;flex-direction:column;gap:8px;">
+                ${item.options.map((opt, oIdx) => `
+                  <div class="studyai-quiz-option" data-idx="${oIdx}">
+                    <div class="studyai-quiz-option-letter">${["A", "B", "C", "D"][oIdx] || oIdx + 1}</div>
+                    <div style="flex:1;">${escapeHtml(opt)}</div>
+                  </div>
+                `).join("")}
+              </div>
+              <div id="quiz-explanation-box" style="display:none;margin-top:14px;padding:12px 14px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;font-size:13px;color:#334155;"></div>
+            </div>
+          </div>
+        `;
+      };
+
+      const renderFinalScore = () => {
+        const percent = Math.round((score / questions.length) * 100);
+        this.trackActivity("quiz", { topic: topicClean, score, total: questions.length });
+        return `
+          <div class="studyai-modal-card" style="text-align:center;">
+            <div class="studyai-modal-header" style="justify-content:flex-end;border-bottom:none;padding-bottom:0;">
+              <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+            </div>
+            <div class="studyai-modal-body" style="padding-top:6px;padding-bottom:28px;">
+              <div style="font-size:52px;line-height:1;margin-bottom:12px;">${percent >= 60 ? "🏆" : "💪"}</div>
+              <h2 style="font-size:22px;font-weight:800;color:#000000;margin-bottom:4px;">${percent >= 60 ? "Shabash! Great Job!" : "Good Practice Attempt!"}</h2>
+              <p style="font-size:13.5px;color:#6b7280;margin-bottom:20px;">Topic: <strong>${escapeHtml(topicClean)}</strong></p>
+              <div style="background:#f4f4f5;border-radius:20px;padding:18px 24px;display:inline-block;margin-bottom:22px;border:1px solid #e4e4e7;">
+                <div style="font-size:36px;font-weight:900;color:#000000;">${score} / ${questions.length}</div>
+                <div style="font-size:12.5px;font-weight:700;color:#059669;margin-top:2px;">Accuracy: ${percent}% • Saved to Progress</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px;max-width:300px;margin:0 auto;">
+                <button type="button" id="quiz-retry-btn" class="studyai-download-action-btn" style="justify-content:center;margin:0;">New AI Quiz on this</button>
+                <button type="button" id="quiz-notes-btn" class="studyai-pill-btn" style="justify-content:center;padding:12px 16px;border:1.5px solid #e5e7eb;font-weight:700;color:#000000;">Generate Revision Notes</button>
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      const attachQuizEvents = () => {
+        const wrap = document.getElementById("studyai-modal-wrap");
+        if (!wrap) return;
+        wrap.querySelectorAll(".studyai-quiz-option").forEach((optEl) => {
+          optEl.addEventListener("click", () => {
+            if (answered) return;
+            answered = true;
+            const chosenIdx = parseInt(optEl.getAttribute("data-idx"), 10);
+            const item = questions[currentIdx];
+            const isCorrect = chosenIdx === item.correct;
+            if (isCorrect) {
+              score++;
+              optEl.classList.add("correct");
+              StudyAI.haptic(25);
+            } else {
+              optEl.classList.add("wrong");
+              StudyAI.haptic(45);
+              wrap.querySelector(`.studyai-quiz-option[data-idx="${item.correct}"]`)?.classList.add("correct");
+            }
+            const expBox = wrap.querySelector("#quiz-explanation-box");
+            if (expBox) {
+              expBox.style.display = "block";
+              expBox.innerHTML = `<strong>${isCorrect ? "✔ Correct!" : "✖ Explanation:"}</strong> ${escapeHtml(item.exp)}`;
+            }
+            setTimeout(() => {
+              currentIdx++;
+              answered = false;
+              if (currentIdx < questions.length) {
+                wrap.innerHTML = renderQuestion();
+                attachQuizEvents();
+              } else {
+                wrap.innerHTML = renderFinalScore();
+                wrap.querySelector("#quiz-retry-btn")?.addEventListener("click", () => StudyAI.openQuiz(mode, topicClean));
+                wrap.querySelector("#quiz-notes-btn")?.addEventListener("click", () => StudyAI.openNotes(topicClean));
+              }
+            }, 1250);
+          });
+        });
+      };
+
+      this.showModal(renderQuestion());
+      attachQuizEvents();
+    },
+
+    getSavedNotes() {
+      try {
+        const raw = localStorage.getItem(this.KEYS.SAVED_NOTES);
+        if (raw) return JSON.parse(raw) || [];
+      } catch (e) {}
+      return [];
+    },
+
+    async openNotes(topic = null) {
+      this.haptic(15);
+      const profile = this.getProfile();
+      const history = this.getChatHistory();
+      const topicClean = (topic && topic.trim())
+        ? topic.trim()
+        : (history.length
+          ? (history[history.length - 1].conceptTitle || history[history.length - 1].question)
+          : `${profile.studying || "Class 10"} Key Revision`);
+
+      this.showModal(`
+        <div class="studyai-modal-card" style="text-align:center;padding:36px 20px;">
+          <div style="width:60px;height:60px;border-radius:18px;background:#fef3c7;color:#d97706;display:flex;align-items:center;justify-content:center;margin:0 auto 16px auto;">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="animate-spin"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <h3 style="font-size:18px;font-weight:800;color:#000000;margin:0 0 6px 0;">Gemini AI Revision Notes Likh Raha Hai...</h3>
+          <p style="font-size:13px;color:#6b7280;margin:0 0 20px 0;line-height:1.5;"><strong>${escapeHtml(profile.studying || "Exam")}</strong> ke hisab se crisp notes &amp; tips tayyar ho rahe hain:<br/><strong style="color:#1e293b;">${escapeHtml(topicClean)}</strong></p>
+          <div class="studyai-progress-track" style="height:6px;max-width:240px;margin:0 auto;">
+            <div class="studyai-progress-fill" style="width:75%;background:linear-gradient(90deg, #d97706, #10b981);"></div>
+          </div>
+        </div>
+      `);
+
+      let notesData = null;
+      try {
+        const sysPrompt = `You are an expert teacher for ${profile.studying || "Class 10"} (${profile.board || "CBSE"}, goal: ${profile.goal || "topper"}).
+Generate structured revision notes on: "${topicClean}".
+Return ONLY valid raw JSON:
+{
+  "chapterTitle": "Topic Title",
+  "book": "${profile.studying} • ${profile.board}",
+  "sections": [
+    {"title": "1. Core Concept", "formula": "Formula/Syntax if any else empty", "content": "Concise explanation", "examTip": "High-yield tip"}
+  ]
+}`;
+        const aiText = await this.fetchAI([
+          { role: "system", content: sysPrompt },
+          { role: "user", content: `Create concise revision notes on ${topicClean}` }
+        ]);
+        if (aiText) {
+          const match = aiText.trim().match(/\{[\s\S]*\}/);
+          if (match) {
+            const parsed = JSON.parse(match[0]);
+            if (parsed && Array.isArray(parsed.sections)) notesData = parsed;
+          }
+        }
+      } catch (e) {
+        console.warn("Notes fetch failed:", e);
+      }
+
+      if (!notesData) {
+        this.showModal(`
+          <div class="studyai-modal-card" style="text-align:center;padding:30px 20px;">
+            <div style="font-size:38px;margin-bottom:10px;">⚠️</div>
+            <h3 style="font-size:17px;font-weight:800;margin-bottom:6px;">Notes Generate Nahi Ho Paye</h3>
+            <p style="font-size:13px;color:#6b7280;margin-bottom:18px;">Network check karke dobara try karein.</p>
+            <button type="button" class="studyai-download-action-btn" style="margin:0 auto;" onclick="StudyAI.openNotes();">Retry Notes</button>
+          </div>
+        `);
+        return;
+      }
+
+      this._lastGeneratedNote = notesData;
+      const savedNotes = this.getSavedNotes();
+
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title">
+              <span>Revision Notes</span>
+              <span class="studyai-pro-badge" style="font-size:10px;padding:2px 6px;">AI LIVE</span>
+            </div>
+            <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+          </div>
+          <div class="studyai-modal-body">
+            <div style="background:#f4f4f5;border-radius:14px;padding:12px 16px;margin-bottom:14px;border:1px solid #e4e4e7;">
+              <span style="font-size:11.5px;font-weight:700;color:#6b7280;">${escapeHtml(notesData.book || profile.studying)}</span>
+              <h3 style="font-size:17px;font-weight:800;color:#000000;margin:2px 0 0 0;">${escapeHtml(notesData.chapterTitle)}</h3>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              ${notesData.sections.map(sec => `
+                <div style="background:#ffffff;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 14px;">
+                  <div style="font-weight:700;color:#000000;margin-bottom:4px;">${escapeHtml(sec.title)}</div>
+                  ${sec.formula ? `<div style="font-family:monospace;font-weight:700;font-size:13px;background:#f8fafc;padding:6px 10px;border-radius:8px;border:1px solid #e2e8f0;display:inline-block;margin-bottom:6px;">${escapeHtml(sec.formula)}</div>` : ""}
+                  <div style="font-size:13px;color:#374151;line-height:1.5;">${escapeHtml(sec.content).replace(/\n/g, "<br/>")}</div>
+                  ${sec.examTip ? `<div style="font-size:12px;color:#b45309;background:#fef3c7;border-radius:8px;padding:6px 10px;margin-top:8px;font-weight:600;"><strong>💡 Tip:</strong> ${escapeHtml(sec.examTip)}</div>` : ""}
+                </div>
+              `).join("")}
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:16px;">
+              <button type="button" id="notes-copy-btn" class="studyai-download-action-btn" style="flex:1;justify-content:center;margin:0;">Copy</button>
+              <button type="button" id="notes-save-btn" class="studyai-pill-btn" style="padding:10px 14px;border:1.5px solid #e5e7eb;font-weight:700;color:#000000;">Save Offline</button>
+              <button type="button" id="notes-quiz-btn" class="studyai-pill-btn" style="padding:10px 14px;border:1.5px solid #e5e7eb;font-weight:700;color:#2563eb;">Quiz</button>
+            </div>
+
+            ${savedNotes.length ? `
+              <div style="margin-top:20px;padding-top:14px;border-top:1px solid #e5e7eb;">
+                <div style="font-size:13px;font-weight:800;color:#18181b;margin-bottom:8px;">Saved Notes (${savedNotes.length})</div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                  ${savedNotes.slice(0, 4).map(sn => `
+                    <div style="padding:8px 12px;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;font-size:12.5px;display:flex;justify-content:space-between;">
+                      <strong style="color:#111827;">${escapeHtml(sn.chapterTitle)}</strong>
+                      <span style="color:#6b7280;">${escapeHtml(sn.savedAt || "")}</span>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `);
+
+      const wrap = document.getElementById("studyai-modal-wrap");
+      wrap?.querySelector("#notes-copy-btn")?.addEventListener("click", () => {
+        const txt = `${notesData.chapterTitle}\n` + notesData.sections.map(s => `${s.title}\n${s.formula || ""}\n${s.content}`).join("\n\n");
+        navigator.clipboard?.writeText(txt);
+        this.toast("✔ Notes clipboard par copy ho gaye!");
+      });
+      wrap?.querySelector("#notes-save-btn")?.addEventListener("click", () => {
+        const arr = this.getSavedNotes();
+        arr.unshift({ ...notesData, id: `note_${Date.now()}`, savedAt: new Date().toLocaleDateString() });
+        localStorage.setItem(this.KEYS.SAVED_NOTES, JSON.stringify(arr.slice(0, 20)));
+        this.haptic(20);
+        this.toast("✔ Offline Library me save ho gaye!");
+      });
+      wrap?.querySelector("#notes-quiz-btn")?.addEventListener("click", () => this.openQuiz("rapid", notesData.chapterTitle));
+    },
+
+    getSyllabusItems() {
+      try {
+        const raw = localStorage.getItem(this.KEYS.SYLLABUS);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr) && arr.length) return arr;
+        }
+      } catch (e) {}
+      return [];
+    },
+
+    async openSyllabus(forceRefresh = false) {
+      this.haptic(15);
+      const profile = this.getProfile();
+      let chapters = this.getSyllabusItems();
+
+      if (forceRefresh || !chapters.length) {
+        this.showModal(`
+          <div class="studyai-modal-card" style="text-align:center;padding:36px 20px;">
+            <div style="font-size:38px;margin-bottom:10px;">📋</div>
+            <h3 style="font-size:17px;font-weight:800;">Generating Real Syllabus...</h3>
+            <p style="font-size:13px;color:#6b7280;margin:6px 0 0 0;">${escapeHtml(profile.studying || "Class")} (${escapeHtml(profile.board || "Curriculum")}) ke real chapters load ho rahe hain...</p>
+          </div>
+        `);
+        await this.bootstrapCurriculumWithAI();
+        chapters = this.getSyllabusItems();
+      }
+
+      const completedCount = chapters.filter(c => c.done).length;
+      const percent = chapters.length ? Math.round((completedCount / chapters.length) * 100) : 0;
+
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title">
+              <span>${escapeHtml(profile.studying || "My")} Syllabus</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button type="button" class="studyai-pill-btn" style="padding:5px 10px;font-size:11px;" onclick="StudyAI.openSyllabus(true);">↻ AI Sync</button>
+              <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+            </div>
+          </div>
+          <div class="studyai-modal-body">
+            <div style="background:#f4f4f5;border-radius:14px;padding:12px 16px;margin-bottom:14px;border:1px solid #e4e4e7;">
+              <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#374151;">
+                <span>Overall Progress</span>
+                <span>${completedCount} / ${chapters.length} (${percent}%)</span>
+              </div>
+              <div class="studyai-progress-track">
+                <div class="studyai-progress-fill" style="width:${percent}%;"></div>
+              </div>
+            </div>
+
+            <div class="syllabus-items-list">
+              ${chapters.length ? chapters.map((ch, i) => `
+                <div class="studyai-syllabus-item ${ch.done ? "completed" : ""}" data-idx="${i}">
+                  <div style="display:flex;align-items:center;gap:12px;flex:1;">
+                    <div class="studyai-checkbox" style="${ch.done ? "background:#10b981;border-color:#10b981;" : ""}">
+                      ${ch.done ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
+                    </div>
+                    <div>
+                      <div style="font-size:13.5px;font-weight:700;color:#111827;text-decoration:${ch.done ? "line-through" : "none"};opacity:${ch.done ? "0.75" : "1"};">
+                        ${escapeHtml(ch.name)}
+                      </div>
+                      <div style="font-size:11px;font-weight:600;color:#6b7280;margin-top:1px;">${escapeHtml(ch.subject || profile.studying)}</div>
+                    </div>
+                  </div>
+                </div>
+              `).join("") : `<div style="text-align:center;color:#6b7280;font-size:13px;padding:20px;">Tap "↻ AI Sync" above to load chapters for ${escapeHtml(profile.studying)}.</div>`}
+            </div>
+          </div>
+        </div>
+      `);
+
+      const wrap = document.getElementById("studyai-modal-wrap");
+      wrap?.querySelectorAll(".studyai-syllabus-item").forEach(el => {
+        el.addEventListener("click", () => {
+          const i = parseInt(el.getAttribute("data-idx"), 10);
+          if (!isNaN(i) && chapters[i]) {
+            chapters[i].done = !chapters[i].done;
+            localStorage.setItem(this.KEYS.SYLLABUS, JSON.stringify(chapters));
+            this.openSyllabus(false);
+          }
+        });
+      });
+    },
+
+    openProgress() {
+      this.haptic(15);
+      const profile = this.getProfile();
+      const stats = this.getStats();
+      const chapters = this.getSyllabusItems();
+      const books = this.getBooks();
+      const quizHist = stats.quizHistory || [];
+
+      const totalQ = quizHist.reduce((acc, q) => acc + (q.total || 0), 0);
+      const totalC = quizHist.reduce((acc, q) => acc + (q.score || 0), 0);
+      const avgAcc = totalQ > 0 ? Math.round((totalC / totalQ) * 100) : 0;
+
+      // Real Subject Mastery derived from syllabus completion
+      const bySubject = {};
+      chapters.forEach(ch => {
+        const sub = ch.subject || "Core";
+        if (!bySubject[sub]) bySubject[sub] = { done: 0, total: 0 };
+        bySubject[sub].total++;
+        if (ch.done) bySubject[sub].done++;
+      });
+      const subjects = Object.entries(bySubject);
+
+      const badges = [];
+      if (stats.questionsAsked >= 1) badges.push({ icon: "💡", name: "Curious Mind" });
+      if (quizHist.some(q => q.score >= 4)) badges.push({ icon: "🏆", name: "Quiz Champion" });
+      if (chapters.filter(c => c.done).length >= 3) badges.push({ icon: "⚡", name: "Chapter Finisher" });
+      if (books.length >= 2) badges.push({ icon: "📚", name: "Book Collector" });
+
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title">
+              <span>Real Learning Progress</span>
+            </div>
+            <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+          </div>
+          <div class="studyai-modal-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+              <div style="background:#f4f4f5;border-radius:16px;padding:14px;border:1px solid #e4e4e7;">
+                <div style="font-size:22px;">🔥</div>
+                <div style="font-size:18px;font-weight:900;color:#000000;margin-top:2px;">${stats.streakDays || 1} Day${stats.streakDays > 1 ? "s" : ""}</div>
+                <div style="font-size:11.5px;color:#6b7280;font-weight:600;">Active Study Streak</div>
+              </div>
+              <div style="background:#f4f4f5;border-radius:16px;padding:14px;border:1px solid #e4e4e7;">
+                <div style="font-size:22px;">🎯</div>
+                <div style="font-size:18px;font-weight:900;color:#000000;margin-top:2px;">${stats.questionsAsked || 0} Asked</div>
+                <div style="font-size:11.5px;color:#6b7280;font-weight:600;">Quiz Acc: ${totalQ > 0 ? avgAcc + "%" : "No quizzes yet"}</div>
+              </div>
+            </div>
+
+            <div style="font-size:14.5px;font-weight:800;color:#000000;margin-bottom:10px;">Syllabus Mastery (${escapeHtml(profile.studying)})</div>
+            ${subjects.length ? `
+              <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+                ${subjects.map(([sub, val]) => {
+                  const pct = Math.round((val.done / val.total) * 100);
+                  return `
+                    <div style="background:#ffffff;border:1.5px solid #e5e7eb;border-radius:14px;padding:12px 14px;">
+                      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#111827;">
+                        <span>${escapeHtml(sub)}</span>
+                        <span style="color:#059669;">${val.done}/${val.total} (${pct}%)</span>
+                      </div>
+                      <div class="studyai-progress-track">
+                        <div class="studyai-progress-fill" style="width:${pct}%;background:#10b981;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            ` : `
+              <div style="padding:14px;background:#f8fafc;border-radius:14px;font-size:12.5px;color:#6b7280;margin-bottom:16px;">
+                Open Syllabus &amp; check chapters you finish to track real subject progress!
+              </div>
+            `}
+
+            <div style="font-size:14.5px;font-weight:800;color:#000000;margin-bottom:8px;">Earned Badges</div>
+            ${badges.length ? `
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                ${badges.map(b => `
+                  <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fef3c7;border:1px solid #fde68a;border-radius:9999px;font-size:12px;font-weight:700;color:#92400e;">
+                    <span>${b.icon}</span>
+                    <span>${escapeHtml(b.name)}</span>
+                  </div>
+                `).join("")}
+              </div>
+            ` : `<div style="font-size:12.5px;color:#6b7280;">Ask AI questions or score 4/5 in quizzes to unlock real badges!</div>`}
+          </div>
+        </div>
+      `);
+    },
+
+    openNotifications() {
+      const profile = this.getProfile();
+      const stats = this.getStats();
+      const books = this.getBooks();
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title"><span>Study Updates &amp; Focus</span></div>
+            <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+          </div>
+          <div class="studyai-modal-body" style="display:flex;flex-direction:column;gap:10px;">
+            <div style="padding:12px 14px;background:#f4f4f5;border-radius:14px;font-size:13px;">
+              <strong>🔥 Streak Active:</strong> ${stats.streakDays || 1} day study streak! Goal: <strong>${escapeHtml(profile.goal)}</strong>
+            </div>
+            <div style="padding:12px 14px;background:#f4f4f5;border-radius:14px;font-size:13px;">
+              <strong>📚 Local Books:</strong> ${books.length} books AI-indexed for <strong>${escapeHtml(profile.studying)}</strong>.
+            </div>
+            <div style="padding:12px 14px;background:#f4f4f5;border-radius:14px;font-size:13px;">
+              <strong>💡 Daily Challenge:</strong> Ek Quick 5-Question Quiz solve karein apne mastery score badhane ke liye!
+            </div>
+          </div>
+        </div>
+      `);
+    },
+
+    openProfileModal() {
+      const p = this.getProfile();
+      this.showModal(`
+        <div class="studyai-modal-card">
+          <div class="studyai-modal-header">
+            <div class="studyai-modal-title"><span>My Study Profile</span></div>
+            <button type="button" class="studyai-modal-close" onclick="StudyAI.closeModal();">✕</button>
+          </div>
+          <div class="studyai-modal-body" style="display:flex;flex-direction:column;gap:12px;">
+            <div style="padding:14px;background:#18181b;color:#ffffff;border-radius:16px;">
+              <div style="font-size:17px;font-weight:800;">${escapeHtml(p.name || "Student")} ${p.age ? `(${escapeHtml(p.age)} yrs)` : ""}</div>
+              <div style="font-size:12.5px;color:#d4d4d8;margin-top:4px;">Studying: <strong>${escapeHtml(p.studying)}</strong></div>
+              <div style="font-size:12.5px;color:#d4d4d8;margin-top:2px;">Career Goal: <strong>${escapeHtml(p.goal)}</strong></div>
+              <div style="font-size:12px;color:#a1a1aa;margin-top:2px;">Board: ${escapeHtml(p.board)}</div>
+            </div>
+            <button type="button" class="studyai-download-action-btn" style="margin:0;justify-content:center;" onclick="StudyAI.closeModal(); StudyAI._onboardDraft=null; window.location.hash='#/study/onboarding'; render();">
+              ✎ Edit Class, Age &amp; Career Goal
+            </button>
+            <button type="button" class="studyai-pill-btn" style="justify-content:center;padding:12px;border:1.5px solid #e5e7eb;font-weight:700;" onclick="StudyAI.closeModal(); localStorage.setItem('lumi_app_mode','studio'); window.location.hash='#/chat'; render(); StudyAI.toast('⚡ Switched to Lumi Studio');">
+              ⚡ Switch to Lumi Studio
+            </button>
+            <a href="#/settings" onclick="StudyAI.closeModal();" style="text-align:center;font-size:13px;font-weight:700;color:#2563eb;text-decoration:none;padding:6px;">
+              Open Full App Settings →
+            </a>
+          </div>
+        </div>
+      `);
     }
   };
   window.StudyAI = StudyAI;
@@ -9414,7 +10902,12 @@
     } else if (path.startsWith("/study")) {
       document.body.style.backgroundColor = "#ffffff";
       document.documentElement.style.backgroundColor = "#ffffff";
-      if (path === "/study" || path === "/study/") {
+      try {
+        window.AndroidDevice?.setStatusBarColor?.("#ffffff", true);
+      } catch (e) {}
+      if (path === "/study/onboarding") {
+        root.innerHTML = StudyAI.renderOnboarding(true);
+      } else if (path === "/study" || path === "/study/") {
         root.innerHTML = StudyAI.renderDashboard();
       } else if (path.startsWith("/study/chat")) {
         const threadId = path.startsWith("/study/chat/") ? path.slice(12) : null;
@@ -9433,16 +10926,33 @@
       } else {
         root.innerHTML = StudyAI.renderDashboard();
       }
+      if (window.__lastStudyRoute !== path) {
+        window.__lastStudyRoute = path;
+        const vp = root.querySelector(".studyai-viewport");
+        if (vp) vp.classList.add("studyai-screen-enter");
+      }
     } else if (path === "/auth") {
+      try {
+        window.AndroidDevice?.setStatusBarColor?.("#000000", false);
+      } catch (e) {}
       document.body.style.backgroundColor = "";
       root.innerHTML = renderAuthPage();
     } else if (path === "/providers") {
+      try {
+        window.AndroidDevice?.setStatusBarColor?.("#000000", false);
+      } catch (e) {}
       document.body.style.backgroundColor = "";
       root.innerHTML = renderProvidersPage();
     } else if (path.startsWith("/settings")) {
+      try {
+        window.AndroidDevice?.setStatusBarColor?.("#000000", false);
+      } catch (e) {}
       document.body.style.backgroundColor = "#000000";
       root.innerHTML = renderSettingsPage(path);
     } else if (path.startsWith("/chat")) {
+      try {
+        window.AndroidDevice?.setStatusBarColor?.("#000000", false);
+      } catch (e) {}
       if (!isUserLoggedIn() && sessionStorage.getItem("lumi_guest_bypass") !== "true") {
         window.location.hash = "#/auth";
         root.innerHTML = renderAuthPage();
@@ -11813,48 +13323,42 @@
         const input = document.querySelector("#studyai-search-input");
         const q = (input ? input.value : "").trim();
         if (q) {
-          StudyAI.ask(q);
           window.location.hash = "#/study/chat";
-          render();
+          StudyAI.ask(q);
         }
       });
     }
 
-    // 4. Study Chat Composer Form
+    // 4. Study Chat Composer Form + Photo Homework Solver
     const studyChatForm = document.querySelector("#studyai-chat-form");
     if (studyChatForm) {
       studyChatForm.addEventListener("submit", (e) => {
         e.preventDefault();
         const input = document.querySelector("#studyai-chat-input");
         const q = (input ? input.value : "").trim();
-        if (q) {
-          input.value = "";
-          StudyAI.ask(q);
-          render();
-          setTimeout(() => {
-            window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-          }, 50);
+        const img = StudyAI._pendingImage;
+        if (q || img) {
+          if (input) input.value = "";
+          StudyAI._pendingImage = null;
+          StudyAI.ask(q, img);
         }
       });
     }
 
-    // 5. Reader Previous / Next Page Controls
-    const prevPageBtn = document.querySelector("#reader-prev-page");
-    if (prevPageBtn) {
-      prevPageBtn.addEventListener("click", () => {
-        if (StudyAI.readerState.page > 1) {
-          StudyAI.readerState.page--;
+    const studyPhotoBtn = document.querySelector("#studyai-photo-btn");
+    const studyPhotoInput = document.querySelector("#studyai-photo-input");
+    if (studyPhotoBtn && studyPhotoInput) {
+      studyPhotoBtn.addEventListener("click", () => studyPhotoInput.click());
+      studyPhotoInput.addEventListener("change", (ev) => {
+        const file = ev.target.files && ev.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          StudyAI._pendingImage = reader.result;
           render();
-        }
-      });
-    }
-    const nextPageBtn = document.querySelector("#reader-next-page");
-    if (nextPageBtn) {
-      nextPageBtn.addEventListener("click", () => {
-        if (StudyAI.readerState.page < StudyAI.readerState.totalPages) {
-          StudyAI.readerState.page++;
-          render();
-        }
+          StudyAI.toast("📷 Photo attached! Sawal likho ya Send dabao.");
+        };
+        reader.readAsDataURL(file);
       });
     }
   }
@@ -11992,15 +13496,15 @@
       }
     }
 
-    // Initial Screen: Open directly on Auth/Login Screen if not signed in!
-    if (!isUserLoggedIn() && sessionStorage.getItem("lumi_guest_bypass") !== "true") {
+    // Initial Screen: If study mode or direct study hash, open study mode directly!
+    if (localStorage.getItem("lumi_app_mode") === "study" || (window.location.hash && window.location.hash.startsWith("#/study"))) {
+      if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
+        window.location.hash = "#/study";
+      }
+    } else if (!isUserLoggedIn() && sessionStorage.getItem("lumi_guest_bypass") !== "true") {
       window.location.hash = "#/auth";
     } else if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
-      if (localStorage.getItem("lumi_app_mode") === "study") {
-        window.location.hash = "#/study";
-      } else {
-        window.location.hash = "#/chat";
-      }
+      window.location.hash = "#/chat";
     }
 
     // Render immediately in 0ms!
