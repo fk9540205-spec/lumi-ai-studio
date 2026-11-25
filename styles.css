@@ -4512,3 +4512,720 @@ html.dark .genui-poll-bg-fill {
   background: #ec4899;
   border: 2px solid #000;
 }
+
+/* ==========================================================================
+   STUDYAI PRO — COMPREHENSIVE STUDY COMPANION STYLES
+   Exact Architecture & UI from Reference Design
+   ========================================================================== */
+
+/* ==========================================================================
+   STUDYAI PRO — 100% CLEAN, PROFESSIONAL SUITE MATCHING REFERENCE SHEET
+   Ultra-Crisp Pure White Theme with Bold Charcoal/Black Accents
+   ========================================================================== */
+
+.studyai-viewport {
+  min-height: 100vh;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding-bottom: 76px; /* Space for bottom nav */
+  box-sizing: border-box;
+}
+
+html.dark .studyai-viewport {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+/* Header */
+.studyai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 50;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.studyai-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 20px;
+  color: #000000;
+  letter-spacing: -0.02em;
+}
+
+.studyai-pro-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: #000000;
+  color: #ffffff;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.studyai-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.studyai-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid #e5e7eb;
+  overflow: hidden;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+/* Screen 1: Top Greetings */
+.studyai-greeting-wrap {
+  padding: 16px 18px 4px 18px;
+}
+
+.studyai-greeting {
+  font-size: 26px;
+  font-weight: 800;
+  color: #000000;
+  letter-spacing: -0.02em;
+}
+
+.studyai-subgreeting {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+/* Hero Welcome Card (Deep Black Card with Anime Mascot) */
+.studyai-hero-card {
+  margin: 14px 16px;
+  border-radius: 24px;
+  background: #18181b;
+  padding: 20px 22px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.studyai-hero-content {
+  flex: 1;
+  max-width: 65%;
+  z-index: 2;
+}
+
+.studyai-tagline {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.studyai-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.studyai-pill-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f9fafb;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.studyai-hero-illustration {
+  width: 105px;
+  height: 105px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+/* Universal Study Search (Clean White Pill) */
+.studyai-search-box {
+  margin: 4px 16px 16px 16px;
+  height: 48px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.studyai-search-box:focus-within {
+  border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+.studyai-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #111827;
+  font-size: 14.5px;
+  font-weight: 500;
+}
+
+.studyai-search-input::placeholder {
+  color: #9ca3af;
+}
+
+/* 8 Grid Action Cards */
+.studyai-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 0 16px 18px 16px;
+}
+
+.studyai-grid-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 6px;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 18px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.studyai-grid-btn:active {
+  transform: scale(0.96);
+  background: #f9fafb;
+}
+
+.studyai-grid-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+}
+
+.studyai-grid-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+}
+
+/* Local Books Section */
+.studyai-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 18px 10px 18px;
+}
+
+.studyai-section-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #000000 !important;
+  letter-spacing: -0.01em;
+}
+
+.studyai-section-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.studyai-books-scroll {
+  display: flex;
+  gap: 12px;
+  padding: 0 16px 20px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.studyai-books-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.studyai-book-card {
+  min-width: 210px;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.studyai-book-card:active {
+  transform: scale(0.98);
+}
+
+.studyai-book-thumb {
+  width: 46px;
+  height: 60px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 11px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(249, 115, 22, 0.25);
+  flex-shrink: 0;
+}
+
+.studyai-book-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.studyai-book-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #000000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.studyai-book-class {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.studyai-book-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #d1fae5;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  margin-top: 4px;
+}
+
+/* 5-Tab Bottom Navigation Bar */
+.studyai-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 62px;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 60;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.03);
+}
+
+.studyai-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.studyai-nav-item.active {
+  color: #000000;
+  font-weight: 700;
+}
+
+.studyai-nav-fab {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #000000;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  transition: transform 0.15s ease;
+}
+
+.studyai-nav-fab:active {
+  transform: scale(0.92);
+}
+
+/* Screen 2: Study Chat Components */
+.studyai-concept-card {
+  background: #f4f4f5;
+  border: 1.5px solid #e4e4e7;
+  border-radius: 20px;
+  padding: 18px;
+  margin: 12px 0;
+  color: #111827;
+  position: relative;
+  overflow: hidden;
+}
+
+.studyai-concept-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #000000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studyai-formula-box {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  font-size: 18px;
+  font-weight: 800;
+  color: #000000;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+/* Book Reference Box (Screen 2) */
+.studyai-book-ref-box {
+  background: #ffffff;
+  border: 1.5px solid #e4e4e7;
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.studyai-book-ref-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.studyai-book-ref-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #000000;
+}
+
+.studyai-book-ref-chapter {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.studyai-book-ref-pages {
+  font-size: 12px;
+  color: #ea580c;
+  font-weight: 700;
+}
+
+.studyai-open-book-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 16px;
+  border-radius: 9999px;
+  background: #000000;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.studyai-open-book-btn:active {
+  transform: scale(0.95);
+}
+
+.studyai-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.studyai-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 11px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  color: #111827;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.15s ease;
+}
+
+.studyai-pill-btn:hover,
+.studyai-pill-btn:active {
+  background: #f9fafb;
+  border-color: #cbd5e1;
+  color: #000000;
+}
+
+/* Screen 3: Book Reader View */
+.studyai-reader-page {
+  background: #ffffff;
+  border: 1.5px solid #e4e4e7;
+  border-radius: 20px;
+  margin: 14px 16px;
+  padding: 22px;
+  line-height: 1.6;
+  position: relative;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.studyai-page-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: #000000;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  float: right;
+}
+
+.studyai-reader-callout {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 14px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #92400e;
+}
+
+.studyai-page-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px 16px;
+}
+
+.studyai-pager-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  color: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.studyai-takeaways-card {
+  margin: 0 16px 20px 16px;
+  background: #ffffff;
+  border: 1.5px solid #e4e4e7;
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.studyai-takeaway-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: #111827;
+  font-weight: 500;
+}
+
+/* Screen 4: Book Downloader */
+.studyai-downloader-tabs {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  padding: 4px;
+  margin: 12px 16px 16px 16px;
+  gap: 4px;
+}
+
+.studyai-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.studyai-tab-btn.active {
+  background: #000000;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.studyai-download-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 16px 20px 16px;
+}
+
+.studyai-source-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.studyai-source-item.selected {
+  border-color: #000000;
+  background: #ffffff;
+}
+
+.studyai-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  flex-shrink: 0;
+  background: #ffffff;
+  transition: all 0.15s ease;
+}
+
+.studyai-source-item.selected .studyai-checkbox {
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+
+.studyai-download-sticky-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  z-index: 60;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.studyai-download-action-btn {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  background: #000000;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.studyai-download-action-btn:active {
+  transform: scale(0.98);
+}
