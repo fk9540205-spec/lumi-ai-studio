@@ -4653,8 +4653,7 @@ Include 4 chips, 3 essential core books (with 4-5 real chapters each), and 10 re
       history.push(msgItem);
       this.saveChatHistory(history);
       this.haptic(15);
-      render();
-      this.scrollChatToBottom(true);
+      this.refreshChatInPlace(true);
 
       try {
         const recentTurns = history.slice(-4, -1).map(h => ([
@@ -4750,8 +4749,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
 
       this.saveChatHistory(history);
       this.haptic(20);
-      render();
-      this.scrollChatToBottom(true);
+      this.refreshChatInPlace(true);
     },
 
     handleSuggestedChip(msgIdx, chipIdx) {
@@ -5020,6 +5018,160 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
     },
 
     // -------------------- SCREEN 2: AI CHAT MENTOR --------------------
+    refreshChatInPlace(animateLastOnly = true) {
+      const listEl = document.getElementById("studyai-messages-list");
+      const sc = document.getElementById("studyai-chat-scroll");
+      if (!listEl || !sc) {
+        render();
+        setTimeout(() => {
+          const s = document.getElementById("studyai-chat-scroll");
+          if (s) s.scrollTop = s.scrollHeight;
+        }, 30);
+        return;
+      }
+      const prevTop = sc.scrollTop;
+      const history = this.getChatHistory();
+      const profile = this.getProfile();
+      const chips = this.getTopicChips();
+      listEl.innerHTML = this.renderChatMessagesHtml(history, profile, chips, animateLastOnly);
+      sc.scrollTop = prevTop;
+      requestAnimationFrame(() => {
+        sc.scrollTo({ top: sc.scrollHeight, behavior: "smooth" });
+      });
+    },
+
+    renderChatMessagesHtml(history, profile, chips, animateLastOnly = false) {
+      if (!history || history.length === 0) {
+        return `
+          <div style="margin-top:24px;text-align:center;padding:24px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:22px;">
+            <div style="width:54px;height:54px;border-radius:16px;background:#18181b;color:#ffffff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+            </div>
+            <h2 style="font-size:18px;font-weight:800;color:#000000;margin:0 0 6px 0;">Namaste ${escapeHtml(profile.name || "Dost")}! 👋</h2>
+            <p style="font-size:13.5px;color:#475569;margin:0 0 18px 0;line-height:1.5;">
+              Main tumhara personal AI study mentor hoon (<strong>${escapeHtml(profile.studying)}</strong> • Goal: <strong>${escapeHtml(profile.goal)}</strong>). Koi bhi doubt, homework photo, ya topic pucho!
+            </p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+              ${chips.map((c, idx) => `
+                <button type="button" class="studyai-pill-btn" style="font-weight:700;" onclick="StudyAI.askTopicChip(${idx});">${escapeHtml(c.label)}</button>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+      return history.map((item, idx) => {
+        const animCls = (animateLastOnly && idx === history.length - 1) ? "studyai-msg-in" : "";
+        return `
+          <!-- User Query Bubble -->
+          <div class="flex justify-end items-end gap-2 ${animCls}">
+            <div class="studyai-user-bubble">${item.image ? `<img src="${item.image}" style="max-width:100%;max-height:180px;border-radius:10px;margin-bottom:8px;display:block;" />` : item.imageNote ? `<div style="font-size:11.5px;color:#a1a1aa;margin-bottom:4px;">📷 ${escapeHtml(item.imageNote)}</div>` : ""}${escapeHtml(item.question)}</div>
+            <div class="size-7 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center shrink-0 overflow-hidden">
+              <svg width="20" height="20" viewBox="0 0 36 36" fill="none">
+                <circle cx="18" cy="18" r="18" fill="#e2e8f0"/>
+                <path d="M10 32C10 26 13 23 18 23C23 23 26 26 26 32" fill="#334155"/>
+                <circle cx="18" cy="14" r="7" fill="#f87171"/>
+              </svg>
+            </div>
+          </div>
+
+          ${item.loading ? `
+            <!-- Live AI Thinking Skeleton -->
+            <div class="flex gap-3 items-start animate-pulse ${animCls}">
+              <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                <svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-[14px] text-gray-800 leading-relaxed mb-3 font-semibold">${escapeHtml(item.intro)}</p>
+                <div class="studyai-concept-card" style="background:#f8fafc;border:1.5px dashed #cbd5e1;padding:16px;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                    <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
+                    <span style="font-size:12.5px;font-weight:700;color:#2563eb;">Gemini AI Analyzing (${escapeHtml(profile.studying)})</span>
+                  </div>
+                  <div style="height:14px;width:75%;background:#e2e8f0;border-radius:6px;margin-bottom:8px;"></div>
+                  <div style="height:12px;width:90%;background:#e2e8f0;border-radius:6px;margin-bottom:8px;"></div>
+                  <div style="height:12px;width:55%;background:#e2e8f0;border-radius:6px;"></div>
+                </div>
+              </div>
+            </div>
+          ` : `
+            <!-- AI Mentor Response -->
+            <div class="flex gap-3 items-start ${animCls}">
+              <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                ${item.intro ? `<p class="text-[14px] text-gray-900 leading-relaxed mb-3 font-medium">${escapeHtml(item.intro).replace(/\n/g, "<br/>")}</p>` : ""}
+
+                ${(item.conceptTitle || item.conceptSummary || item.formula || (item.rules && item.rules.length) || item.example) ? `
+                  <div class="studyai-concept-card">
+                    ${item.conceptTitle ? `
+                      <div class="studyai-concept-title">
+                        <span>${escapeHtml(item.conceptTitle)}</span>
+                      </div>
+                    ` : ""}
+                    ${item.conceptSummary ? `
+                      <p class="text-[13.5px] text-gray-700 ${item.conceptTitle ? "mt-2" : ""} leading-relaxed">
+                        ${escapeHtml(item.conceptSummary).replace(/\n/g, "<br/>")}
+                      </p>
+                    ` : ""}
+
+                    ${item.formula ? `
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+                        <span style="font-size:12.5px;font-weight:700;color:#71717a;">${escapeHtml(item.formulaLabel || "Key Formula:")}</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+                      </div>
+                      <div class="studyai-formula-box">${escapeHtml(item.formula)}</div>
+                    ` : ""}
+
+                    ${item.rules && item.rules.length ? `
+                      <ul class="text-[12.5px] text-gray-700 list-disc pl-4 space-y-1 mt-2">
+                        ${item.rules.map(r => `<li>${escapeHtml(r)}</li>`).join("")}
+                      </ul>
+                    ` : ""}
+
+                    ${item.example ? `
+                      <div style="font-size:12.5px;font-weight:700;color:#71717a;margin-top:12px;">Example:</div>
+                      <div class="text-[13.5px] text-black font-mono font-bold mt-1">${escapeHtml(item.example)}</div>
+                      ${item.exampleNote ? `<div class="text-[12.5px] text-gray-600 mt-1">${escapeHtml(item.exampleNote)}</div>` : ""}
+                    ` : ""}
+                  </div>
+                ` : ""}
+
+                <!-- Optional Textbook Reference Box (ONLY when genuinely applicable) -->
+                ${item.bookRef && item.bookRef.bookTitle ? `
+                  <div class="studyai-book-ref-box">
+                    <div class="studyai-book-ref-info">
+                      <div class="studyai-book-ref-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/></svg>
+                        <span>${escapeHtml(item.bookRef.bookTitle)}</span>
+                      </div>
+                      <div class="studyai-book-ref-chapter">${escapeHtml(item.bookRef.chapterTitle)}</div>
+                      ${item.bookRef.pages ? `<div class="studyai-book-ref-pages">${escapeHtml(item.bookRef.pages)}</div>` : ""}
+                    </div>
+                    <button type="button" class="studyai-open-book-btn" onclick="StudyAI.openBookFromRef(${idx});">
+                      <span>Open Book</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </button>
+                  </div>
+                ` : ""}
+
+                <!-- AI-Decided Contextual Follow-Up Chips -->
+                ${item.suggestedChips && item.suggestedChips.length ? `
+                  <div class="studyai-pills-row">
+                    ${item.suggestedChips.map((chip, cIdx) => `
+                      <button type="button" class="studyai-pill-btn" onclick="StudyAI.handleSuggestedChip(${idx}, ${cIdx});">
+                        <span>${escapeHtml(chip.label)}</span>
+                      </button>
+                    `).join("")}
+                  </div>
+                ` : ""}
+              </div>
+            </div>
+          `}
+        `;
+      }).join("");
+    },
+
     renderChat() {
       const profile = this.getProfile();
       if (!profile.setupDone) {
@@ -5061,129 +5213,7 @@ CRITICAL GUIDELINES FOR bookRef, GREETINGS, AND suggestedChips:
 
           <div id="studyai-chat-scroll" class="studyai-chat-scroll">
             <div id="studyai-messages-list" class="px-4 py-3 flex flex-col gap-5">
-            ${history.length === 0 ? `
-              <div style="margin-top:24px;text-align:center;padding:24px 16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:22px;">
-                <div style="width:54px;height:54px;border-radius:16px;background:#18181b;color:#ffffff;display:flex;align-items:center;justify-content:center;margin:0 auto 14px auto;">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
-                </div>
-                <h2 style="font-size:18px;font-weight:800;color:#000000;margin:0 0 6px 0;">Namaste ${escapeHtml(profile.name || "Dost")}! 👋</h2>
-                <p style="font-size:13.5px;color:#475569;margin:0 0 18px 0;line-height:1.5;">
-                  Main tumhara personal AI study mentor hoon (<strong>${escapeHtml(profile.studying)}</strong> • Goal: <strong>${escapeHtml(profile.goal)}</strong>). Koi bhi doubt, homework photo, ya topic pucho!
-                </p>
-                <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-                  ${chips.map((c, idx) => `
-                    <button type="button" class="studyai-pill-btn" style="font-weight:700;" onclick="StudyAI.askTopicChip(${idx});">${escapeHtml(c.label)}</button>
-                  `).join("")}
-                </div>
-              </div>
-            ` : history.map((item, idx) => `
-              <!-- User Query Bubble -->
-              <div class="flex justify-end items-end gap-2 studyai-msg-in">
-                <div class="studyai-user-bubble">${item.image ? `<img src="${item.image}" style="max-width:100%;max-height:180px;border-radius:10px;margin-bottom:8px;display:block;" />` : item.imageNote ? `<div style="font-size:11.5px;color:#a1a1aa;margin-bottom:4px;">📷 ${escapeHtml(item.imageNote)}</div>` : ""}${escapeHtml(item.question)}</div>
-                <div class="size-7 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center shrink-0 overflow-hidden">
-                  <svg width="20" height="20" viewBox="0 0 36 36" fill="none">
-                    <circle cx="18" cy="18" r="18" fill="#e2e8f0"/>
-                    <path d="M10 32C10 26 13 23 18 23C23 23 26 26 26 32" fill="#334155"/>
-                    <circle cx="18" cy="14" r="7" fill="#f87171"/>
-                  </svg>
-                </div>
-              </div>
-
-              ${item.loading ? `
-                <!-- Live AI Thinking Skeleton -->
-                <div class="flex gap-3 items-start animate-pulse studyai-msg-in">
-                  <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                    <svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-[14px] text-gray-800 leading-relaxed mb-3 font-semibold">${escapeHtml(item.intro)}</p>
-                    <div class="studyai-concept-card" style="background:#f8fafc;border:1.5px dashed #cbd5e1;padding:16px;">
-                      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-                        <span class="size-2 rounded-full bg-blue-600 animate-ping"></span>
-                        <span style="font-size:12.5px;font-weight:700;color:#2563eb;">Gemini AI Analyzing (${escapeHtml(profile.studying)})</span>
-                      </div>
-                      <div style="height:14px;width:75%;background:#e2e8f0;border-radius:6px;margin-bottom:8px;"></div>
-                      <div style="height:12px;width:90%;background:#e2e8f0;border-radius:6px;margin-bottom:8px;"></div>
-                      <div style="height:12px;width:55%;background:#e2e8f0;border-radius:6px;"></div>
-                    </div>
-                  </div>
-                </div>
-              ` : `
-                <!-- AI Mentor Response -->
-                <div class="flex gap-3 items-start studyai-msg-in">
-                  <div class="size-8 rounded-full bg-black text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    ${item.intro ? `<p class="text-[14px] text-gray-900 leading-relaxed mb-3 font-medium">${escapeHtml(item.intro).replace(/\n/g, "<br/>")}</p>` : ""}
-
-                    ${(item.conceptTitle || item.conceptSummary || item.formula || (item.rules && item.rules.length) || item.example) ? `
-                      <div class="studyai-concept-card">
-                        ${item.conceptTitle ? `
-                          <div class="studyai-concept-title">
-                            <span>${escapeHtml(item.conceptTitle)}</span>
-                          </div>
-                        ` : ""}
-                        ${item.conceptSummary ? `
-                          <p class="text-[13.5px] text-gray-700 ${item.conceptTitle ? "mt-2" : ""} leading-relaxed">
-                            ${escapeHtml(item.conceptSummary).replace(/\n/g, "<br/>")}
-                          </p>
-                        ` : ""}
-
-                        ${item.formula ? `
-                          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
-                            <span style="font-size:12.5px;font-weight:700;color:#71717a;">${escapeHtml(item.formulaLabel || "Key Formula:")}</span>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
-                          </div>
-                          <div class="studyai-formula-box">${escapeHtml(item.formula)}</div>
-                        ` : ""}
-
-                        ${item.rules && item.rules.length ? `
-                          <ul class="text-[12.5px] text-gray-700 list-disc pl-4 space-y-1 mt-2">
-                            ${item.rules.map(r => `<li>${escapeHtml(r)}</li>`).join("")}
-                          </ul>
-                        ` : ""}
-
-                        ${item.example ? `
-                          <div style="font-size:12.5px;font-weight:700;color:#71717a;margin-top:12px;">Example:</div>
-                          <div class="text-[13.5px] text-black font-mono font-bold mt-1">${escapeHtml(item.example)}</div>
-                          ${item.exampleNote ? `<div class="text-[12.5px] text-gray-600 mt-1">${escapeHtml(item.exampleNote)}</div>` : ""}
-                        ` : ""}
-                      </div>
-                    ` : ""}
-
-                    <!-- Optional Textbook Reference Box (ONLY when genuinely applicable) -->
-                    ${item.bookRef && item.bookRef.bookTitle ? `
-                      <div class="studyai-book-ref-box">
-                        <div class="studyai-book-ref-info">
-                          <div class="studyai-book-ref-title">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/></svg>
-                            <span>${escapeHtml(item.bookRef.bookTitle)}</span>
-                          </div>
-                          <div class="studyai-book-ref-chapter">${escapeHtml(item.bookRef.chapterTitle)}</div>
-                          ${item.bookRef.pages ? `<div class="studyai-book-ref-pages">${escapeHtml(item.bookRef.pages)}</div>` : ""}
-                        </div>
-                        <button type="button" class="studyai-open-book-btn" onclick="StudyAI.openBookFromRef(${idx});">
-                          <span>Open Book</span>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        </button>
-                      </div>
-                    ` : ""}
-
-                    <!-- AI-Decided Contextual Follow-Up Chips -->
-                    ${item.suggestedChips && item.suggestedChips.length ? `
-                      <div class="studyai-pills-row">
-                        ${item.suggestedChips.map((chip, cIdx) => `
-                          <button type="button" class="studyai-pill-btn" onclick="StudyAI.handleSuggestedChip(${idx}, ${cIdx});">
-                            <span>${escapeHtml(chip.label)}</span>
-                          </button>
-                        `).join("")}
-                      </div>
-                    ` : ""}
-                  </div>
-                </div>
-              `}
-            `).join("")}
+              ${this.renderChatMessagesHtml(history, profile, chips, false)}
             </div>
           </div>
 
@@ -11080,6 +11110,10 @@ Return ONLY valid raw JSON:
           } catch (e) { }
         }
         root.innerHTML = StudyAI.renderChat(threadId);
+        setTimeout(() => {
+          const s = document.getElementById("studyai-chat-scroll");
+          if (s) s.scrollTop = s.scrollHeight;
+        }, 0);
       } else if (path.startsWith("/study/reader")) {
         root.innerHTML = StudyAI.renderReader();
       } else if (path.startsWith("/study/downloader")) {
